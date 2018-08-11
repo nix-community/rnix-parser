@@ -1,4 +1,4 @@
-use crate::value::Value;
+use crate::value::{Anchor, Value};
 use std::iter::Peekable;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -14,7 +14,11 @@ pub enum Token {
     Add,
     Sub,
     Mul,
-    Div
+    Div,
+    Let,
+    In,
+    With,
+    Import
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -32,7 +36,16 @@ pub enum TokenizeError {
     #[fail(display = "unexpected eof")]
     UnexpectedEOF,
     #[fail(display = "undefined token")]
-    UndefinedToken
+    UndefinedToken,
+    #[fail(display = "paths cannot have a trailing slash")]
+    TrailingSlash
+}
+
+fn is_valid_path_char(c: char) -> bool {
+    match c {
+        'a'..='z' | 'A'..='Z' | '0'..='9' | '/' | '_' | '.' | '+' | '-' => true,
+        _ => false
+    }
 }
 
 pub struct Tokenizer<I>
@@ -54,18 +67,7 @@ impl<I> Tokenizer<I>
             span_start: (0, 0)
         }
     }
-    fn next(&mut self) -> Option<char> {
-        let c = self.iter.next();
-        match c {
-            Some('\n') => {
-                self.col = 0;
-                self.row += 1;
-            },
-            Some(_) => self.col += 1,
-            None => ()
-        }
-        c
-    }
+
     fn span_start(&mut self) {
         self.span_start = (self.row, self.col);
     }
@@ -86,6 +88,38 @@ impl<I> Tokenizer<I>
             },
             Ok(token)
         ))
+    }
+
+    fn next(&mut self) -> Option<char> {
+        let c = self.iter.next();
+        match c {
+            Some('\n') => {
+                self.col = 0;
+                self.row += 1;
+            },
+            Some(_) => self.col += 1,
+            None => ()
+        }
+        c
+    }
+    fn next_ident<F>(&mut self, prefix: Option<char>, mut include: F) -> String
+        where F: FnMut(char) -> bool
+    {
+        let mut ident = String::new();
+        if let Some(c) = prefix {
+            ident.push(c);
+        }
+        loop {
+            match self.iter.peek() {
+                Some(c) => if include(*c) {
+                    ident.push(self.next().unwrap())
+                } else {
+                    break;
+                },
+                _ => break,
+            }
+        }
+        ident
     }
 }
 impl<I> Iterator for Tokenizer<I>
@@ -110,23 +144,55 @@ impl<I> Iterator for Tokenizer<I>
             '+' => self.span_end(Token::Add),
             '-' => self.span_end(Token::Sub),
             '*' => self.span_end(Token::Mul),
-            '/' => self.span_end(Token::Div),
-            'a'..='z' | 'A'..='Z' => {
-                let mut ident = String::new();
-                ident.push(c);
-                loop {
-                    match self.iter.peek() {
-                        None => break,
-                        // TODO: Some(&('a'..='z')) | Some(&('A'..='Z')) | Some(&('0'..='9'))
-                        Some(c) => match *c {
-                            'a'..='z' | 'A'..='Z' | '0'..='9' => {
-                                ident.push(self.next()?);
-                            },
-                            _ => break
-                        }
+            '/' => {
+                match self.iter.peek() {
+                    Some(c) if c.is_whitespace() => self.span_end(Token::Div),
+                    None => self.span_end(Token::Div),
+                    Some(_) => {
+                        let ident = self.next_ident(Some(c), is_valid_path_char);
+                        self.span_end(Token::Value(Value::Path(Anchor::Absolute, ident)))
                     }
                 }
-                self.span_end(Token::Ident(ident))
+            },
+            '.' | '~' => {
+                let anchor = match c {
+                    '.' => Anchor::Relative,
+                    '~' => Anchor::Home,
+                    _ => unreachable!()
+                };
+                if self.next() != Some('/') {
+                    return self.span_err(TokenizeError::UndefinedToken);
+                }
+                let ident = self.next_ident(None, is_valid_path_char);
+                if ident.ends_with('/') {
+                    return self.span_err(TokenizeError::TrailingSlash);
+                }
+                self.span_end(Token::Value(Value::Path(anchor, ident)))
+            },
+            '<' => {
+                let ident = self.next_ident(None, is_valid_path_char);
+                if self.next() != Some('>') {
+                    return self.span_err(TokenizeError::UndefinedToken);
+                }
+                self.span_end(Token::Value(Value::Path(Anchor::Store, ident)))
+            },
+            'a'..='z' | 'A'..='Z' => {
+                let mut path = false;
+                let ident = self.next_ident(Some(c), |c| match c {
+                    // TODO: SOMEHOW, support + and - here, but only if it's a path,
+                    // which we don't know before-hand without cloning the iterator
+                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' => true,
+                    '/' => { path = true; true },
+                    _ => false
+                });
+                self.span_end(match &*ident {
+                    "let" => Token::Let,
+                    "in" => Token::In,
+                    "with" => Token::With,
+                    "import" => Token::Import,
+                    _ if path => Token::Value(Value::Path(Anchor::Relative, ident)),
+                    _ => Token::Ident(ident),
+                })
             },
             '"' => {
                 let mut literal = String::new();
@@ -231,6 +297,7 @@ pub fn tokenize<I>(input: I) -> impl Iterator<Item = (Span, Result<Token, Tokeni
 
 #[cfg(test)]
 mod tests {
+    use crate::value::{Anchor, Value};
     use super::{Span, Token, TokenizeError};
 
     fn tokenize(input: &str) -> Result<Vec<Token>, TokenizeError> {
@@ -320,6 +387,49 @@ string :D
                 Token::Sub, Token::ParenOpen,
                     Token::Value(3.into()), Token::Sub, Token::Value(2.into()),
                 Token::ParenClose
+            ])
+        );
+    }
+    #[test]
+    fn let_in() {
+        assert_eq!(
+            tokenize("let a = 3; in a"),
+            Ok(vec![
+                Token::Let,
+                    Token::Ident("a".into()), Token::Equal, Token::Value(3.into()), Token::Semicolon,
+                Token::In,
+                    Token::Ident("a".into())
+            ])
+        );
+    }
+    #[test]
+    fn with() {
+        assert_eq!(
+            tokenize("with namespace; expr"),
+            Ok(vec![
+                Token::With, Token::Ident("namespace".into()), Token::Semicolon,
+                Token::Ident("expr".into())
+            ])
+        );
+    }
+    #[test]
+    fn paths() {
+        fn path(anchor: Anchor, path: &str) -> Result<Vec<Token>, TokenizeError> {
+            Ok(vec![Token::Value(Value::Path(anchor, path.into()))])
+        }
+        assert_eq!(tokenize("/hello/world"), path(Anchor::Absolute, "/hello/world"));
+        assert_eq!(tokenize("hello/world"), path(Anchor::Relative, "hello/world"));
+        assert_eq!(tokenize("./hello/world"), path(Anchor::Relative, "hello/world"));
+        assert_eq!(tokenize("~/hello/world"), path(Anchor::Home, "hello/world"));
+        assert_eq!(tokenize("<hello/world>"), path(Anchor::Store, "hello/world"));
+    }
+    #[test]
+    fn import() {
+        assert_eq!(
+            tokenize("import <nixpkgs>"),
+            Ok(vec![
+                Token::Import,
+                Token::Value(Value::Path(Anchor::Store, "nixpkgs".into()))
             ])
         );
     }

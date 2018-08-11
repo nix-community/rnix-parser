@@ -24,10 +24,7 @@ You can check the `tests/` directory to see what is currently implemented.
 
 **TODO**:
 
- - let..in
- - with
- - import
- - paths and urls
+ - urls
  - lists
  - combining lists and strings
  - lambdas

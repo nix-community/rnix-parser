@@ -7,6 +7,23 @@ macro_rules! nix_inner {
             $((String::from(stringify!($ident)), nix_inner!($($val)*))),*
         ])
     }};
+    (let {
+        $($ident:ident = ($($val:tt)*);)*
+    } in $($remaining:tt)*) => {{
+        AST::LetIn(
+            vec![$((String::from(stringify!($ident)), nix_inner!($($val)*))),*],
+            Box::new(nix_inner!($($remaining)*))
+        )
+    }};
+    (with ($($namespace:tt)*); $($remaining:tt)*) => {{
+        AST::With(Box::new((
+            nix_inner!($($namespace)*),
+            nix_inner!($($remaining)*)
+        )))
+    }};
+    (import ($($path:tt)*)) => {{
+        AST::Import(Box::new(nix_inner!($($path)*)))
+    }};
     (($($val1:tt)*) + ($($val2:tt)*)) => {{
         AST::Add(Box::new((nix_inner!($($val1)*), nix_inner!($($val2)*))))
     }};
@@ -19,16 +36,23 @@ macro_rules! nix_inner {
     (($($val1:tt)*) / ($($val2:tt)*)) => {{
         AST::Div(Box::new((nix_inner!($($val1)*), nix_inner!($($val2)*))))
     }};
+    ($val:ident) => {{
+        AST::Var(String::from(stringify!($val)))
+    }};
+    (./$val:expr) => {{
+        AST::Value(Value::Path(Anchor::Relative, String::from($val)))
+    }};
     ($val:expr) => {{
         AST::Value(Value::from($val))
-    }}
+    }};
 }
 #[macro_export]
 macro_rules! nix {
     ($($tokens:tt)*) => {{
+        #[allow(unused_imports)]
         use crate::{
             parser::AST,
-            value::Value
+            value::{Anchor, Value}
         };
         nix_inner!($($tokens)*)
     }}

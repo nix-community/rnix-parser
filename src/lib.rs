@@ -41,5 +41,17 @@ string :D
             parse(include_str!("../tests/math.nix")),
             nix!(((1) + ((2) * (3))) + ((4) / ((5) - (6))))
         );
+        assert_eq!(
+            parse(include_str!("../tests/with-import-let-in.nix")),
+            nix!(
+                with (import (./"simple-set.nix"));
+
+                let {
+                    a = ((4) + (2));
+                } in {
+                    b = ((a) + (2));
+                }
+            )
+        );
     }
 }

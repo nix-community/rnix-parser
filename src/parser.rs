@@ -14,9 +14,15 @@ pub enum ParseError {
     Unexpected(Token)
 }
 
+type Set = Vec<(String, AST)>;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
-    Set(Vec<(String, AST)>),
+    Set(Set),
+    LetIn(Set, Box<AST>),
+    With(Box<(AST, AST)>),
+    Import(Box<AST>),
+    Var(String),
     Negate(Box<AST>),
     // Could also do Add(Box<AST>, Box<AST>), but I believe this is more
     // efficient.
@@ -73,6 +79,7 @@ impl<I> Parser<I>
             },
             (_, Token::Sub) => AST::Negate(Box::new(self.parse_val()?)),
             (_, Token::Value(val)) => AST::Value(val),
+            (_, Token::Ident(name)) => AST::Var(name),
             (span, token) => return Err((Some(span), ParseError::Unexpected(token)))
         })
     }
@@ -113,25 +120,47 @@ impl<I> Parser<I>
         Ok(val)
     }
 
+    pub fn parse_set(&mut self) -> Result<Set> {
+        let mut values = Vec::new();
+        while let &Token::Ident(_) = self.peek()? {
+            let key = match self.next()? {
+                (_, Token::Ident(name)) => name,
+                _ => unreachable!()
+            };
+            self.expect(Token::Equal)?;
+            let value = self.parse_expr()?;
+            self.expect(Token::Semicolon)?;
+
+            values.push((key, value));
+        }
+        Ok(values)
+    }
+
     pub fn parse_expr(&mut self) -> Result<AST> {
         Ok(match self.peek()? {
             Token::BracketOpen => {
                 self.next()?;
-
-                let mut values = Vec::new();
-                while let &Token::Ident(_) = self.peek()? {
-                    let key = match self.next()? {
-                        (_, Token::Ident(name)) => name,
-                        _ => unreachable!()
-                    };
-                    self.expect(Token::Equal)?;
-                    let value = self.parse_expr()?;
-                    self.expect(Token::Semicolon)?;
-
-                    values.push((key, value));
-                }
+                let values = self.parse_set()?;
                 self.expect(Token::BracketClose)?;
                 AST::Set(values)
+            },
+            Token::Let => {
+                self.next()?;
+                let vars = self.parse_set()?;
+                self.expect(Token::In)?;
+                let expr = self.parse_expr()?;
+                AST::LetIn(vars, Box::new(expr))
+            },
+            Token::With => {
+                self.next()?;
+                let vars = self.parse_expr()?;
+                self.expect(Token::Semicolon)?;
+                let expr = self.parse_expr()?;
+                AST::With(Box::new((vars, expr)))
+            },
+            Token::Import => {
+                self.next()?;
+                AST::Import(Box::new(self.parse_expr()?))
             },
             _ => self.parse_add()?
         })
@@ -146,7 +175,10 @@ pub fn parse<I>(iter: I) -> Result<AST>
 
 #[cfg(test)]
 mod tests {
-    use crate::tokenizer::{Span, Token};
+    use crate::{
+        tokenizer::{Span, Token},
+        value::{Anchor, Value}
+    };
     use super::{parse, AST, ParseError};
 
     macro_rules! test {
@@ -213,6 +245,46 @@ mod tests {
                     AST::Value(2.into()),
                 )))))
             ))))
+        );
+    }
+    #[test]
+    fn let_in() {
+        assert_eq!(
+            parse(test![
+                Token::Let,
+                    Token::Ident("a".into()), Token::Equal, Token::Value(42.into()), Token::Semicolon,
+                Token::In,
+                    Token::Ident("a".into())
+            ]),
+            Ok(AST::LetIn(
+                vec![("a".into(), AST::Value(42.into()))],
+                Box::new(AST::Var("a".into()))
+            ))
+        );
+    }
+    #[test]
+    fn with() {
+        assert_eq!(
+            parse(test![
+                Token::With, Token::Ident("namespace".into()), Token::Semicolon,
+                Token::Ident("expr".into())
+            ]),
+            Ok(AST::With(Box::new((
+                AST::Var("namespace".into()),
+                AST::Var("expr".into())
+            ))))
+        );
+    }
+    #[test]
+    fn import() {
+        assert_eq!(
+            parse(test![
+                Token::Import,
+                Token::Value(Value::Path(Anchor::Store, "nixpkgs".into()))
+            ]),
+            Ok(AST::Import(Box::new(
+                AST::Value(Value::Path(Anchor::Store, "nixpkgs".into()))
+            )))
         );
     }
 }

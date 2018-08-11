@@ -1,8 +1,17 @@
 #[derive(Clone, Debug, PartialEq)]
+pub enum Anchor {
+    Absolute,
+    Relative,
+    Home,
+    Store
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Integer(i64),
     Float(f64),
-    Str(String)
+    Str(String),
+    Path(Anchor, String)
 }
 
 impl From<i64> for Value {
