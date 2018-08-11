@@ -13,7 +13,8 @@ and a lot more!
 rust-nix ...
 
  - will always maintain span information (line number and column) so the error
-   messages can be as useful as possible.
+   messages can be as useful as possible and any syntax highlighting plugin
+   could use the tokenizer to highlight.
  - works on top of Rust iterators, which are lazy by design. Less heap
    allocations, yay!
 

@@ -20,7 +20,8 @@ pub enum AST {
     Value(Value)
 }
 
-type Return = Result<AST, ParseError>;
+type Error = (Option<Span>, ParseError);
+type Result<T> = std::result::Result<T, Error>;
 
 pub struct Parser<I>
     where I: Iterator<Item = (Span, Token)>
@@ -34,32 +35,35 @@ impl<I> Parser<I>
         Self { iter }
     }
 
-    pub fn peek(&mut self) -> Result<&Token, ParseError> {
+    pub fn peek(&mut self) -> Result<&Token> {
         self.iter.peek()
             .map(|(_, token)| token)
-            .ok_or(ParseError::UnexpectedEOF)
+            .ok_or((None, ParseError::UnexpectedEOF))
     }
-    pub fn next(&mut self) -> Result<Token, ParseError> {
+    pub fn next(&mut self) -> Result<(Span, Token)> {
         self.iter.next()
-            .map(|(_, token)| token)
-            .ok_or(ParseError::UnexpectedEOF)
+            .map(|entry| entry)
+            .ok_or((None, ParseError::UnexpectedEOF))
     }
-    pub fn expect(&mut self, expected: Token) -> Result<(), ParseError> {
-        let actual = self.iter.next().map(|(_, token)| token);
-        if actual.as_ref() == Some(&expected) {
-            Ok(())
+    pub fn expect(&mut self, expected: Token) -> Result<()> {
+        if let Some((span, actual)) = self.iter.next() {
+            if actual == expected {
+                Ok(())
+            } else {
+                Err((Some(span), ParseError::Expected(expected, Some(actual))))
+            }
         } else {
-            Err(ParseError::Expected(expected, actual))
+            Err((None, ParseError::Expected(expected, None)))
         }
     }
 
-    pub fn parse_expr(&mut self) -> Return {
+    pub fn parse_expr(&mut self) -> Result<AST> {
         Ok(match self.next()? {
-            Token::BracketOpen => {
+            (_, Token::BracketOpen) => {
                 let mut values = Vec::new();
                 while let &Token::Ident(_) = self.peek()? {
                     let key = match self.next()? {
-                        Token::Ident(name) => name,
+                        (_, Token::Ident(name)) => name,
                         _ => unreachable!()
                     };
                     self.expect(Token::Equal)?;
@@ -71,13 +75,13 @@ impl<I> Parser<I>
                 self.expect(Token::BracketClose)?;
                 AST::Set(values)
             },
-            Token::Value(value) => AST::Value(value),
-            token => return Err(ParseError::Unexpected(token))
+            (_, Token::Value(value)) => AST::Value(value),
+            (span, token) => return Err((Some(span), ParseError::Unexpected(token)))
         })
     }
 }
 
-pub fn parse<I>(iter: I) -> Return
+pub fn parse<I>(iter: I) -> Result<AST>
     where I: IntoIterator<Item = (Span, Token)>
 {
     Parser::new(iter.into_iter().peekable()).parse_expr()
@@ -86,7 +90,7 @@ pub fn parse<I>(iter: I) -> Return
 #[cfg(test)]
 mod tests {
     use crate::tokenizer::{Span, Token};
-    use super::{parse, AST};
+    use super::{parse, AST, ParseError};
 
     macro_rules! test {
         ($($token:expr),*) => {
@@ -112,5 +116,18 @@ mod tests {
                 ("H4X0RNUM83R".into(), AST::Value(1.337.into()))
             ]))
         );
+    }
+    #[test]
+    fn spans() {
+        assert_eq!(
+            parse(vec![
+                (Span::default(), Token::BracketOpen),
+                (Span { start: (4, 2), end: None }, Token::Semicolon),
+            ].into_iter()),
+            Err((
+                Some(Span { start: (4, 2), end: None }),
+                ParseError::Expected(Token::BracketClose, Some(Token::Semicolon))
+            ))
+        )
     }
 }
