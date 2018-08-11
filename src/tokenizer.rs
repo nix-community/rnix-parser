@@ -7,9 +7,14 @@ pub enum Token {
     BracketClose,
     Equal,
     Semicolon,
-    //Negate,
     Ident(String),
-    Value(Value)
+    Value(Value),
+    ParenOpen,
+    ParenClose,
+    Add,
+    Sub,
+    Mul,
+    Div
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -100,7 +105,12 @@ impl<I> Iterator for Tokenizer<I>
             '}' => self.span_end(Token::BracketClose),
             '=' => self.span_end(Token::Equal),
             ';' => self.span_end(Token::Semicolon),
-            //'-' => self.span_end(Token::Negate),
+            '(' => self.span_end(Token::ParenOpen),
+            ')' => self.span_end(Token::ParenClose),
+            '+' => self.span_end(Token::Add),
+            '-' => self.span_end(Token::Sub),
+            '*' => self.span_end(Token::Mul),
+            '/' => self.span_end(Token::Div),
             'a'..='z' | 'A'..='Z' => {
                 let mut ident = String::new();
                 ident.push(c);
@@ -294,6 +304,22 @@ multiline
 string :D
 \'\'\'\'\"#.into()),
                 Token::Semicolon, Token::BracketClose
+            ])
+        );
+    }
+    #[test]
+    fn math() {
+        assert_eq!(
+            tokenize("1 + 2 * 3"),
+            Ok(vec![Token::Value(1.into()), Token::Add, Token::Value(2.into()), Token::Mul, Token::Value(3.into())])
+        );
+        assert_eq!(
+            tokenize("5 * -(3 - 2)"),
+            Ok(vec![
+                Token::Value(5.into()), Token::Mul,
+                Token::Sub, Token::ParenOpen,
+                    Token::Value(3.into()), Token::Sub, Token::Value(2.into()),
+                Token::ParenClose
             ])
         );
     }

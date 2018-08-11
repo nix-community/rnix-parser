@@ -17,6 +17,13 @@ pub enum ParseError {
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
     Set(Vec<(String, AST)>),
+    Negate(Box<AST>),
+    // Could also do Add(Box<AST>, Box<AST>), but I believe this is more
+    // efficient.
+    Add(Box<(AST, AST)>),
+    Sub(Box<(AST, AST)>),
+    Mul(Box<(AST, AST)>),
+    Div(Box<(AST, AST)>),
     Value(Value)
 }
 
@@ -57,9 +64,60 @@ impl<I> Parser<I>
         }
     }
 
-    pub fn parse_expr(&mut self) -> Result<AST> {
+    pub fn parse_val(&mut self) -> Result<AST> {
         Ok(match self.next()? {
-            (_, Token::BracketOpen) => {
+            (_, Token::ParenOpen) => {
+                let expr = self.parse_expr()?;
+                self.expect(Token::ParenClose)?;
+                expr
+            },
+            (_, Token::Sub) => AST::Negate(Box::new(self.parse_val()?)),
+            (_, Token::Value(val)) => AST::Value(val),
+            (span, token) => return Err((Some(span), ParseError::Unexpected(token)))
+        })
+    }
+
+    pub fn parse_mul(&mut self) -> Result<AST> {
+        let mut val = self.parse_val()?;
+        loop {
+            match self.iter.peek() {
+                Some(&(_, Token::Mul)) => {
+                    self.next()?;
+                    val = AST::Mul(Box::new((val, self.parse_val()?)));
+                },
+                Some(&(_, Token::Div)) => {
+                    self.next()?;
+                    val = AST::Div(Box::new((val, self.parse_val()?)));
+                },
+                _ => break
+            }
+        }
+        Ok(val)
+    }
+
+    pub fn parse_add(&mut self) -> Result<AST> {
+        let mut val = self.parse_mul()?;
+        loop {
+            match self.iter.peek() {
+                Some(&(_, Token::Add)) => {
+                    self.next()?;
+                    val = AST::Add(Box::new((val, self.parse_mul()?)));
+                },
+                Some(&(_, Token::Sub)) => {
+                    self.next()?;
+                    val = AST::Sub(Box::new((val, self.parse_mul()?)));
+                },
+                _ => break
+            }
+        }
+        Ok(val)
+    }
+
+    pub fn parse_expr(&mut self) -> Result<AST> {
+        Ok(match self.peek()? {
+            Token::BracketOpen => {
+                self.next()?;
+
                 let mut values = Vec::new();
                 while let &Token::Ident(_) = self.peek()? {
                     let key = match self.next()? {
@@ -75,8 +133,7 @@ impl<I> Parser<I>
                 self.expect(Token::BracketClose)?;
                 AST::Set(values)
             },
-            (_, Token::Value(value)) => AST::Value(value),
-            (span, token) => return Err((Some(span), ParseError::Unexpected(token)))
+            _ => self.parse_add()?
         })
     }
 }
@@ -129,5 +186,33 @@ mod tests {
                 ParseError::Expected(Token::BracketClose, Some(Token::Semicolon))
             ))
         )
+    }
+    #[test]
+    fn math() {
+        assert_eq!(
+            parse(test![Token::Value(1.into()), Token::Add, Token::Value(2.into()), Token::Mul, Token::Value(3.into())]),
+            Ok(AST::Add(Box::new((
+                AST::Value(1.into()),
+                AST::Mul(Box::new((
+                    AST::Value(2.into()),
+                    AST::Value(3.into()),
+                )))
+            ))))
+        );
+        assert_eq!(
+            parse(test![
+                Token::Value(5.into()), Token::Mul,
+                Token::Sub, Token::ParenOpen,
+                    Token::Value(3.into()), Token::Sub, Token::Value(2.into()),
+                Token::ParenClose
+            ]),
+            Ok(AST::Mul(Box::new((
+                AST::Value(5.into()),
+                AST::Negate(Box::new(AST::Sub(Box::new((
+                    AST::Value(3.into()),
+                    AST::Value(2.into()),
+                )))))
+            ))))
+        );
     }
 }
