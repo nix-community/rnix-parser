@@ -1,0 +1,10 @@
+cargo-features = ["edition"]
+
+[package]
+authors = ["jD91mZM2 <me@krake.one>"]
+edition = "2018"
+name = "rust-nix"
+version = "0.1.0"
+
+[dependencies]
+failure = "0.1.2"
