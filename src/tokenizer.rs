@@ -1,4 +1,5 @@
 use crate::value::{Anchor, Value};
+use std::mem;
 
 #[derive(PartialEq, Eq)]
 enum IdentType {
@@ -8,13 +9,21 @@ enum IdentType {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum Interpol {
+    Literal(String),
+    Tokens(Vec<(Span, Token)>)
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     BracketOpen,
     BracketClose,
     Equal,
     Semicolon,
+    Dot,
     Ident(String),
     Value(Value),
+    Interpol(Vec<Interpol>),
     ParenOpen,
     ParenClose,
     Add,
@@ -114,27 +123,111 @@ impl<'a> Tokenizer<'a> {
         }
         c
     }
-    fn peek(&mut self) -> Option<char> {
+    fn peek(&self) -> Option<char> {
         self.input.chars().next()
     }
-    fn next_ident<F>(&mut self, prefix: Option<char>, mut include: F) -> String
-        where F: FnMut(char) -> bool
+    fn next_ident<F>(&mut self, prefix: Option<char>, include: F) -> String
+        where F: Fn(char) -> bool
     {
-        let mut ident = String::new();
+        let capacity = self.input.chars().take_while(|&c| include(c)).count()
+            + if prefix.is_some() { 1 } else { 0 };
+        let mut ident = String::with_capacity(capacity);
+        let initial_pointer = ident.as_ptr();
         if let Some(c) = prefix {
             ident.push(c);
         }
         loop {
             match self.peek() {
-                Some(c) => if include(c) {
-                    ident.push(self.next().unwrap())
-                } else {
-                    break;
-                },
+                Some(c) if include(c) => ident.push(self.next().unwrap()),
                 _ => break,
             }
         }
+        assert_eq!(ident.as_ptr(), initial_pointer, "String reallocated, wasn't given enough capacity");
         ident
+    }
+
+    fn next_string(&mut self, multiline: bool) -> Option<(Span, Result<Token, TokenizeError>)> {
+        let mut interpol = Vec::new();
+        let mut literal = String::new();
+        loop {
+            match self.peek() {
+                None => return self.span_err(TokenizeError::UnexpectedEOF),
+                Some('"') if !multiline => { self.next(); break },
+                Some('\'') if multiline => match { self.next()?; self.peek() } {
+                    None => return self.span_err(TokenizeError::UnexpectedEOF),
+                    Some('\'') => { self.next()?; break; },
+                    Some(_) => literal.push('\''),
+                },
+                Some('\n') if multiline => {
+                    // Don't push initial newline
+                    self.next()?;
+                    if !literal.is_empty() {
+                        literal.push('\n');
+                    }
+                    while self.peek() == Some(' ')
+                            || self.peek() == Some('\t') {
+                        self.next();
+                    }
+                },
+                Some('\\') if !multiline => {
+                    self.next()?;
+                    literal.push(self.next()?);
+                },
+                Some('$') => match { self.next(); self.peek() } {
+                    Some('{') => {
+                        self.next()?;
+                        interpol.push(Interpol::Literal(mem::replace(&mut literal, String::new())));
+
+                        let mut tokens = Vec::new();
+                        let mut count = 0;
+                        loop {
+                            let start_backup = self.span_start;
+                            let token = Iterator::next(self);
+                            self.span_start = start_backup;
+
+                            match token {
+                                None => return self.span_err(TokenizeError::UnexpectedEOF),
+                                Some(token) => {
+                                    let token = match token {
+                                        result @ (_, Err(_)) => return Some(result),
+                                        (span, Ok(token)) => (span, token)
+                                    };
+                                    match token.1 {
+                                        Token::BracketOpen => count += 1,
+                                        Token::BracketClose if count == 0 => break,
+                                        Token::BracketClose => count -= 1,
+                                        _ => ()
+                                    }
+                                    tokens.push(token);
+                                }
+                            }
+                        }
+
+                        interpol.push(Interpol::Tokens(tokens));
+                    },
+                    _ => literal.push('$')
+                }
+                Some(_) => {
+                    literal.push(self.next()?);
+                }
+            }
+        }
+
+        if multiline {
+            // Remove all trailing newlines
+            while literal.chars().last() == Some('\n') {
+                literal.pop();
+            }
+        }
+
+        if interpol.is_empty() {
+            self.span_end(Token::Value(Value::Str(literal)))
+        } else {
+            if !literal.is_empty() {
+                interpol.push(Interpol::Literal(literal));
+            }
+            self.span_end(Token::Interpol(interpol))
+        }
     }
 }
 impl<'a> Iterator for Tokenizer<'a> {
@@ -167,21 +260,20 @@ impl<'a> Iterator for Tokenizer<'a> {
                     }
                 }
             },
-            '.' | '~' => {
+            '.' | '~' if self.peek() == Some('/') => {
+                self.next()?; // the slash
                 let anchor = match c {
                     '.' => Anchor::Relative,
                     '~' => Anchor::Home,
                     _ => unreachable!()
                 };
-                if self.next() != Some('/') {
-                    return self.span_err(TokenizeError::UndefinedToken);
-                }
                 let ident = self.next_ident(None, is_valid_path_char);
                 if ident.ends_with('/') {
                     return self.span_err(TokenizeError::TrailingSlash);
                 }
                 self.span_end(Token::Value(Value::Path(anchor, ident)))
             },
+            '.' => self.span_end(Token::Dot),
             '<' => {
                 let ident = self.next_ident(None, is_valid_path_char);
                 if self.next() != Some('>') {
@@ -202,10 +294,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                     _ => IdentType::Ident
                 };
                 let ident = self.next_ident(Some(c), |c| match c {
-                    '/' | '+' | '-' => kind == IdentType::Path || kind == IdentType::Uri,
+                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => true,
                     ':' | '?' | '@' | '&' | '=' | '$' | ',' | '!'
                         | '~' | '*' | '\'' | '%' => kind == IdentType::Uri,
-                    c => is_valid_path_char(c)
+                    c => (kind == IdentType::Path || kind == IdentType::Uri) && is_valid_path_char(c),
                 });
                 if kind == IdentType::Ident {
                     self.span_end(match &*ident {
@@ -223,55 +315,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                     })
                 }
             },
-            '"' => {
-                let mut literal = String::new();
-                loop {
-                    match self.peek() {
-                        None => return self.span_err(TokenizeError::UnexpectedEOF),
-                        Some('"') => { self.next(); break },
-                        Some('\\') => {
-                            self.next()?;
-                            literal.push(self.next()?);
-                        },
-                        Some(_) => {
-                            literal.push(self.next()?);
-                        }
-                    }
-                }
-                self.span_end(Token::Value(Value::Str(literal)))
-            },
-            '\'' => {
-                if self.next() != Some('\'') {
-                    return self.span_err(TokenizeError::UndefinedToken);
-                }
-                let mut multiline = String::new();
-                loop {
-                    match self.peek() {
-                        None => return self.span_err(TokenizeError::UnexpectedEOF),
-                        Some('\'') => match { self.next()?; self.peek() } {
-                            None => return self.span_err(TokenizeError::UnexpectedEOF),
-                            Some('\'') => { self.next()?; break; },
-                            Some(_) => multiline.push('\''),
-                        },
-                        Some('\n') => {
-                            // Don't push initial newline
-                            self.next()?;
-                            if !multiline.is_empty() {
-                                multiline.push('\n');
-                            }
-                            while self.peek() == Some(' ')
-                                    || self.peek() == Some('\t') {
-                                self.next();
-                            }
-                        },
-                        Some(_) => multiline.push(self.next()?),
-                    }
-                }
-                // Remove all trailing newlines
-                while multiline.chars().last() == Some('\n') {
-                    multiline.pop();
-                }
-                self.span_end(Token::Value(Value::Str(multiline)))
+            '"' => self.next_string(false),
+            '\'' if self.peek() == Some('\'') => {
+                self.next()?;
+                self.next_string(true)
             },
             '0'..='9' => {
                 // Could use built-in rust parse function here, however that
@@ -325,11 +372,18 @@ pub fn tokenize<'a>(input: &'a str) -> impl Iterator<Item = (Span, Result<Token,
 #[cfg(test)]
 mod tests {
     use crate::value::{Anchor, Value};
-    use super::{Span, Token, TokenizeError};
+    use super::{Interpol, Span, Token, TokenizeError};
 
     fn tokenize(input: &str) -> Result<Vec<Token>, TokenizeError> {
         super::tokenize(input)
             .map(|(_, result)| result)
+            .collect()
+    }
+    fn tokenize_span(input: &str) -> Result<Vec<(Span, Token)>, (Span, TokenizeError)> {
+        super::tokenize(input)
+            .map(|(span, result)| result
+                .map(|token| (span, token))
+                .map_err(|err| (span, err)))
             .collect()
     }
 
@@ -360,9 +414,7 @@ mod tests {
     #[test]
     fn spans() {
         assert_eq!(
-            super::tokenize("{\n    int = 1;\n}")
-                .map(|(span, result)| result.map(|token| (span, token)))
-                .collect::<Result<Vec<(Span, Token)>, TokenizeError>>(),
+            tokenize_span("{\n    int = 1;\n}"),
             Ok(vec![
                (Span { start: (0,  0), end: Some((0,  1)) }, Token::BracketOpen),
                (Span { start: (1,  4), end: Some((1,  7)) }, Token::Ident("int".to_string())),
@@ -373,9 +425,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            super::tokenize("{\n    overflow = 9999999999999999999999999999")
-                .map(|(span, result)| result.map_err(|err| (span, err)))
-                .collect::<Result<Vec<Token>, (Span, TokenizeError)>>(),
+            tokenize_span("{\n    overflow = 9999999999999999999999999999"),
             Err((Span { start: (1, 15), end: None }, TokenizeError::IntegerOverflow))
         );
     }
@@ -399,6 +449,29 @@ string :D
 \'\'\'\'\"#.into()),
                 Token::Semicolon, Token::BracketClose
             ])
+        );
+    }
+    #[test]
+    fn interpolation() {
+        assert_eq!(
+            tokenize_span(r#" "Hello, ${ { world = "World"; }.world }!" "#),
+            Ok(vec![(
+                Span { start: (0, 1), end: Some((0, 42)) },
+                Token::Interpol(vec![
+                    Interpol::Literal("Hello, ".into()),
+                    Interpol::Tokens(vec![
+                        (Span { start: (0, 12), end: Some((0, 13)) }, Token::BracketOpen),
+                        (Span { start: (0, 14), end: Some((0, 19)) }, Token::Ident("world".into())),
+                        (Span { start: (0, 20), end: Some((0, 21)) }, Token::Equal),
+                        (Span { start: (0, 22), end: Some((0, 29)) }, Token::Value("World".into())),
+                        (Span { start: (0, 29), end: Some((0, 30)) }, Token::Semicolon),
+                        (Span { start: (0, 31), end: Some((0, 32)) }, Token::BracketClose),
+                        (Span { start: (0, 32), end: Some((0, 33)) }, Token::Dot),
+                        (Span { start: (0, 33), end: Some((0, 38)) }, Token::Ident("world".into()))
+                    ]),
+                    Interpol::Literal("!".into())
+                ])
+            )])
         );
     }
     #[test]

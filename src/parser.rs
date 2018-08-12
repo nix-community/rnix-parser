@@ -1,11 +1,8 @@
 use crate::{
-    tokenizer::{Span, Token},
+    tokenizer::{Interpol as TokenInterpol, Span, Token},
     value::Value
 };
-use std::{
-    iter::Peekable,
-    ops::Deref
-};
+use std::iter::Peekable;
 
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum ParseError {
@@ -23,12 +20,10 @@ pub type SetNoSpan = Vec<(String, ASTNoSpan)>;
 #[derive(Clone, Debug, PartialEq)]
 pub struct AST(Span, ASTType);
 
-impl Deref for AST {
-    type Target = ASTType;
-
-    fn deref(&self) -> &Self::Target {
-        &self.1
-    }
+#[derive(Clone, Debug, PartialEq)]
+pub enum Interpol {
+    Literal(String),
+    AST(AST)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -45,7 +40,23 @@ pub enum ASTType {
     Sub(Box<(AST, AST)>),
     Mul(Box<(AST, AST)>),
     Div(Box<(AST, AST)>),
+    Interpol(Vec<Interpol>),
     Value(Value)
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum InterpolNoSpan {
+    Literal(String),
+    AST(ASTNoSpan)
+}
+
+impl From<Interpol> for InterpolNoSpan {
+    fn from(interpol: Interpol) -> Self {
+        match interpol {
+            Interpol::Literal(text) => InterpolNoSpan::Literal(text),
+            Interpol::AST(ast) => InterpolNoSpan::AST(ASTNoSpan::from(ast))
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -60,12 +71,18 @@ pub enum ASTNoSpan {
     Sub(Box<(ASTNoSpan, ASTNoSpan)>),
     Mul(Box<(ASTNoSpan, ASTNoSpan)>),
     Div(Box<(ASTNoSpan, ASTNoSpan)>),
+    Interpol(Vec<InterpolNoSpan>),
     Value(Value)
 }
 
 fn set_discard_span(set: Set) -> SetNoSpan {
     set.into_iter()
         .map(|(name, ast)| (name, ASTNoSpan::from(ast)))
+        .collect()
+}
+fn vec_into<F, T: From<F>>(vec: Vec<F>) -> Vec<T> {
+    vec.into_iter()
+        .map(|item| T::from(item))
         .collect()
 }
 fn discard_span(ast: Box<AST>) -> Box<ASTNoSpan> {
@@ -88,6 +105,7 @@ impl From<AST> for ASTNoSpan {
             ASTType::Sub(inner) => ASTNoSpan::Sub(tuple_discard_span(inner)),
             ASTType::Mul(inner) => ASTNoSpan::Mul(tuple_discard_span(inner)),
             ASTType::Div(inner) => ASTNoSpan::Div(tuple_discard_span(inner)),
+            ASTType::Interpol(inner) => ASTNoSpan::Interpol(vec_into(inner)),
             ASTType::Value(inner) => ASTNoSpan::Value(inner)
         }
     }
@@ -160,6 +178,16 @@ impl<I> Parser<I>
             },
             (span, Token::Value(val)) => AST(span, ASTType::Value(val)),
             (span, Token::Ident(name)) => AST(span, ASTType::Var(name)),
+            (span, Token::Interpol(values)) => {
+                let mut parsed = Vec::new();
+                for value in values {
+                    parsed.push(match value {
+                        TokenInterpol::Literal(text) => Interpol::Literal(text),
+                        TokenInterpol::Tokens(tokens) => Interpol::AST(parse(tokens.into_iter())?)
+                    });
+                }
+                AST(span, ASTType::Interpol(parsed))
+            },
             (span, token) => return Err((Some(span), ParseError::Unexpected(token)))
         })
     }
@@ -237,10 +265,10 @@ pub fn parse<I>(iter: I) -> Result<AST>
 #[cfg(test)]
 mod tests {
     use crate::{
-        tokenizer::{Span, Token},
+        tokenizer::{Interpol as TokenInterpol, Span, Token},
         value::{Anchor, Value}
     };
-    use super::{AST as ASTSpan, ASTNoSpan as AST, ASTType, ParseError};
+    use super::{AST as ASTSpan, ASTNoSpan as AST, ASTType, InterpolNoSpan as Interpol, ParseError};
 
     macro_rules! parse {
         ($($token:expr),*) => {
@@ -378,6 +406,34 @@ mod tests {
             Ok(AST::Import(Box::new(
                 AST::Value(Value::Path(Anchor::Store, "nixpkgs".into()))
             )))
+        );
+    }
+    #[test]
+    fn interpolation() {
+        assert_eq!(
+            parse![
+                Token::Interpol(vec![
+                    TokenInterpol::Literal("Hello, ".into()),
+                    TokenInterpol::Tokens(vec![
+                        (Span { start: (0, 12), end: Some((0, 13)) }, Token::BracketOpen),
+                        (Span { start: (0, 14), end: Some((0, 19)) }, Token::Ident("world".into())),
+                        (Span { start: (0, 20), end: Some((0, 21)) }, Token::Equal),
+                        (Span { start: (0, 22), end: Some((0, 29)) }, Token::Value("World".into())),
+                        (Span { start: (0, 29), end: Some((0, 30)) }, Token::Semicolon),
+                        (Span { start: (0, 31), end: Some((0, 32)) }, Token::BracketClose),
+                        // TODO: (Span { start: (0, 32), end: Some((0, 33)) }, Token::Dot),
+                        // TODO: (Span { start: (0, 33), end: Some((0, 38)) }, Token::Ident("world".into()))
+                    ]),
+                    TokenInterpol::Literal("!".into())
+                ])
+            ],
+            Ok(AST::Interpol(vec![
+                Interpol::Literal("Hello, ".into()),
+                Interpol::AST(AST::Set(vec![
+                    ("world".into(), AST::Value("World".into()))
+                ])),
+                Interpol::Literal("!".into())
+            ]))
         );
     }
 }
