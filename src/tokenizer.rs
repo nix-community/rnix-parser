@@ -1,5 +1,11 @@
 use crate::value::{Anchor, Value};
-use std::iter::Peekable;
+
+#[derive(PartialEq, Eq)]
+enum IdentType {
+    Uri,
+    Path,
+    Ident
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
@@ -48,20 +54,16 @@ fn is_valid_path_char(c: char) -> bool {
     }
 }
 
-pub struct Tokenizer<I>
-    where I: Iterator<Item = char>
-{
-    iter: Peekable<I>,
+pub struct Tokenizer<'a> {
+    input: &'a str,
     row: u64,
     col: u64,
     span_start: (u64, u64)
 }
-impl<I> Tokenizer<I>
-    where I: Iterator<Item = char>
-{
-    pub fn new(iter: Peekable<I>) -> Self {
+impl<'a> Tokenizer<'a> {
+    pub fn new(input: &'a str) -> Self {
         Self {
-            iter,
+            input,
             row: 0,
             col: 0,
             span_start: (0, 0)
@@ -91,16 +93,20 @@ impl<I> Tokenizer<I>
     }
 
     fn next(&mut self) -> Option<char> {
-        let c = self.iter.next();
-        match c {
-            Some('\n') => {
+        let c = self.peek();
+        if let Some(c) = c {
+            self.input = &self.input[c.len_utf8()..];
+            if c == '\n' {
                 self.col = 0;
                 self.row += 1;
-            },
-            Some(_) => self.col += 1,
-            None => ()
+            } else {
+                self.col += 1;
+            }
         }
         c
+    }
+    fn peek(&mut self) -> Option<char> {
+        self.input.chars().next()
     }
     fn next_ident<F>(&mut self, prefix: Option<char>, mut include: F) -> String
         where F: FnMut(char) -> bool
@@ -110,8 +116,8 @@ impl<I> Tokenizer<I>
             ident.push(c);
         }
         loop {
-            match self.iter.peek() {
-                Some(c) => if include(*c) {
+            match self.peek() {
+                Some(c) => if include(c) {
                     ident.push(self.next().unwrap())
                 } else {
                     break;
@@ -122,9 +128,7 @@ impl<I> Tokenizer<I>
         ident
     }
 }
-impl<I> Iterator for Tokenizer<I>
-    where I: Iterator<Item = char>
-{
+impl<'a> Iterator for Tokenizer<'a> {
     type Item = (Span, Result<Token, TokenizeError>);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -145,7 +149,7 @@ impl<I> Iterator for Tokenizer<I>
             '-' => self.span_end(Token::Sub),
             '*' => self.span_end(Token::Mul),
             '/' => {
-                match self.iter.peek() {
+                match self.peek() {
                     Some(c) if c.is_whitespace() => self.span_end(Token::Div),
                     None => self.span_end(Token::Div),
                     Some(_) => {
@@ -177,30 +181,46 @@ impl<I> Iterator for Tokenizer<I>
                 self.span_end(Token::Value(Value::Path(Anchor::Store, ident)))
             },
             'a'..='z' | 'A'..='Z' => {
-                let mut path = false;
-                let ident = self.next_ident(Some(c), |c| match c {
-                    // TODO: SOMEHOW, support + and - here, but only if it's a path,
-                    // which we don't know before-hand without cloning the iterator
-                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' => true,
-                    '/' => { path = true; true },
+                let mut lookahead = self.input.chars().skip_while(|c| match c {
+                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' | '+' | '-' => true,
                     _ => false
                 });
-                self.span_end(match &*ident {
-                    "let" => Token::Let,
-                    "in" => Token::In,
-                    "with" => Token::With,
-                    "import" => Token::Import,
-                    _ if path => Token::Value(Value::Path(Anchor::Relative, ident)),
-                    _ => Token::Ident(ident),
-                })
+                // Check what character is after all these characters to see what
+                // type it is.
+                let kind = match (lookahead.next(), lookahead.next()) {
+                    (Some(':'), Some(c)) if !c.is_whitespace() => IdentType::Uri,
+                    (Some('/'), Some(c)) if !c.is_whitespace() => IdentType::Path,
+                    _ => IdentType::Ident
+                };
+                let ident = self.next_ident(Some(c), |c| match c {
+                    '/' | '+' | '-' => kind == IdentType::Path || kind == IdentType::Uri,
+                    ':' | '?' | '@' | '&' | '=' | '$' | ',' | '!'
+                        | '~' | '*' | '\'' | '%' => kind == IdentType::Uri,
+                    c => is_valid_path_char(c)
+                });
+                if kind == IdentType::Ident {
+                    self.span_end(match &*ident {
+                        "let" => Token::Let,
+                        "in" => Token::In,
+                        "with" => Token::With,
+                        "import" => Token::Import,
+                        _ => Token::Ident(ident),
+                    })
+                } else {
+                    self.span_end(match kind {
+                        IdentType::Ident => Token::Ident(ident),
+                        IdentType::Path => Token::Value(Value::Path(Anchor::Relative, ident)),
+                        IdentType::Uri => Token::Value(Value::Path(Anchor::Uri, ident)),
+                    })
+                }
             },
             '"' => {
                 let mut literal = String::new();
                 loop {
-                    match self.iter.peek() {
+                    match self.peek() {
                         None => return self.span_err(TokenizeError::UnexpectedEOF),
-                        Some(&'"') => { self.next(); break },
-                        Some(&'\\') => {
+                        Some('"') => { self.next(); break },
+                        Some('\\') => {
                             self.next()?;
                             literal.push(self.next()?);
                         },
@@ -212,26 +232,26 @@ impl<I> Iterator for Tokenizer<I>
                 self.span_end(Token::Value(Value::Str(literal)))
             },
             '\'' => {
-                if self.iter.next() != Some('\'') {
+                if self.next() != Some('\'') {
                     return self.span_err(TokenizeError::UndefinedToken);
                 }
                 let mut multiline = String::new();
                 loop {
-                    match self.iter.peek() {
+                    match self.peek() {
                         None => return self.span_err(TokenizeError::UnexpectedEOF),
-                        Some(&'\'') => match { self.next()?; self.iter.peek() } {
+                        Some('\'') => match { self.next()?; self.peek() } {
                             None => return self.span_err(TokenizeError::UnexpectedEOF),
-                            Some(&'\'') => { self.next()?; break; },
+                            Some('\'') => { self.next()?; break; },
                             Some(_) => multiline.push('\''),
                         },
-                        Some(&'\n') => {
+                        Some('\n') => {
                             // Don't push initial newline
                             self.next()?;
                             if !multiline.is_empty() {
                                 multiline.push('\n');
                             }
-                            while self.iter.peek() == Some(&' ')
-                                    || self.iter.peek() == Some(&'\t') {
+                            while self.peek() == Some(' ')
+                                    || self.peek() == Some('\t') {
                                 self.next();
                             }
                         },
@@ -255,7 +275,7 @@ impl<I> Iterator for Tokenizer<I>
                 // We already know it's a digit
                 let mut num = c.to_digit(RADIX).unwrap() as i64;
 
-                while let Some(digit) = self.iter.peek().and_then(|c| c.to_digit(RADIX)) {
+                while let Some(digit) = self.peek().and_then(|c| c.to_digit(RADIX)) {
                     self.next();
                     num = match num.checked_mul(RADIX as i64).and_then(|num| num.checked_add(digit as i64)) {
                         Some(num) => num,
@@ -263,13 +283,13 @@ impl<I> Iterator for Tokenizer<I>
                     };
                 }
 
-                if self.iter.peek() == Some(&'.') {
+                if self.peek() == Some('.') {
                     self.next();
 
                     let mut i = 1;
                     let mut num = num as f64;
 
-                    while let Some(digit) = self.iter.peek().and_then(|c| c.to_digit(RADIX)) {
+                    while let Some(digit) = self.peek().and_then(|c| c.to_digit(RADIX)) {
                         self.next();
                         i *= RADIX;
                         num += digit as f64 / i as f64;
@@ -289,10 +309,8 @@ impl<I> Iterator for Tokenizer<I>
     }
 }
 
-pub fn tokenize<I>(input: I) -> impl Iterator<Item = (Span, Result<Token, TokenizeError>)>
-    where I: IntoIterator<Item = char>
-{
-    Tokenizer::new(input.into_iter().peekable())
+pub fn tokenize<'a>(input: &'a str) -> impl Iterator<Item = (Span, Result<Token, TokenizeError>)> + 'a {
+    Tokenizer::new(input)
 }
 
 #[cfg(test)]
@@ -301,7 +319,7 @@ mod tests {
     use super::{Span, Token, TokenizeError};
 
     fn tokenize(input: &str) -> Result<Vec<Token>, TokenizeError> {
-        super::tokenize(input.chars())
+        super::tokenize(input)
             .map(|(_, result)| result)
             .collect()
     }
@@ -333,7 +351,7 @@ mod tests {
     #[test]
     fn spans() {
         assert_eq!(
-            super::tokenize("{\n    int = 1;\n}".chars())
+            super::tokenize("{\n    int = 1;\n}")
                 .map(|(span, result)| result.map(|token| (span, token)))
                 .collect::<Result<Vec<(Span, Token)>, TokenizeError>>(),
             Ok(vec![
@@ -346,7 +364,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            super::tokenize("{\n    overflow = 9999999999999999999999999999".chars())
+            super::tokenize("{\n    overflow = 9999999999999999999999999999")
                 .map(|(span, result)| result.map_err(|err| (span, err)))
                 .collect::<Result<Vec<Token>, (Span, TokenizeError)>>(),
             Err((Span { start: (1, 15), end: None }, TokenizeError::IntegerOverflow))
@@ -389,6 +407,10 @@ string :D
                 Token::ParenClose
             ])
         );
+        assert_eq!(
+            tokenize("a/ 3"), // <- could get mistaken for a path
+            Ok(vec![Token::Ident("a".into()), Token::Div, Token::Value(3.into())])
+        );
     }
     #[test]
     fn let_in() {
@@ -419,9 +441,14 @@ string :D
         }
         assert_eq!(tokenize("/hello/world"), path(Anchor::Absolute, "/hello/world"));
         assert_eq!(tokenize("hello/world"), path(Anchor::Relative, "hello/world"));
+        assert_eq!(tokenize("a+3/5+b"), path(Anchor::Relative, "a+3/5+b"));
         assert_eq!(tokenize("./hello/world"), path(Anchor::Relative, "hello/world"));
         assert_eq!(tokenize("~/hello/world"), path(Anchor::Home, "hello/world"));
         assert_eq!(tokenize("<hello/world>"), path(Anchor::Store, "hello/world"));
+        assert_eq!(
+            tokenize("https://google.com/?q=Hello+World"),
+            path(Anchor::Uri, "https://google.com/?q=Hello+World")
+        );
     }
     #[test]
     fn import() {

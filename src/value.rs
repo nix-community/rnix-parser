@@ -3,7 +3,8 @@ pub enum Anchor {
     Absolute,
     Relative,
     Home,
-    Store
+    Store,
+    Uri
 }
 
 #[derive(Clone, Debug, PartialEq)]

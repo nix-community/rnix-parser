@@ -18,7 +18,7 @@ mod tests {
 
     fn parse(string: &str) -> AST {
         inner_parse(
-            tokenize(string.chars())
+            tokenize(string)
                 .map(|(span, result)| (span, result.expect("error while tokenizing")))
         ).expect("error while parsing")
     }
