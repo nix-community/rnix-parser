@@ -1,7 +1,7 @@
 use crate::value::{Anchor, Value};
 use std::mem;
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 enum IdentType {
     Uri,
     Path,
@@ -229,12 +229,42 @@ impl<'a> Iterator for Tokenizer<'a> {
     type Item = (Span, Result<Token, TokenizeError>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.span_start();
-        let mut c = self.next()?;
-        while c.is_whitespace() {
-            self.span_start();
-            c = self.next()?;
+        while self.peek().map(char::is_whitespace).unwrap_or(false) {
+            self.next()?;
         }
+
+        // Check if it's a path
+        let mut lookahead = self.input.chars().skip_while(|c| match c {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' | '+' | '-' => true,
+            _ => false
+        });
+        let kind = match (lookahead.next(), lookahead.next()) {
+            (Some(':'), Some(c)) if !c.is_whitespace() => Some(IdentType::Uri),
+            (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
+            _ => None
+        };
+
+        self.span_start();
+        let c = self.next()?;
+
+        if c == '~' || kind == Some(IdentType::Path) {
+            println!("Path!");
+            let (anchor, prefix) = match c {
+                '~' => if self.next() != Some('/') {
+                    return self.span_err(TokenizeError::UndefinedToken);
+                } else {
+                    (Anchor::Home, None)
+                },
+                '/' => (Anchor::Absolute, Some('/')),
+                c => (Anchor::Relative, Some(c))
+            };
+            let ident = self.next_ident(prefix, is_valid_path_char);
+            if ident.ends_with('/') {
+                return self.span_err(TokenizeError::TrailingSlash);
+            }
+            return self.span_end(Token::Value(Value::Path(anchor, ident)));
+        }
+
         match c {
             '{' => self.span_end(Token::BracketOpen),
             '}' => self.span_end(Token::BracketClose),
@@ -245,31 +275,10 @@ impl<'a> Iterator for Tokenizer<'a> {
             '+' => self.span_end(Token::Add),
             '-' => self.span_end(Token::Sub),
             '*' => self.span_end(Token::Mul),
-            '/' => {
-                match self.peek() {
-                    Some(c) if c.is_whitespace() => self.span_end(Token::Div),
-                    None => self.span_end(Token::Div),
-                    Some(_) => {
-                        let ident = self.next_ident(Some(c), is_valid_path_char);
-                        self.span_end(Token::Value(Value::Path(Anchor::Absolute, ident)))
-                    }
-                }
-            },
-            '.' | '~' if self.peek() == Some('/') => {
-                self.next()?; // the slash
-                let anchor = match c {
-                    '.' => Anchor::Relative,
-                    '~' => Anchor::Home,
-                    _ => unreachable!()
-                };
-                let ident = self.next_ident(None, is_valid_path_char);
-                if ident.ends_with('/') {
-                    return self.span_err(TokenizeError::TrailingSlash);
-                }
-                self.span_end(Token::Value(Value::Path(anchor, ident)))
-            },
+            '/' => self.span_end(Token::Div),
             '.' => self.span_end(Token::Dot),
             '<' => {
+                println!("Store path!");
                 let ident = self.next_ident(None, is_valid_path_char);
                 if self.next() != Some('>') {
                     return self.span_err(TokenizeError::UndefinedToken);
@@ -277,22 +286,13 @@ impl<'a> Iterator for Tokenizer<'a> {
                 self.span_end(Token::Value(Value::Path(Anchor::Store, ident)))
             },
             'a'..='z' | 'A'..='Z' => {
-                let mut lookahead = self.input.chars().skip_while(|c| match c {
-                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' | '+' | '-' => true,
-                    _ => false
-                });
-                // Check what character is after all these characters to see what
-                // type it is.
-                let kind = match (lookahead.next(), lookahead.next()) {
-                    (Some(':'), Some(c)) if !c.is_whitespace() => IdentType::Uri,
-                    (Some('/'), Some(c)) if !c.is_whitespace() => IdentType::Path,
-                    _ => IdentType::Ident
-                };
+                let kind = kind.unwrap_or(IdentType::Ident);
+                assert_ne!(kind, IdentType::Path, "paths are checked earlier");
                 let ident = self.next_ident(Some(c), |c| match c {
                     'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => true,
                     ':' | '?' | '@' | '&' | '=' | '$' | ',' | '!'
                         | '~' | '*' | '\'' | '%' => kind == IdentType::Uri,
-                    c => (kind == IdentType::Path || kind == IdentType::Uri) && is_valid_path_char(c),
+                    c => kind == IdentType::Uri && is_valid_path_char(c),
                 });
                 if kind == IdentType::Ident {
                     self.span_end(match &*ident {
@@ -521,7 +521,8 @@ string :D
         assert_eq!(tokenize("/hello/world"), path(Anchor::Absolute, "/hello/world"));
         assert_eq!(tokenize("hello/world"), path(Anchor::Relative, "hello/world"));
         assert_eq!(tokenize("a+3/5+b"), path(Anchor::Relative, "a+3/5+b"));
-        assert_eq!(tokenize("./hello/world"), path(Anchor::Relative, "hello/world"));
+        assert_eq!(tokenize("1-2/3"), path(Anchor::Relative, "1-2/3"));
+        assert_eq!(tokenize("./hello/world"), path(Anchor::Relative, "./hello/world"));
         assert_eq!(tokenize("~/hello/world"), path(Anchor::Home, "hello/world"));
         assert_eq!(tokenize("<hello/world>"), path(Anchor::Store, "hello/world"));
         assert_eq!(

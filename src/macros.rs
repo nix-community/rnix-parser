@@ -48,7 +48,7 @@ macro_rules! nix_inner {
         AST::Var(String::from(stringify!($val)))
     }};
     (parse ./$val:expr) => {{
-        AST::Value(Value::Path(Anchor::Relative, String::from($val)))
+        AST::Value(Value::Path(Anchor::Relative, String::from(concat!("./", $val))))
     }};
     (parse raw $ast:expr) => {{ $ast }};
     (parse $val:expr) => {{ AST::Value(Value::from($val)) }};
