@@ -2,7 +2,10 @@ use crate::{
     tokenizer::{Span, Token},
     value::Value
 };
-use std::iter::Peekable;
+use std::{
+    iter::Peekable,
+    ops::Deref
+};
 
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum ParseError {
@@ -14,10 +17,22 @@ pub enum ParseError {
     Unexpected(Token)
 }
 
-type Set = Vec<(String, AST)>;
+pub type Set = Vec<(String, AST)>;
+pub type SetNoSpan = Vec<(String, ASTNoSpan)>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum AST {
+pub struct AST(Span, ASTType);
+
+impl Deref for AST {
+    type Target = ASTType;
+
+    fn deref(&self) -> &Self::Target {
+        &self.1
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ASTType {
     Set(Set),
     LetIn(Set, Box<AST>),
     With(Box<(AST, AST)>),
@@ -33,8 +48,70 @@ pub enum AST {
     Value(Value)
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum ASTNoSpan {
+    Set(SetNoSpan),
+    LetIn(SetNoSpan, Box<ASTNoSpan>),
+    With(Box<(ASTNoSpan, ASTNoSpan)>),
+    Import(Box<ASTNoSpan>),
+    Var(String),
+    Negate(Box<ASTNoSpan>),
+    Add(Box<(ASTNoSpan, ASTNoSpan)>),
+    Sub(Box<(ASTNoSpan, ASTNoSpan)>),
+    Mul(Box<(ASTNoSpan, ASTNoSpan)>),
+    Div(Box<(ASTNoSpan, ASTNoSpan)>),
+    Value(Value)
+}
+
+fn set_discard_span(set: Set) -> SetNoSpan {
+    set.into_iter()
+        .map(|(name, ast)| (name, ASTNoSpan::from(ast)))
+        .collect()
+}
+fn discard_span(ast: Box<AST>) -> Box<ASTNoSpan> {
+    Box::new((*ast).into())
+}
+fn tuple_discard_span(ast: Box<(AST, AST)>) -> Box<(ASTNoSpan, ASTNoSpan)> {
+    Box::new((ast.0.into(), ast.1.into()))
+}
+
+impl From<AST> for ASTNoSpan {
+    fn from(ast: AST) -> ASTNoSpan {
+        match ast.1 {
+            ASTType::Set(set) => ASTNoSpan::Set(set_discard_span(set)),
+            ASTType::LetIn(set, ast) => ASTNoSpan::LetIn(set_discard_span(set), discard_span(ast)),
+            ASTType::With(inner) => ASTNoSpan::With(tuple_discard_span(inner)),
+            ASTType::Import(inner) => ASTNoSpan::Import(discard_span(inner)),
+            ASTType::Var(inner) => ASTNoSpan::Var(inner),
+            ASTType::Negate(inner) => ASTNoSpan::Negate(discard_span(inner)),
+            ASTType::Add(inner) => ASTNoSpan::Add(tuple_discard_span(inner)),
+            ASTType::Sub(inner) => ASTNoSpan::Sub(tuple_discard_span(inner)),
+            ASTType::Mul(inner) => ASTNoSpan::Mul(tuple_discard_span(inner)),
+            ASTType::Div(inner) => ASTNoSpan::Div(tuple_discard_span(inner)),
+            ASTType::Value(inner) => ASTNoSpan::Value(inner)
+        }
+    }
+}
+
 type Error = (Option<Span>, ParseError);
 type Result<T> = std::result::Result<T, Error>;
+
+macro_rules! math {
+    ($self:expr, $next:block, $($token:pat => $ast:expr),*) => {{
+        let mut val = { $next };
+        loop {
+            match $self.iter.peek() {
+                $(Some(&(_, $token)) => {
+                    $self.next()?;
+                    let AST(end, expr) = { $next };
+                    val = AST(val.0.until(end), $ast(Box::new((val, AST(end, expr)))));
+                },)*
+                _ => break
+            }
+        }
+        Ok(val)
+    }}
+}
 
 pub struct Parser<I>
     where I: Iterator<Item = (Span, Token)>
@@ -58,10 +135,10 @@ impl<I> Parser<I>
             .map(|entry| entry)
             .ok_or((None, ParseError::UnexpectedEOF))
     }
-    pub fn expect(&mut self, expected: Token) -> Result<()> {
+    pub fn expect(&mut self, expected: Token) -> Result<Span> {
         if let Some((span, actual)) = self.iter.next() {
             if actual == expected {
-                Ok(())
+                Ok(span)
             } else {
                 Err((Some(span), ParseError::Expected(expected, Some(actual))))
             }
@@ -72,52 +149,35 @@ impl<I> Parser<I>
 
     pub fn parse_val(&mut self) -> Result<AST> {
         Ok(match self.next()? {
-            (_, Token::ParenOpen) => {
-                let expr = self.parse_expr()?;
-                self.expect(Token::ParenClose)?;
-                expr
+            (start, Token::ParenOpen) => {
+                let AST(_, expr) = self.parse_expr()?;
+                let end = self.expect(Token::ParenClose)?;
+                AST(start.until(end), expr)
             },
-            (_, Token::Sub) => AST::Negate(Box::new(self.parse_val()?)),
-            (_, Token::Value(val)) => AST::Value(val),
-            (_, Token::Ident(name)) => AST::Var(name),
+            (start, Token::Sub) => {
+                let AST(end, expr) = self.parse_val()?;
+                AST(start.until(end), ASTType::Negate(Box::new(AST(end, expr))))
+            },
+            (span, Token::Value(val)) => AST(span, ASTType::Value(val)),
+            (span, Token::Ident(name)) => AST(span, ASTType::Var(name)),
             (span, token) => return Err((Some(span), ParseError::Unexpected(token)))
         })
     }
 
     pub fn parse_mul(&mut self) -> Result<AST> {
-        let mut val = self.parse_val()?;
-        loop {
-            match self.iter.peek() {
-                Some(&(_, Token::Mul)) => {
-                    self.next()?;
-                    val = AST::Mul(Box::new((val, self.parse_val()?)));
-                },
-                Some(&(_, Token::Div)) => {
-                    self.next()?;
-                    val = AST::Div(Box::new((val, self.parse_val()?)));
-                },
-                _ => break
-            }
-        }
-        Ok(val)
+        math!(
+            self, { self.parse_val()? },
+            Token::Mul => ASTType::Mul,
+            Token::Div => ASTType::Div
+        )
     }
 
     pub fn parse_add(&mut self) -> Result<AST> {
-        let mut val = self.parse_mul()?;
-        loop {
-            match self.iter.peek() {
-                Some(&(_, Token::Add)) => {
-                    self.next()?;
-                    val = AST::Add(Box::new((val, self.parse_mul()?)));
-                },
-                Some(&(_, Token::Sub)) => {
-                    self.next()?;
-                    val = AST::Sub(Box::new((val, self.parse_mul()?)));
-                },
-                _ => break
-            }
-        }
-        Ok(val)
+        math!(
+            self, { self.parse_mul()? },
+            Token::Add => ASTType::Add,
+            Token::Sub => ASTType::Sub
+        )
     }
 
     pub fn parse_set(&mut self) -> Result<Set> {
@@ -139,28 +199,29 @@ impl<I> Parser<I>
     pub fn parse_expr(&mut self) -> Result<AST> {
         Ok(match self.peek()? {
             Token::BracketOpen => {
-                self.next()?;
+                let (start, _) = self.next()?;
                 let values = self.parse_set()?;
-                self.expect(Token::BracketClose)?;
-                AST::Set(values)
+                let end = self.expect(Token::BracketClose)?;
+                AST(start.until(end), ASTType::Set(values))
             },
             Token::Let => {
-                self.next()?;
+                let (start, _) = self.next()?;
                 let vars = self.parse_set()?;
                 self.expect(Token::In)?;
-                let expr = self.parse_expr()?;
-                AST::LetIn(vars, Box::new(expr))
+                let AST(end, expr) = self.parse_expr()?;
+                AST(start.until(end), ASTType::LetIn(vars, Box::new(AST(end, expr))))
             },
             Token::With => {
-                self.next()?;
+                let (start, _) = self.next()?;
                 let vars = self.parse_expr()?;
                 self.expect(Token::Semicolon)?;
-                let expr = self.parse_expr()?;
-                AST::With(Box::new((vars, expr)))
+                let AST(end, expr) = self.parse_expr()?;
+                AST(start.until(end), ASTType::With(Box::new((vars, AST(end, expr)))))
             },
             Token::Import => {
-                self.next()?;
-                AST::Import(Box::new(self.parse_expr()?))
+                let (start, _) = self.next()?;
+                let AST(end, expr) = self.parse_expr()?;
+                AST(start.until(end), ASTType::Import(Box::new(AST(end, expr))))
             },
             _ => self.parse_add()?
         })
@@ -179,27 +240,26 @@ mod tests {
         tokenizer::{Span, Token},
         value::{Anchor, Value}
     };
-    use super::{parse, AST, ParseError};
+    use super::{AST as ASTSpan, ASTNoSpan as AST, ASTType, ParseError};
 
-    macro_rules! test {
+    macro_rules! parse {
         ($($token:expr),*) => {
-            vec![
-                $((Span::default(), $token)),*
-            ].into_iter()
+            super::parse(vec![$((Span::default(), $token)),*].into_iter())
+                .map(AST::from)
         }
     }
 
     #[test]
     fn set() {
         assert_eq!(
-            parse(test![
+            parse![
                 Token::BracketOpen,
 
                 Token::Ident("meaning_of_life".into()), Token::Equal, Token::Value(42.into()), Token::Semicolon,
                 Token::Ident("H4X0RNUM83R".into()), Token::Equal, Token::Value(1.337.into()), Token::Semicolon,
 
                 Token::BracketClose
-            ]),
+            ],
             Ok(AST::Set(vec![
                 ("meaning_of_life".into(), AST::Value(42.into())),
                 ("H4X0RNUM83R".into(), AST::Value(1.337.into()))
@@ -209,7 +269,7 @@ mod tests {
     #[test]
     fn spans() {
         assert_eq!(
-            parse(vec![
+            super::parse(vec![
                 (Span::default(), Token::BracketOpen),
                 (Span { start: (4, 2), end: None }, Token::Semicolon),
             ].into_iter()),
@@ -217,12 +277,45 @@ mod tests {
                 Some(Span { start: (4, 2), end: None }),
                 ParseError::Expected(Token::BracketClose, Some(Token::Semicolon))
             ))
-        )
+        );
+        assert_eq!(
+            super::parse(vec![
+                (Span { start: (0, 0), end: Some((0, 1)) }, Token::Value(1.into())),
+                (Span { start: (0, 2), end: Some((0, 3)) }, Token::Add),
+                (Span { start: (0, 4), end: Some((0, 5)) }, Token::Value(2.into())),
+                (Span { start: (0, 6), end: Some((0, 7)) }, Token::Mul),
+                (Span { start: (0, 8), end: Some((0, 9)) }, Token::Value(3.into())),
+            ].into_iter()),
+            Ok(ASTSpan(
+                Span { start: (0, 0), end: Some((0, 9)) },
+                ASTType::Add(Box::new((
+                    ASTSpan(
+                        Span { start: (0, 0), end: Some((0, 1)) },
+                        ASTType::Value(1.into())
+                    ),
+                    ASTSpan(
+                        Span { start: (0, 4), end: Some((0, 9)) },
+                        ASTType::Mul(Box::new((
+                            ASTSpan(
+                                Span { start: (0, 4), end: Some((0, 5)) },
+                                ASTType::Value(2.into())
+                            ),
+                            ASTSpan(
+                                Span { start: (0, 8), end: Some((0, 9)) },
+                                ASTType::Value(3.into())
+                            )
+                        )))
+                    )
+                )))
+            ))
+        );
     }
     #[test]
     fn math() {
         assert_eq!(
-            parse(test![Token::Value(1.into()), Token::Add, Token::Value(2.into()), Token::Mul, Token::Value(3.into())]),
+            parse![
+                Token::Value(1.into()), Token::Add, Token::Value(2.into()), Token::Mul, Token::Value(3.into())
+            ],
             Ok(AST::Add(Box::new((
                 AST::Value(1.into()),
                 AST::Mul(Box::new((
@@ -232,12 +325,12 @@ mod tests {
             ))))
         );
         assert_eq!(
-            parse(test![
+            parse![
                 Token::Value(5.into()), Token::Mul,
                 Token::Sub, Token::ParenOpen,
                     Token::Value(3.into()), Token::Sub, Token::Value(2.into()),
                 Token::ParenClose
-            ]),
+            ],
             Ok(AST::Mul(Box::new((
                 AST::Value(5.into()),
                 AST::Negate(Box::new(AST::Sub(Box::new((
@@ -250,12 +343,12 @@ mod tests {
     #[test]
     fn let_in() {
         assert_eq!(
-            parse(test![
+            parse![
                 Token::Let,
                     Token::Ident("a".into()), Token::Equal, Token::Value(42.into()), Token::Semicolon,
                 Token::In,
                     Token::Ident("a".into())
-            ]),
+            ],
             Ok(AST::LetIn(
                 vec![("a".into(), AST::Value(42.into()))],
                 Box::new(AST::Var("a".into()))
@@ -265,10 +358,10 @@ mod tests {
     #[test]
     fn with() {
         assert_eq!(
-            parse(test![
+            parse![
                 Token::With, Token::Ident("namespace".into()), Token::Semicolon,
                 Token::Ident("expr".into())
-            ]),
+            ],
             Ok(AST::With(Box::new((
                 AST::Var("namespace".into()),
                 AST::Var("expr".into())
@@ -278,10 +371,10 @@ mod tests {
     #[test]
     fn import() {
         assert_eq!(
-            parse(test![
+            parse![
                 Token::Import,
                 Token::Value(Value::Path(Anchor::Store, "nixpkgs".into()))
-            ]),
+            ],
             Ok(AST::Import(Box::new(
                 AST::Value(Value::Path(Anchor::Store, "nixpkgs".into()))
             )))

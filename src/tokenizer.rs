@@ -33,6 +33,15 @@ pub struct Span {
     pub end: Option<(u64, u64)>
 }
 
+impl Span {
+    pub fn until(self, other: Span) -> Span {
+        Span {
+            start: self.start,
+            end: other.end
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Fail, PartialEq)]
 pub enum TokenizeError {
     #[fail(display = "error parsing integer: overflow")]

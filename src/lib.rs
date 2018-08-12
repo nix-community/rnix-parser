@@ -12,15 +12,15 @@ pub mod value;
 #[cfg(test)]
 mod tests {
     use super::{
-        parser::{parse as inner_parse, AST},
+        parser::{parse as inner_parse, ASTNoSpan},
         tokenizer::tokenize
     };
 
-    fn parse(string: &str) -> AST {
-        inner_parse(
+    fn parse(string: &str) -> ASTNoSpan {
+        ASTNoSpan::from(inner_parse(
             tokenize(string)
                 .map(|(span, result)| (span, result.expect("error while tokenizing")))
-        ).expect("error while parsing")
+        ).expect("error while parsing"))
     }
 
     #[test]

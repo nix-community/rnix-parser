@@ -51,7 +51,7 @@ macro_rules! nix {
     ($($tokens:tt)*) => {{
         #[allow(unused_imports)]
         use crate::{
-            parser::AST,
+            parser::ASTNoSpan as AST,
             value::{Anchor, Value}
         };
         nix_inner!($($tokens)*)
@@ -61,7 +61,7 @@ macro_rules! nix {
 #[cfg(test)]
 #[test]
 fn test_macro() {
-    use crate::parser::AST;
+    use crate::parser::ASTNoSpan as AST;
     assert_eq!(
         nix!({
             string = ("Hello World");
