@@ -36,15 +36,17 @@ macro_rules! nix_inner {
     (($($val1:tt)*) / ($($val2:tt)*)) => {{
         AST::Div(Box::new((nix_inner!($($val1)*), nix_inner!($($val2)*))))
     }};
+    (($($set:tt)*).$field:ident) => {{
+        AST::IndexSet(Box::new(nix_inner!($($set)*)), String::from(stringify!($field)))
+    }};
     ($val:ident) => {{
         AST::Var(String::from(stringify!($val)))
     }};
     (./$val:expr) => {{
         AST::Value(Value::Path(Anchor::Relative, String::from($val)))
     }};
-    ($val:expr) => {{
-        AST::Value(Value::from($val))
-    }};
+    (raw $ast:expr) => {{ $ast }};
+    ($val:expr) => {{ AST::Value(Value::from($val)) }};
 }
 #[macro_export]
 macro_rules! nix {
@@ -74,7 +76,7 @@ fn test_macro() {
                 AST::Add(Box::new((
                     AST::Value(4.into()),
                     AST::Value(2.into()),
-                ))),
+                )))
             )))),
         ])
     );

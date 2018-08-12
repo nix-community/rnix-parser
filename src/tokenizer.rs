@@ -213,13 +213,6 @@ impl<'a> Tokenizer<'a> {
             }
         }
 
-        if multiline {
-            // Remove all trailing newlines
-            while literal.chars().last() == Some('\n') {
-                literal.pop();
-            }
-        }
-
         if interpol.is_empty() {
             self.span_end(Token::Value(Value::Str(literal)))
         } else {
@@ -446,7 +439,8 @@ mod tests {
                     Token::Value(r#"This is a
 multiline
 string :D
-\'\'\'\'\"#.into()),
+\'\'\'\'\
+"#.into()),
                 Token::Semicolon, Token::BracketClose
             ])
         );

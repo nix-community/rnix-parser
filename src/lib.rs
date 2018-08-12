@@ -12,12 +12,12 @@ pub mod value;
 #[cfg(test)]
 mod tests {
     use super::{
-        parser::{parse as inner_parse, ASTNoSpan},
+        parser::{parse as inner_parse, ASTNoSpan as AST, InterpolNoSpan as Interpol},
         tokenizer::tokenize
     };
 
-    fn parse(string: &str) -> ASTNoSpan {
-        ASTNoSpan::from(inner_parse(
+    fn parse(string: &str) -> AST {
+        AST::from(inner_parse(
             tokenize(string)
                 .map(|(span, result)| (span, result.expect("error while tokenizing")))
         ).expect("error while parsing"))
@@ -34,7 +34,8 @@ mod tests {
                 multiline = (r#"This is a
 multiline
 string :D
-\'\'\'\'\"#);
+\'\'\'\'\
+"#);
             })
         );
         assert_eq!(
@@ -53,5 +54,28 @@ string :D
                 }
             )
         );
+        assert_eq!(
+            parse(include_str!("../tests/interpolation.nix")),
+            nix!(
+                let {
+                    world = ("World");
+                } in {
+                    string = (raw (AST::Interpol(vec![
+                        Interpol::Literal("Hello ".into()),
+                        Interpol::AST(AST::Var("world".into())),
+                        Interpol::Literal("!".into()),
+                    ])));
+                    multiline = (raw (AST::Interpol(vec![
+                        Interpol::Literal("The set's x value is: ".into()),
+                        Interpol::AST(nix!(
+                            ({
+                                x = ("1");
+                                y = ("2");
+                            }).x
+                        ))
+                    ])));
+                }
+            )
+        )
     }
 }
