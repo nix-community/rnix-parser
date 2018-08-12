@@ -28,7 +28,10 @@ pub enum Interpol {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ASTType {
-    Set(Set),
+    Set {
+        recursive: bool,
+        values: Set
+    },
     LetIn(Set, Box<AST>),
     With(Box<(AST, AST)>),
     Import(Box<AST>),
@@ -63,7 +66,10 @@ impl From<Interpol> for InterpolNoSpan {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ASTNoSpan {
-    Set(SetNoSpan),
+    Set {
+        recursive: bool,
+        values: SetNoSpan
+    },
     LetIn(SetNoSpan, Box<ASTNoSpan>),
     With(Box<(ASTNoSpan, ASTNoSpan)>),
     Import(Box<ASTNoSpan>),
@@ -99,7 +105,7 @@ fn tuple_discard_span(ast: Box<(AST, AST)>) -> Box<(ASTNoSpan, ASTNoSpan)> {
 impl From<AST> for ASTNoSpan {
     fn from(ast: AST) -> ASTNoSpan {
         match ast.1 {
-            ASTType::Set(set) => ASTNoSpan::Set(set_discard_span(set)),
+            ASTType::Set { recursive, values } => ASTNoSpan::Set { recursive, values: set_discard_span(values) },
             ASTType::LetIn(set, ast) => ASTNoSpan::LetIn(set_discard_span(set), discard_span(ast)),
             ASTType::With(inner) => ASTNoSpan::With(tuple_discard_span(inner)),
             ASTType::Import(inner) => ASTNoSpan::Import(discard_span(inner)),
@@ -168,13 +174,35 @@ impl<I> Parser<I>
             Err((None, ParseError::Expected(expected, None)))
         }
     }
+    pub fn expect_peek(&mut self, expected: Token) -> Result<Span> {
+        if let Some(&(span, ref actual)) = self.iter.peek() {
+            if *actual == expected {
+                Ok(span)
+            } else {
+                Err((Some(span), ParseError::Expected(expected, Some(actual.clone()))))
+            }
+        } else {
+            Err((None, ParseError::Expected(expected, None)))
+        }
+    }
 
     pub fn parse_val(&mut self) -> Result<AST> {
         let mut next = match self.next()? {
+            (start, Token::Rec) => {
+                self.expect_peek(Token::BracketOpen)?;
+                let AST(end, mut set) = self.parse_val()?;
+                if let ASTType::Set { ref mut recursive, .. } = set {
+                    *recursive = true;
+                }
+                AST(start.until(end), set)
+            },
             (start, Token::BracketOpen) => {
                 let values = self.parse_set()?;
                 let end = self.expect(Token::BracketClose)?;
-                AST(start.until(end), ASTType::Set(values))
+                AST(start.until(end), ASTType::Set {
+                    recursive: false,
+                    values
+                })
             },
             (start, Token::ParenOpen) => {
                 let AST(_, expr) = self.parse_expr()?;
@@ -300,10 +328,24 @@ mod tests {
 
                 Token::BracketClose
             ],
-            Ok(AST::Set(vec![
-                ("meaning_of_life".into(), AST::Value(42.into())),
-                ("H4X0RNUM83R".into(), AST::Value(1.337.into()))
-            ]))
+            Ok(AST::Set {
+                recursive: false,
+                values: vec![
+                    ("meaning_of_life".into(), AST::Value(42.into())),
+                    ("H4X0RNUM83R".into(), AST::Value(1.337.into()))
+                ]
+            })
+        );
+        assert_eq!(
+            parse![
+                Token::Rec, Token::BracketOpen,
+                Token::Ident("test".into()), Token::Equal, Token::Value(1.into()), Token::Semicolon,
+                Token::BracketClose
+            ],
+            Ok(AST::Set {
+                recursive: true,
+                values: vec![("test".into(), AST::Value(1.into()))]
+            })
         );
     }
     #[test]
@@ -452,9 +494,10 @@ mod tests {
             Ok(AST::Interpol(vec![
                 Interpol::Literal("Hello, ".into()),
                 Interpol::AST(AST::IndexSet(
-                    Box::new(AST::Set(vec![
-                        ("world".into(), AST::Value("World".into()))
-                    ])),
+                    Box::new(AST::Set {
+                        recursive: false,
+                        values: vec![("world".into(), AST::Value("World".into()))]
+                    }),
                     "world".into()
                 )),
                 Interpol::Literal("!".into())

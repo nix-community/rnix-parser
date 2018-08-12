@@ -24,16 +24,18 @@ pub enum Token {
     Ident(String),
     Value(Value),
     Interpol(Vec<Interpol>),
+    Let,
+    In,
+    With,
+    Import,
+    Rec,
+
     ParenOpen,
     ParenClose,
     Add,
     Sub,
     Mul,
-    Div,
-    Let,
-    In,
-    With,
-    Import
+    Div
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -298,6 +300,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                         "in" => Token::In,
                         "with" => Token::With,
                         "import" => Token::Import,
+                        "rec" => Token::Rec,
                         _ => Token::Ident(ident),
                     })
                 } else {

@@ -1,52 +1,57 @@
 #[macro_export]
 macro_rules! nix_inner {
-    ({
+    (set (rec: $recursive:expr) {
         $($ident:ident = ($($val:tt)*);)*
     }) => {{
-        AST::Set(vec![
-            $((String::from(stringify!($ident)), nix_inner!($($val)*))),*
-        ])
+        AST::Set {
+            recursive: $recursive,
+            values: vec![
+                $((String::from(stringify!($ident)), nix_inner!(parse $($val)*))),*
+            ]
+        }
     }};
-    (let {
+    (parse { $($token:tt)* }) => {{ nix_inner!(set (rec: false) { $($token)* }) }};
+    (parse rec { $($token:tt)* }) => {{ nix_inner!(set (rec: true) { $($token)* }) }};
+    (parse let {
         $($ident:ident = ($($val:tt)*);)*
     } in $($remaining:tt)*) => {{
         AST::LetIn(
-            vec![$((String::from(stringify!($ident)), nix_inner!($($val)*))),*],
-            Box::new(nix_inner!($($remaining)*))
+            vec![$((String::from(stringify!($ident)), nix_inner!(parse $($val)*))),*],
+            Box::new(nix_inner!(parse $($remaining)*))
         )
     }};
-    (with ($($namespace:tt)*); $($remaining:tt)*) => {{
+    (parse with ($($namespace:tt)*); $($remaining:tt)*) => {{
         AST::With(Box::new((
-            nix_inner!($($namespace)*),
-            nix_inner!($($remaining)*)
+            nix_inner!(parse $($namespace)*),
+            nix_inner!(parse $($remaining)*)
         )))
     }};
-    (import ($($path:tt)*)) => {{
-        AST::Import(Box::new(nix_inner!($($path)*)))
+    (parse import ($($path:tt)*)) => {{
+        AST::Import(Box::new(nix_inner!(parse $($path)*)))
     }};
-    (($($val1:tt)*) + ($($val2:tt)*)) => {{
-        AST::Add(Box::new((nix_inner!($($val1)*), nix_inner!($($val2)*))))
+    (parse ($($val1:tt)*) + ($($val2:tt)*)) => {{
+        AST::Add(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
     }};
-    (($($val1:tt)*) - ($($val2:tt)*)) => {{
-        AST::Sub(Box::new((nix_inner!($($val1)*), nix_inner!($($val2)*))))
+    (parse ($($val1:tt)*) - ($($val2:tt)*)) => {{
+        AST::Sub(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
     }};
-    (($($val1:tt)*) * ($($val2:tt)*)) => {{
-        AST::Mul(Box::new((nix_inner!($($val1)*), nix_inner!($($val2)*))))
+    (parse ($($val1:tt)*) * ($($val2:tt)*)) => {{
+        AST::Mul(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
     }};
-    (($($val1:tt)*) / ($($val2:tt)*)) => {{
-        AST::Div(Box::new((nix_inner!($($val1)*), nix_inner!($($val2)*))))
+    (parse ($($val1:tt)*) / ($($val2:tt)*)) => {{
+        AST::Div(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
     }};
-    (($($set:tt)*).$field:ident) => {{
-        AST::IndexSet(Box::new(nix_inner!($($set)*)), String::from(stringify!($field)))
+    (parse ($($set:tt)*).$field:ident) => {{
+        AST::IndexSet(Box::new(nix_inner!(parse $($set)*)), String::from(stringify!($field)))
     }};
-    ($val:ident) => {{
+    (parse $val:ident) => {{
         AST::Var(String::from(stringify!($val)))
     }};
-    (./$val:expr) => {{
+    (parse ./$val:expr) => {{
         AST::Value(Value::Path(Anchor::Relative, String::from($val)))
     }};
-    (raw $ast:expr) => {{ $ast }};
-    ($val:expr) => {{ AST::Value(Value::from($val)) }};
+    (parse raw $ast:expr) => {{ $ast }};
+    (parse $val:expr) => {{ AST::Value(Value::from($val)) }};
 }
 #[macro_export]
 macro_rules! nix {
@@ -56,7 +61,7 @@ macro_rules! nix {
             parser::ASTNoSpan as AST,
             value::{Anchor, Value}
         };
-        nix_inner!($($tokens)*)
+        nix_inner!(parse $($tokens)*)
     }}
 }
 
@@ -69,15 +74,18 @@ fn test_macro() {
             string = ("Hello World");
             number = ((3) * ((4) + (2)));
         }),
-        AST::Set(vec![
-            ("string".into(), AST::Value("Hello World".into())),
-            ("number".into(), AST::Mul(Box::new((
-                AST::Value(3.into()),
-                AST::Add(Box::new((
-                    AST::Value(4.into()),
-                    AST::Value(2.into()),
-                )))
-            )))),
-        ])
+        AST::Set {
+            recursive: false,
+            values: vec![
+                ("string".into(), AST::Value("Hello World".into())),
+                ("number".into(), AST::Mul(Box::new((
+                    AST::Value(3.into()),
+                    AST::Add(Box::new((
+                        AST::Value(4.into()),
+                        AST::Value(2.into()),
+                    )))
+                )))),
+            ]
+        }
     );
 }
