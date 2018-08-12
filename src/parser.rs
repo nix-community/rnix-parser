@@ -33,14 +33,16 @@ pub enum ASTType {
     With(Box<(AST, AST)>),
     Import(Box<AST>),
     Var(String),
-    Negate(Box<AST>),
+    Interpol(Vec<Interpol>),
+    IndexSet(Box<AST>, String),
+
     // Could also do Add(Box<AST>, Box<AST>), but I believe this is more
     // efficient.
+    Negate(Box<AST>),
     Add(Box<(AST, AST)>),
     Sub(Box<(AST, AST)>),
     Mul(Box<(AST, AST)>),
     Div(Box<(AST, AST)>),
-    Interpol(Vec<Interpol>),
     Value(Value)
 }
 
@@ -66,12 +68,14 @@ pub enum ASTNoSpan {
     With(Box<(ASTNoSpan, ASTNoSpan)>),
     Import(Box<ASTNoSpan>),
     Var(String),
+    Interpol(Vec<InterpolNoSpan>),
+    IndexSet(Box<ASTNoSpan>, String),
+
     Negate(Box<ASTNoSpan>),
     Add(Box<(ASTNoSpan, ASTNoSpan)>),
     Sub(Box<(ASTNoSpan, ASTNoSpan)>),
     Mul(Box<(ASTNoSpan, ASTNoSpan)>),
     Div(Box<(ASTNoSpan, ASTNoSpan)>),
-    Interpol(Vec<InterpolNoSpan>),
     Value(Value)
 }
 
@@ -100,12 +104,14 @@ impl From<AST> for ASTNoSpan {
             ASTType::With(inner) => ASTNoSpan::With(tuple_discard_span(inner)),
             ASTType::Import(inner) => ASTNoSpan::Import(discard_span(inner)),
             ASTType::Var(inner) => ASTNoSpan::Var(inner),
+            ASTType::Interpol(inner) => ASTNoSpan::Interpol(vec_into(inner)),
+            ASTType::IndexSet(set, key) => ASTNoSpan::IndexSet(discard_span(set), key),
+
             ASTType::Negate(inner) => ASTNoSpan::Negate(discard_span(inner)),
             ASTType::Add(inner) => ASTNoSpan::Add(tuple_discard_span(inner)),
             ASTType::Sub(inner) => ASTNoSpan::Sub(tuple_discard_span(inner)),
             ASTType::Mul(inner) => ASTNoSpan::Mul(tuple_discard_span(inner)),
             ASTType::Div(inner) => ASTNoSpan::Div(tuple_discard_span(inner)),
-            ASTType::Interpol(inner) => ASTNoSpan::Interpol(vec_into(inner)),
             ASTType::Value(inner) => ASTNoSpan::Value(inner)
         }
     }
@@ -143,10 +149,8 @@ impl<I> Parser<I>
         Self { iter }
     }
 
-    pub fn peek(&mut self) -> Result<&Token> {
-        self.iter.peek()
-            .map(|(_, token)| token)
-            .ok_or((None, ParseError::UnexpectedEOF))
+    pub fn peek(&mut self) -> Option<&Token> {
+        self.iter.peek().map(|(_, token)| token)
     }
     pub fn next(&mut self) -> Result<(Span, Token)> {
         self.iter.next()
@@ -166,7 +170,12 @@ impl<I> Parser<I>
     }
 
     pub fn parse_val(&mut self) -> Result<AST> {
-        Ok(match self.next()? {
+        let mut next = match self.next()? {
+            (start, Token::BracketOpen) => {
+                let values = self.parse_set()?;
+                let end = self.expect(Token::BracketClose)?;
+                AST(start.until(end), ASTType::Set(values))
+            },
             (start, Token::ParenOpen) => {
                 let AST(_, expr) = self.parse_expr()?;
                 let end = self.expect(Token::ParenClose)?;
@@ -189,7 +198,16 @@ impl<I> Parser<I>
                 AST(span, ASTType::Interpol(parsed))
             },
             (span, token) => return Err((Some(span), ParseError::Unexpected(token)))
-        })
+        };
+
+        while self.peek() == Some(&Token::Dot) {
+            self.next()?;
+            if let (end, Token::Ident(ident)) = self.next()? {
+                next = AST(next.0.until(end), ASTType::IndexSet(Box::new(next), ident));
+            }
+        }
+
+        Ok(next)
     }
 
     pub fn parse_mul(&mut self) -> Result<AST> {
@@ -210,7 +228,7 @@ impl<I> Parser<I>
 
     pub fn parse_set(&mut self) -> Result<Set> {
         let mut values = Vec::new();
-        while let &Token::Ident(_) = self.peek()? {
+        while let Some(&Token::Ident(_)) = self.peek() {
             let key = match self.next()? {
                 (_, Token::Ident(name)) => name,
                 _ => unreachable!()
@@ -225,28 +243,22 @@ impl<I> Parser<I>
     }
 
     pub fn parse_expr(&mut self) -> Result<AST> {
-        Ok(match self.peek()? {
-            Token::BracketOpen => {
-                let (start, _) = self.next()?;
-                let values = self.parse_set()?;
-                let end = self.expect(Token::BracketClose)?;
-                AST(start.until(end), ASTType::Set(values))
-            },
-            Token::Let => {
+        Ok(match self.peek() {
+            Some(Token::Let) => {
                 let (start, _) = self.next()?;
                 let vars = self.parse_set()?;
                 self.expect(Token::In)?;
                 let AST(end, expr) = self.parse_expr()?;
                 AST(start.until(end), ASTType::LetIn(vars, Box::new(AST(end, expr))))
             },
-            Token::With => {
+            Some(Token::With) => {
                 let (start, _) = self.next()?;
                 let vars = self.parse_expr()?;
                 self.expect(Token::Semicolon)?;
                 let AST(end, expr) = self.parse_expr()?;
                 AST(start.until(end), ASTType::With(Box::new((vars, AST(end, expr)))))
             },
-            Token::Import => {
+            Some(Token::Import) => {
                 let (start, _) = self.next()?;
                 let AST(end, expr) = self.parse_expr()?;
                 AST(start.until(end), ASTType::Import(Box::new(AST(end, expr))))
@@ -409,6 +421,16 @@ mod tests {
         );
     }
     #[test]
+    fn index_set() {
+        assert_eq!(
+            parse![Token::Ident("hello".into()), Token::Dot, Token::Ident("world".into())],
+            Ok(AST::IndexSet(
+                Box::new(AST::Var("hello".into())),
+                "world".into()
+            ))
+        );
+    }
+    #[test]
     fn interpolation() {
         assert_eq!(
             parse![
@@ -421,17 +443,20 @@ mod tests {
                         (Span { start: (0, 22), end: Some((0, 29)) }, Token::Value("World".into())),
                         (Span { start: (0, 29), end: Some((0, 30)) }, Token::Semicolon),
                         (Span { start: (0, 31), end: Some((0, 32)) }, Token::BracketClose),
-                        // TODO: (Span { start: (0, 32), end: Some((0, 33)) }, Token::Dot),
-                        // TODO: (Span { start: (0, 33), end: Some((0, 38)) }, Token::Ident("world".into()))
+                        (Span { start: (0, 32), end: Some((0, 33)) }, Token::Dot),
+                        (Span { start: (0, 33), end: Some((0, 38)) }, Token::Ident("world".into()))
                     ]),
                     TokenInterpol::Literal("!".into())
                 ])
             ],
             Ok(AST::Interpol(vec![
                 Interpol::Literal("Hello, ".into()),
-                Interpol::AST(AST::Set(vec![
-                    ("world".into(), AST::Value("World".into()))
-                ])),
+                Interpol::AST(AST::IndexSet(
+                    Box::new(AST::Set(vec![
+                        ("world".into(), AST::Value("World".into()))
+                    ])),
+                    "world".into()
+                )),
                 Interpol::Literal("!".into())
             ]))
         );
