@@ -100,5 +100,13 @@ string :D
                 concat = ((([(1)]) ++ ([(2) (3)])) ++ ([(4)]));
             })
         );
+        assert_eq!(
+            parse(include_str!("../tests/lambdas.nix")),
+            nix!(let {
+                add = (x: y: (x) + (y));
+            } in {
+                result = (((add) (2)) (5));
+            })
+        );
     }
 }

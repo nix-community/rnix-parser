@@ -29,6 +29,9 @@ macro_rules! nix_inner {
     (parse import ($($path:tt)*)) => {{
         AST::Import(Box::new(nix_inner!(parse $($path)*)))
     }};
+    (parse $fn:ident: $($body:tt)*) => {{
+        AST::Lambda(String::from(stringify!($fn)), Box::new(nix_inner!(parse $($body)*)))
+    }};
     (parse ($($val1:tt)*) + ($($val2:tt)*)) => {{
         AST::Add(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
     }};
@@ -43,6 +46,9 @@ macro_rules! nix_inner {
     }};
     (parse ($($val1:tt)*) ++ ($($val2:tt)*)) => {{
         AST::Concat(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    }};
+    (parse ($($fn:tt)*) ($($arg:tt)*)) => {{
+        AST::Apply(Box::new((nix_inner!(parse $($fn)*), nix_inner!(parse $($arg)*))))
     }};
     (parse ($($set:tt)*).$field:ident) => {{
         AST::IndexSet(Box::new(nix_inner!(parse $($set)*)), String::from(stringify!($field)))

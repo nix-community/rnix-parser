@@ -28,27 +28,32 @@ pub enum Interpol {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ASTType {
+    // Types
+    Interpol(Vec<Interpol>),
+    Lambda(String, Box<AST>),
+    List(Vec<AST>),
     Set {
         recursive: bool,
         values: Set
     },
-    List(Vec<AST>),
+    Value(Value),
+    Var(String),
+
+    // Expressions
+    Import(Box<AST>),
     LetIn(Set, Box<AST>),
     With(Box<(AST, AST)>),
-    Import(Box<AST>),
-    Var(String),
-    Interpol(Vec<Interpol>),
-    IndexSet(Box<AST>, String),
-    Concat(Box<(AST, AST)>),
 
-    // Could also do Add(Box<AST>, Box<AST>), but I believe this is more
-    // efficient.
+    // Operators
+    Apply(Box<(AST, AST)>),
+    Concat(Box<(AST, AST)>),
+    IndexSet(Box<AST>, String),
     Negate(Box<AST>),
+
     Add(Box<(AST, AST)>),
     Sub(Box<(AST, AST)>),
     Mul(Box<(AST, AST)>),
-    Div(Box<(AST, AST)>),
-    Value(Value)
+    Div(Box<(AST, AST)>)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -68,25 +73,32 @@ impl From<Interpol> for InterpolNoSpan {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ASTNoSpan {
+    // Types
+    Interpol(Vec<InterpolNoSpan>),
+    Lambda(String, Box<ASTNoSpan>),
+    List(Vec<ASTNoSpan>),
     Set {
         recursive: bool,
         values: SetNoSpan
     },
-    List(Vec<ASTNoSpan>),
+    Value(Value),
+    Var(String),
+
+    // Expressions
+    Import(Box<ASTNoSpan>),
     LetIn(SetNoSpan, Box<ASTNoSpan>),
     With(Box<(ASTNoSpan, ASTNoSpan)>),
-    Import(Box<ASTNoSpan>),
-    Var(String),
-    Interpol(Vec<InterpolNoSpan>),
-    IndexSet(Box<ASTNoSpan>, String),
-    Concat(Box<(ASTNoSpan, ASTNoSpan)>),
 
+    // Operators
+    Apply(Box<(ASTNoSpan, ASTNoSpan)>),
+    Concat(Box<(ASTNoSpan, ASTNoSpan)>),
+    IndexSet(Box<ASTNoSpan>, String),
     Negate(Box<ASTNoSpan>),
+
     Add(Box<(ASTNoSpan, ASTNoSpan)>),
     Sub(Box<(ASTNoSpan, ASTNoSpan)>),
     Mul(Box<(ASTNoSpan, ASTNoSpan)>),
-    Div(Box<(ASTNoSpan, ASTNoSpan)>),
-    Value(Value)
+    Div(Box<(ASTNoSpan, ASTNoSpan)>)
 }
 
 fn set_discard_span(set: Set) -> SetNoSpan {
@@ -109,22 +121,29 @@ fn tuple_discard_span(ast: Box<(AST, AST)>) -> Box<(ASTNoSpan, ASTNoSpan)> {
 impl From<AST> for ASTNoSpan {
     fn from(ast: AST) -> ASTNoSpan {
         match ast.1 {
-            ASTType::Set { recursive, values } => ASTNoSpan::Set { recursive, values: set_discard_span(values) },
+            // Types
+            ASTType::Interpol(inner) => ASTNoSpan::Interpol(vec_into(inner)),
+            ASTType::Lambda(args, body) => ASTNoSpan::Lambda(args, discard_span(body)),
             ASTType::List(inner) => ASTNoSpan::List(vec_into(inner)),
+            ASTType::Set { recursive, values } => ASTNoSpan::Set { recursive, values: set_discard_span(values) },
+            ASTType::Value(inner) => ASTNoSpan::Value(inner),
+            ASTType::Var(inner) => ASTNoSpan::Var(inner),
+
+            // Expressions
+            ASTType::Import(inner) => ASTNoSpan::Import(discard_span(inner)),
             ASTType::LetIn(set, ast) => ASTNoSpan::LetIn(set_discard_span(set), discard_span(ast)),
             ASTType::With(inner) => ASTNoSpan::With(tuple_discard_span(inner)),
-            ASTType::Import(inner) => ASTNoSpan::Import(discard_span(inner)),
-            ASTType::Var(inner) => ASTNoSpan::Var(inner),
-            ASTType::Interpol(inner) => ASTNoSpan::Interpol(vec_into(inner)),
-            ASTType::IndexSet(set, key) => ASTNoSpan::IndexSet(discard_span(set), key),
-            ASTType::Concat(inner) => ASTNoSpan::Concat(tuple_discard_span(inner)),
 
+            // Operators
+            ASTType::Apply(inner) => ASTNoSpan::Apply(tuple_discard_span(inner)),
+            ASTType::Concat(inner) => ASTNoSpan::Concat(tuple_discard_span(inner)),
+            ASTType::IndexSet(set, key) => ASTNoSpan::IndexSet(discard_span(set), key),
             ASTType::Negate(inner) => ASTNoSpan::Negate(discard_span(inner)),
+
             ASTType::Add(inner) => ASTNoSpan::Add(tuple_discard_span(inner)),
             ASTType::Sub(inner) => ASTNoSpan::Sub(tuple_discard_span(inner)),
             ASTType::Mul(inner) => ASTNoSpan::Mul(tuple_discard_span(inner)),
-            ASTType::Div(inner) => ASTNoSpan::Div(tuple_discard_span(inner)),
-            ASTType::Value(inner) => ASTNoSpan::Value(inner)
+            ASTType::Div(inner) => ASTNoSpan::Div(tuple_discard_span(inner))
         }
     }
 }
@@ -161,13 +180,13 @@ impl<I> Parser<I>
         Self { iter }
     }
 
-    pub fn peek(&mut self) -> Option<&Token> {
+    fn peek(&mut self) -> Option<&Token> {
         self.iter.peek().map(|(_, token)| token)
     }
-    pub fn next(&mut self) -> Result<(Meta, Token)> {
+    fn next(&mut self) -> Result<(Meta, Token)> {
         self.iter.next().ok_or((None, ParseError::UnexpectedEOF))
     }
-    pub fn expect(&mut self, expected: Token) -> Result<Meta> {
+    fn expect(&mut self, expected: Token) -> Result<Meta> {
         if let Some((meta, actual)) = self.iter.next() {
             if actual == expected {
                 Ok(meta)
@@ -178,7 +197,7 @@ impl<I> Parser<I>
             Err((None, ParseError::Expected(expected, None)))
         }
     }
-    pub fn expect_peek(&mut self, expected: Token) -> Result<()> {
+    fn expect_peek(&mut self, expected: Token) -> Result<()> {
         if let Some((meta, actual)) = self.iter.peek() {
             if *actual == expected {
                 Ok(())
@@ -189,9 +208,8 @@ impl<I> Parser<I>
             Err((None, ParseError::Expected(expected, None)))
         }
     }
-
-    pub fn parse_val(&mut self) -> Result<AST> {
-        let mut next = match self.next()? {
+    fn parse_val(&mut self) -> Result<AST> {
+        let mut val = match self.next()? {
             (_, Token::ParenOpen) => {
                 let expr = self.parse_expr()?;
                 self.expect(Token::ParenClose)?;
@@ -247,22 +265,36 @@ impl<I> Parser<I>
         while self.peek() == Some(&Token::Dot) {
             self.next()?;
             if let (end, Token::Ident(ident)) = self.next()? {
-                next = AST(next.0.span.until(end.span).into(), ASTType::IndexSet(Box::new(next), ident));
+                val = AST(
+                    val.0.span.until(end.span).into(),
+                    ASTType::IndexSet(Box::new(val), ident)
+                );
             }
         }
 
-        Ok(next)
+        Ok(val)
     }
+    fn parse_fn(&mut self) -> Result<AST> {
+        let mut val = self.parse_val()?;
 
-    pub fn parse_mul(&mut self) -> Result<AST> {
+        while self.peek().map(|t| t.is_fn_arg()).unwrap_or(false) {
+            let arg = self.parse_val()?;
+            val = AST(
+                val.0.span.until(arg.0.span).into(),
+                ASTType::Apply(Box::new((val, arg)))
+            );
+        }
+
+        Ok(val)
+    }
+    fn parse_mul(&mut self) -> Result<AST> {
         math!(
-            self, { self.parse_val()? },
+            self, { self.parse_fn()? },
             Token::Mul => ASTType::Mul,
             Token::Div => ASTType::Div
         )
     }
-
-    pub fn parse_add(&mut self) -> Result<AST> {
+    fn parse_add(&mut self) -> Result<AST> {
         math!(
             self, { self.parse_mul()? },
             Token::Add => ASTType::Add,
@@ -270,8 +302,7 @@ impl<I> Parser<I>
             Token::Concat => ASTType::Concat
         )
     }
-
-    pub fn parse_set(&mut self) -> Result<Set> {
+    fn parse_set(&mut self) -> Result<Set> {
         let mut values = Vec::new();
         while let Some(&Token::Ident(_)) = self.peek() {
             let key = match self.next()? {
@@ -286,7 +317,6 @@ impl<I> Parser<I>
         }
         Ok(values)
     }
-
     pub fn parse_expr(&mut self) -> Result<AST> {
         Ok(match self.peek() {
             Some(Token::Let) => {
@@ -308,7 +338,16 @@ impl<I> Parser<I>
                 let AST(end, expr) = self.parse_expr()?;
                 AST(start.until(&end), ASTType::Import(Box::new(AST(end, expr))))
             },
-            _ => self.parse_add()?
+            _ => match self.parse_add()? {
+                AST(start, ASTType::Var(name)) => if self.peek() == Some(&Token::Colon) {
+                    self.next()?;
+                    let AST(end, expr) = self.parse_expr()?;
+                    AST(start.until(&end), ASTType::Lambda(name, Box::new(AST(end, expr))))
+                } else {
+                    AST(start, ASTType::Var(name))
+                },
+                ast => ast
+            }
         })
     }
 }
@@ -556,6 +595,42 @@ mod tests {
                     AST::List(vec![AST::Value(2.into())]),
                 ))),
                 AST::List(vec![AST::Value(3.into())])
+            ))))
+        );
+    }
+    #[test]
+    fn functions() {
+        assert_eq!(
+            parse![
+               Token::Ident("a".into()), Token::Colon, Token::Ident("b".into()), Token::Colon,
+               Token::Ident("a".into()), Token::Add, Token::Ident("b".into())
+            ],
+            Ok(AST::Lambda(
+                "a".into(),
+                Box::new(AST::Lambda(
+                    "b".into(),
+                    Box::new(AST::Add(Box::new((
+                        AST::Var("a".into()),
+                        AST::Var("b".into())
+                    ))))
+                ))
+            ))
+        );
+        assert_eq!(
+            parse![
+                Token::Ident("a".into()), Token::Value(1.into()), Token::Value(2.into()),
+                Token::Add,
+                Token::Value(3.into())
+            ],
+            Ok(AST::Add(Box::new((
+                AST::Apply(Box::new((
+                    AST::Apply(Box::new((
+                        AST::Var("a".into()),
+                        AST::Value(1.into())
+                    ))),
+                    AST::Value(2.into()),
+                ))),
+                AST::Value(3.into())
             ))))
         );
     }

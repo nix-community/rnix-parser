@@ -24,7 +24,6 @@ You can check the `tests/` directory to see what is currently implemented.
 
 **TODO**:
 
- - lambdas
  - argument patterns (optionals, ellipsis, @)
  - if..then..else
  - inherit

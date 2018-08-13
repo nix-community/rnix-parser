@@ -16,29 +16,53 @@ pub enum Interpol {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
+    // Keywords
+    Import,
+    In,
+    Let,
+    Rec,
+    With,
+
+    // Symbols
     CurlyBOpen,
     CurlyBClose,
-    Equal,
-    Semicolon,
-    Dot,
-    Ident(String),
-    Value(Value),
-    Interpol(Vec<Interpol>),
-    Let,
-    In,
-    With,
-    Import,
-    Rec,
     SquareBOpen,
     SquareBClose,
-    Concat,
+    Dot,
+    Equal,
+    Colon,
+    Semicolon,
 
+    // Operators
     ParenOpen,
     ParenClose,
+    Concat,
     Add,
     Sub,
     Mul,
-    Div
+    Div,
+
+    // Identifiers and values
+    Ident(String),
+    Value(Value),
+    Interpol(Vec<Interpol>)
+}
+impl Token {
+    /// Returns true if this token should be used as a function argument.
+    /// Example:
+    /// add 1 2 + 3
+    /// ^   ^ ^ ^
+    /// |   | | | false
+    /// |   | | true
+    /// |   | true
+    /// | true
+    pub fn is_fn_arg(&self) -> bool {
+        match self {
+            Token::CurlyBOpen | Token::SquareBOpen | Token::ParenOpen
+                | Token::Ident(_) | Token::Value(_) | Token::Interpol(_) => true,
+            _ => false
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -317,10 +341,12 @@ impl<'a> Iterator for Tokenizer<'a> {
         match c {
             '{' => self.span_end(meta, Token::CurlyBOpen),
             '}' => self.span_end(meta, Token::CurlyBClose),
-            '=' => self.span_end(meta, Token::Equal),
-            ';' => self.span_end(meta, Token::Semicolon),
             '[' => self.span_end(meta, Token::SquareBOpen),
             ']' => self.span_end(meta, Token::SquareBClose),
+            '.' => self.span_end(meta, Token::Dot),
+            '=' => self.span_end(meta, Token::Equal),
+            ':' => self.span_end(meta, Token::Colon),
+            ';' => self.span_end(meta, Token::Semicolon),
             '(' => self.span_end(meta, Token::ParenOpen),
             ')' => self.span_end(meta, Token::ParenClose),
             '+' if self.peek() == Some('+') => { self.next()?; self.span_end(meta, Token::Concat) },
@@ -328,7 +354,6 @@ impl<'a> Iterator for Tokenizer<'a> {
             '-' => self.span_end(meta, Token::Sub),
             '*' => self.span_end(meta, Token::Mul),
             '/' => self.span_end(meta, Token::Div),
-            '.' => self.span_end(meta, Token::Dot),
             '<' => {
                 let ident = self.next_ident(None, is_valid_path_char);
                 if self.next() != Some('>') {
@@ -613,11 +638,21 @@ string :D
             ])
         );
         assert_eq!(
-            tokenize(r#"[1] ++ [2] ++ [3]"#),
+            tokenize("[1] ++ [2] ++ [3]"),
             Ok(vec![
                Token::SquareBOpen, Token::Value(1.into()), Token::SquareBClose, Token::Concat,
                Token::SquareBOpen, Token::Value(2.into()), Token::SquareBClose, Token::Concat,
                Token::SquareBOpen, Token::Value(3.into()), Token::SquareBClose
+            ])
+        );
+    }
+    #[test]
+    fn functions() {
+        assert_eq!(
+            tokenize("a: b: a + b"),
+            Ok(vec![
+               Token::Ident("a".into()), Token::Colon, Token::Ident("b".into()), Token::Colon,
+               Token::Ident("a".into()), Token::Add, Token::Ident("b".into())
             ])
         );
     }
