@@ -16,8 +16,8 @@ pub enum Interpol {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    BracketOpen,
-    BracketClose,
+    CurlyBOpen,
+    CurlyBClose,
     Equal,
     Semicolon,
     Dot,
@@ -29,6 +29,8 @@ pub enum Token {
     With,
     Import,
     Rec,
+    SquareBOpen,
+    SquareBClose,
 
     ParenOpen,
     ParenClose,
@@ -201,9 +203,9 @@ impl<'a> Tokenizer<'a> {
                                         result @ Err(_) => return Some(result)
                                     };
                                     match token.1 {
-                                        Token::BracketOpen => count += 1,
-                                        Token::BracketClose if count == 0 => break,
-                                        Token::BracketClose => count -= 1,
+                                        Token::CurlyBOpen => count += 1,
+                                        Token::CurlyBClose if count == 0 => break,
+                                        Token::CurlyBClose => count -= 1,
                                         _ => ()
                                     }
                                     tokens.push(token);
@@ -312,10 +314,12 @@ impl<'a> Iterator for Tokenizer<'a> {
         }
 
         match c {
-            '{' => self.span_end(meta, Token::BracketOpen),
-            '}' => self.span_end(meta, Token::BracketClose),
+            '{' => self.span_end(meta, Token::CurlyBOpen),
+            '}' => self.span_end(meta, Token::CurlyBClose),
             '=' => self.span_end(meta, Token::Equal),
             ';' => self.span_end(meta, Token::Semicolon),
+            '[' => self.span_end(meta, Token::SquareBOpen),
+            ']' => self.span_end(meta, Token::SquareBClose),
             '(' => self.span_end(meta, Token::ParenOpen),
             ')' => self.span_end(meta, Token::ParenClose),
             '+' => self.span_end(meta, Token::Add),
@@ -430,24 +434,24 @@ mod tests {
     fn basic_int_set() {
         assert_eq!(
             tokenize("{ int = 42; }"),
-            Ok(vec![Token::BracketOpen, Token::Ident("int".into()), Token::Equal,
-            Token::Value(42.into()), Token::Semicolon, Token::BracketClose])
+            Ok(vec![Token::CurlyBOpen, Token::Ident("int".into()), Token::Equal,
+            Token::Value(42.into()), Token::Semicolon, Token::CurlyBClose])
         );
     }
     #[test]
     fn basic_float_set() {
         assert_eq!(
             tokenize("{ float = 1.234; }"),
-            Ok(vec![Token::BracketOpen, Token::Ident("float".into()), Token::Equal,
-            Token::Value(1.234.into()), Token::Semicolon, Token::BracketClose])
+            Ok(vec![Token::CurlyBOpen, Token::Ident("float".into()), Token::Equal,
+            Token::Value(1.234.into()), Token::Semicolon, Token::CurlyBClose])
         );
     }
     #[test]
     fn basic_string_set() {
         assert_eq!(
             tokenize(r#"{ string = "Hello \"World\""; }"#),
-            Ok(vec![Token::BracketOpen, Token::Ident("string".into()), Token::Equal,
-            Token::Value("Hello \"World\"".into()), Token::Semicolon, Token::BracketClose])
+            Ok(vec![Token::CurlyBOpen, Token::Ident("string".into()), Token::Equal,
+            Token::Value("Hello \"World\"".into()), Token::Semicolon, Token::CurlyBClose])
         );
     }
     #[test]
@@ -455,7 +459,7 @@ mod tests {
         assert_eq!(
             tokenize_span("{\n    int /* hi */ = 1; # testing comments!\n}"),
             Ok(vec![
-                (meta! { start: (0,  0), end: (0,  1) }, Token::BracketOpen),
+                (meta! { start: (0,  0), end: (0,  1) }, Token::CurlyBOpen),
                 (meta! { start: (1,  4), end: (1,  7) }, Token::Ident("int".to_string())),
                 (
                     Meta {
@@ -471,7 +475,7 @@ mod tests {
                         comments: vec![" testing comments!\n".into()],
                         span: Span { start: (2,  0), end: Some((2,  1)) }
                     },
-                    Token::BracketClose
+                    Token::CurlyBClose
                 )
             ])
         );
@@ -492,14 +496,14 @@ mod tests {
     '';
 }"#),
             Ok(vec![
-                Token::BracketOpen,
+                Token::CurlyBOpen,
                     Token::Ident("multiline".into()), Token::Equal,
                     Token::Value(r#"This is a
 multiline
 string :D
 \'\'\'\'\
 "#.into()),
-                Token::Semicolon, Token::BracketClose
+                Token::Semicolon, Token::CurlyBClose
             ])
         );
     }
@@ -512,12 +516,12 @@ string :D
                 Token::Interpol(vec![
                     Interpol::Literal("Hello, ".into()),
                     Interpol::Tokens(vec![
-                        (meta! { start: (0, 12), end: (0, 13) }, Token::BracketOpen),
+                        (meta! { start: (0, 12), end: (0, 13) }, Token::CurlyBOpen),
                         (meta! { start: (0, 14), end: (0, 19) }, Token::Ident("world".into())),
                         (meta! { start: (0, 20), end: (0, 21) }, Token::Equal),
                         (meta! { start: (0, 22), end: (0, 29) }, Token::Value("World".into())),
                         (meta! { start: (0, 29), end: (0, 30) }, Token::Semicolon),
-                        (meta! { start: (0, 31), end: (0, 32) }, Token::BracketClose),
+                        (meta! { start: (0, 31), end: (0, 32) }, Token::CurlyBClose),
                         (meta! { start: (0, 32), end: (0, 33) }, Token::Dot),
                         (meta! { start: (0, 33), end: (0, 38) }, Token::Ident("world".into()))
                     ]),
@@ -592,6 +596,18 @@ string :D
             Ok(vec![
                 Token::Import,
                 Token::Value(Value::Path(Anchor::Store, "nixpkgs".into()))
+            ])
+        );
+    }
+    #[test]
+    fn list() {
+        assert_eq!(
+            tokenize(r#"[a 2 3 "lol"]"#),
+            Ok(vec![
+               Token::SquareBOpen,
+               Token::Ident("a".into()), Token::Value(2.into()), Token::Value(3.into()),
+               Token::Value("lol".into()),
+               Token::SquareBClose
             ])
         );
     }

@@ -32,6 +32,7 @@ pub enum ASTType {
         recursive: bool,
         values: Set
     },
+    List(Vec<AST>),
     LetIn(Set, Box<AST>),
     With(Box<(AST, AST)>),
     Import(Box<AST>),
@@ -70,6 +71,7 @@ pub enum ASTNoSpan {
         recursive: bool,
         values: SetNoSpan
     },
+    List(Vec<ASTNoSpan>),
     LetIn(SetNoSpan, Box<ASTNoSpan>),
     With(Box<(ASTNoSpan, ASTNoSpan)>),
     Import(Box<ASTNoSpan>),
@@ -106,6 +108,7 @@ impl From<AST> for ASTNoSpan {
     fn from(ast: AST) -> ASTNoSpan {
         match ast.1 {
             ASTType::Set { recursive, values } => ASTNoSpan::Set { recursive, values: set_discard_span(values) },
+            ASTType::List(inner) => ASTNoSpan::List(vec_into(inner)),
             ASTType::LetIn(set, ast) => ASTNoSpan::LetIn(set_discard_span(set), discard_span(ast)),
             ASTType::With(inner) => ASTNoSpan::With(tuple_discard_span(inner)),
             ASTType::Import(inner) => ASTNoSpan::Import(discard_span(inner)),
@@ -186,26 +189,38 @@ impl<I> Parser<I>
 
     pub fn parse_val(&mut self) -> Result<AST> {
         let mut next = match self.next()? {
+            (_, Token::ParenOpen) => {
+                let expr = self.parse_expr()?;
+                self.expect(Token::ParenClose)?;
+                expr
+            },
             (start, Token::Rec) => {
-                self.expect_peek(Token::BracketOpen)?;
+                self.expect_peek(Token::CurlyBOpen)?;
                 let AST(end, mut set) = self.parse_val()?;
                 if let ASTType::Set { ref mut recursive, .. } = set {
                     *recursive = true;
                 }
                 AST(start.until(&end), set)
             },
-            (start, Token::BracketOpen) => {
+            (start, Token::CurlyBOpen) => {
                 let values = self.parse_set()?;
-                let end = self.expect(Token::BracketClose)?;
+                let end = self.expect(Token::CurlyBClose)?;
                 AST(start.until(&end), ASTType::Set {
                     recursive: false,
                     values
                 })
             },
-            (_, Token::ParenOpen) => {
-                let expr = self.parse_expr()?;
-                self.expect(Token::ParenClose)?;
-                expr
+            (start, Token::SquareBOpen) => {
+                let mut values = Vec::new();
+                loop {
+                    let peek = self.peek();
+                    match peek {
+                        None | Some(Token::SquareBClose) => break,
+                        _ => values.push(self.parse_val()?)
+                    }
+                }
+                let end = self.expect(Token::SquareBClose)?;
+                AST(start.until(&end), ASTType::List(values))
             },
             (start, Token::Sub) => {
                 let AST(end, expr) = self.parse_val()?;
@@ -319,12 +334,12 @@ mod tests {
     fn set() {
         assert_eq!(
             parse![
-                Token::BracketOpen,
+                Token::CurlyBOpen,
 
                 Token::Ident("meaning_of_life".into()), Token::Equal, Token::Value(42.into()), Token::Semicolon,
                 Token::Ident("H4X0RNUM83R".into()), Token::Equal, Token::Value(1.337.into()), Token::Semicolon,
 
-                Token::BracketClose
+                Token::CurlyBClose
             ],
             Ok(AST::Set {
                 recursive: false,
@@ -336,9 +351,9 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::Rec, Token::BracketOpen,
+                Token::Rec, Token::CurlyBOpen,
                 Token::Ident("test".into()), Token::Equal, Token::Value(1.into()), Token::Semicolon,
-                Token::BracketClose
+                Token::CurlyBClose
             ],
             Ok(AST::Set {
                 recursive: true,
@@ -350,12 +365,12 @@ mod tests {
     fn meta() {
         assert_eq!(
             super::parse(vec![
-                (Meta::default(), Token::BracketOpen),
+                (Meta::default(), Token::CurlyBOpen),
                 (meta! { start: (4, 2), end: None }, Token::Semicolon),
             ].into_iter()),
             Err((
                 Some(Span { start: (4, 2), end: None }),
-                ParseError::Expected(Token::BracketClose, Some(Token::Semicolon))
+                ParseError::Expected(Token::CurlyBClose, Some(Token::Semicolon))
             ))
         );
         assert_eq!(
@@ -486,12 +501,12 @@ mod tests {
                 Token::Interpol(vec![
                     TokenInterpol::Literal("Hello, ".into()),
                     TokenInterpol::Tokens(vec![
-                        (meta! { start: (0, 12), end: (0, 13) }, Token::BracketOpen),
+                        (meta! { start: (0, 12), end: (0, 13) }, Token::CurlyBOpen),
                         (meta! { start: (0, 14), end: (0, 19) }, Token::Ident("world".into())),
                         (meta! { start: (0, 20), end: (0, 21) }, Token::Equal),
                         (meta! { start: (0, 22), end: (0, 29) }, Token::Value("World".into())),
                         (meta! { start: (0, 29), end: (0, 30) }, Token::Semicolon),
-                        (meta! { start: (0, 31), end: (0, 32) }, Token::BracketClose),
+                        (meta! { start: (0, 31), end: (0, 32) }, Token::CurlyBClose),
                         (meta! { start: (0, 32), end: (0, 33) }, Token::Dot),
                         (meta! { start: (0, 33), end: (0, 38) }, Token::Ident("world".into()))
                     ]),
@@ -508,6 +523,21 @@ mod tests {
                     "world".into()
                 )),
                 Interpol::Literal("!".into())
+            ]))
+        );
+    }
+    #[test]
+    fn list() {
+        assert_eq!(
+            parse![
+               Token::SquareBOpen,
+               Token::Ident("a".into()), Token::Value(2.into()), Token::Value(3.into()),
+               Token::Value("lol".into()),
+               Token::SquareBClose
+            ],
+            Ok(AST::List(vec![
+                AST::Var("a".into()), AST::Value(2.into()), AST::Value(3.into()),
+                AST::Value("lol".into())
             ]))
         );
     }

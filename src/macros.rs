@@ -44,6 +44,9 @@ macro_rules! nix_inner {
     (parse ($($set:tt)*).$field:ident) => {{
         AST::IndexSet(Box::new(nix_inner!(parse $($set)*)), String::from(stringify!($field)))
     }};
+    (parse [$(($($item:tt)*))*]) => {{
+        AST::List(vec![$(nix_inner!(parse $($item)*)),*])
+    }};
     (parse $val:ident) => {{
         AST::Var(String::from(stringify!($val)))
     }};

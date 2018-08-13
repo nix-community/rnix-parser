@@ -93,5 +93,11 @@ string :D
                 password = ("hunter2");
             })
         );
+        assert_eq!(
+            parse(include_str!("../tests/lists.nix")),
+            nix!({
+                thing = ([(1) (2) (3) ((2) + (2))]);
+            })
+        );
     }
 }
