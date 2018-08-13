@@ -41,6 +41,9 @@ macro_rules! nix_inner {
     (parse ($($val1:tt)*) / ($($val2:tt)*)) => {{
         AST::Div(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
     }};
+    (parse ($($val1:tt)*) ++ ($($val2:tt)*)) => {{
+        AST::Concat(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    }};
     (parse ($($set:tt)*).$field:ident) => {{
         AST::IndexSet(Box::new(nix_inner!(parse $($set)*)), String::from(stringify!($field)))
     }};

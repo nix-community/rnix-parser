@@ -31,6 +31,7 @@ pub enum Token {
     Rec,
     SquareBOpen,
     SquareBClose,
+    Concat,
 
     ParenOpen,
     ParenClose,
@@ -322,6 +323,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             ']' => self.span_end(meta, Token::SquareBClose),
             '(' => self.span_end(meta, Token::ParenOpen),
             ')' => self.span_end(meta, Token::ParenClose),
+            '+' if self.peek() == Some('+') => { self.next()?; self.span_end(meta, Token::Concat) },
             '+' => self.span_end(meta, Token::Add),
             '-' => self.span_end(meta, Token::Sub),
             '*' => self.span_end(meta, Token::Mul),
@@ -608,6 +610,14 @@ string :D
                Token::Ident("a".into()), Token::Value(2.into()), Token::Value(3.into()),
                Token::Value("lol".into()),
                Token::SquareBClose
+            ])
+        );
+        assert_eq!(
+            tokenize(r#"[1] ++ [2] ++ [3]"#),
+            Ok(vec![
+               Token::SquareBOpen, Token::Value(1.into()), Token::SquareBClose, Token::Concat,
+               Token::SquareBOpen, Token::Value(2.into()), Token::SquareBClose, Token::Concat,
+               Token::SquareBOpen, Token::Value(3.into()), Token::SquareBClose
             ])
         );
     }

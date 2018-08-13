@@ -24,7 +24,6 @@ You can check the `tests/` directory to see what is currently implemented.
 
 **TODO**:
 
- - combining lists
  - lambdas
  - argument patterns (optionals, ellipsis, @)
  - if..then..else

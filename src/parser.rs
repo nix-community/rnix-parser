@@ -39,6 +39,7 @@ pub enum ASTType {
     Var(String),
     Interpol(Vec<Interpol>),
     IndexSet(Box<AST>, String),
+    Concat(Box<(AST, AST)>),
 
     // Could also do Add(Box<AST>, Box<AST>), but I believe this is more
     // efficient.
@@ -78,6 +79,7 @@ pub enum ASTNoSpan {
     Var(String),
     Interpol(Vec<InterpolNoSpan>),
     IndexSet(Box<ASTNoSpan>, String),
+    Concat(Box<(ASTNoSpan, ASTNoSpan)>),
 
     Negate(Box<ASTNoSpan>),
     Add(Box<(ASTNoSpan, ASTNoSpan)>),
@@ -115,6 +117,7 @@ impl From<AST> for ASTNoSpan {
             ASTType::Var(inner) => ASTNoSpan::Var(inner),
             ASTType::Interpol(inner) => ASTNoSpan::Interpol(vec_into(inner)),
             ASTType::IndexSet(set, key) => ASTNoSpan::IndexSet(discard_span(set), key),
+            ASTType::Concat(inner) => ASTNoSpan::Concat(tuple_discard_span(inner)),
 
             ASTType::Negate(inner) => ASTNoSpan::Negate(discard_span(inner)),
             ASTType::Add(inner) => ASTNoSpan::Add(tuple_discard_span(inner)),
@@ -263,7 +266,8 @@ impl<I> Parser<I>
         math!(
             self, { self.parse_mul()? },
             Token::Add => ASTType::Add,
-            Token::Sub => ASTType::Sub
+            Token::Sub => ASTType::Sub,
+            Token::Concat => ASTType::Concat
         )
     }
 
@@ -539,6 +543,20 @@ mod tests {
                 AST::Var("a".into()), AST::Value(2.into()), AST::Value(3.into()),
                 AST::Value("lol".into())
             ]))
+        );
+        assert_eq!(
+            parse![
+               Token::SquareBOpen, Token::Value(1.into()), Token::SquareBClose, Token::Concat,
+               Token::SquareBOpen, Token::Value(2.into()), Token::SquareBClose, Token::Concat,
+               Token::SquareBOpen, Token::Value(3.into()), Token::SquareBClose
+            ],
+            Ok(AST::Concat(Box::new((
+                AST::Concat(Box::new((
+                    AST::List(vec![AST::Value(1.into())]),
+                    AST::List(vec![AST::Value(2.into())]),
+                ))),
+                AST::List(vec![AST::Value(3.into())])
+            ))))
         );
     }
 }
