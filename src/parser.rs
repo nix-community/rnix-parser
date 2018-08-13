@@ -1,5 +1,5 @@
 use crate::{
-    tokenizer::{Interpol as TokenInterpol, Span, Token},
+    tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
     value::Value
 };
 use std::iter::Peekable;
@@ -18,7 +18,7 @@ pub type Set = Vec<(String, AST)>;
 pub type SetNoSpan = Vec<(String, ASTNoSpan)>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct AST(Span, ASTType);
+pub struct AST(Meta, ASTType);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Interpol {
@@ -134,7 +134,7 @@ macro_rules! math {
                 $(Some(&(_, $token)) => {
                     $self.next()?;
                     let AST(end, expr) = { $next };
-                    val = AST(val.0.until(end), $ast(Box::new((val, AST(end, expr)))));
+                    val = AST(val.0.span.until(end.span).into(), $ast(Box::new((val, AST(end, expr)))));
                 },)*
                 _ => break
             }
@@ -144,12 +144,12 @@ macro_rules! math {
 }
 
 pub struct Parser<I>
-    where I: Iterator<Item = (Span, Token)>
+    where I: Iterator<Item = (Meta, Token)>
 {
     iter: Peekable<I>
 }
 impl<I> Parser<I>
-    where I: Iterator<Item = (Span, Token)>
+    where I: Iterator<Item = (Meta, Token)>
 {
     pub fn new(iter: Peekable<I>) -> Self {
         Self { iter }
@@ -158,28 +158,26 @@ impl<I> Parser<I>
     pub fn peek(&mut self) -> Option<&Token> {
         self.iter.peek().map(|(_, token)| token)
     }
-    pub fn next(&mut self) -> Result<(Span, Token)> {
-        self.iter.next()
-            .map(|entry| entry)
-            .ok_or((None, ParseError::UnexpectedEOF))
+    pub fn next(&mut self) -> Result<(Meta, Token)> {
+        self.iter.next().ok_or((None, ParseError::UnexpectedEOF))
     }
-    pub fn expect(&mut self, expected: Token) -> Result<Span> {
-        if let Some((span, actual)) = self.iter.next() {
+    pub fn expect(&mut self, expected: Token) -> Result<Meta> {
+        if let Some((meta, actual)) = self.iter.next() {
             if actual == expected {
-                Ok(span)
+                Ok(meta)
             } else {
-                Err((Some(span), ParseError::Expected(expected, Some(actual))))
+                Err((Some(meta.span), ParseError::Expected(expected, Some(actual))))
             }
         } else {
             Err((None, ParseError::Expected(expected, None)))
         }
     }
-    pub fn expect_peek(&mut self, expected: Token) -> Result<Span> {
-        if let Some(&(span, ref actual)) = self.iter.peek() {
+    pub fn expect_peek(&mut self, expected: Token) -> Result<()> {
+        if let Some((meta, actual)) = self.iter.peek() {
             if *actual == expected {
-                Ok(span)
+                Ok(())
             } else {
-                Err((Some(span), ParseError::Expected(expected, Some(actual.clone()))))
+                Err((Some(meta.span), ParseError::Expected(expected, Some(actual.clone()))))
             }
         } else {
             Err((None, ParseError::Expected(expected, None)))
@@ -194,28 +192,28 @@ impl<I> Parser<I>
                 if let ASTType::Set { ref mut recursive, .. } = set {
                     *recursive = true;
                 }
-                AST(start.until(end), set)
+                AST(start.until(&end), set)
             },
             (start, Token::BracketOpen) => {
                 let values = self.parse_set()?;
                 let end = self.expect(Token::BracketClose)?;
-                AST(start.until(end), ASTType::Set {
+                AST(start.until(&end), ASTType::Set {
                     recursive: false,
                     values
                 })
             },
-            (start, Token::ParenOpen) => {
-                let AST(_, expr) = self.parse_expr()?;
-                let end = self.expect(Token::ParenClose)?;
-                AST(start.until(end), expr)
+            (_, Token::ParenOpen) => {
+                let expr = self.parse_expr()?;
+                self.expect(Token::ParenClose)?;
+                expr
             },
             (start, Token::Sub) => {
                 let AST(end, expr) = self.parse_val()?;
-                AST(start.until(end), ASTType::Negate(Box::new(AST(end, expr))))
+                AST(start.until(&end), ASTType::Negate(Box::new(AST(end, expr))))
             },
-            (span, Token::Value(val)) => AST(span, ASTType::Value(val)),
-            (span, Token::Ident(name)) => AST(span, ASTType::Var(name)),
-            (span, Token::Interpol(values)) => {
+            (meta, Token::Value(val)) => AST(meta, ASTType::Value(val)),
+            (meta, Token::Ident(name)) => AST(meta, ASTType::Var(name)),
+            (meta, Token::Interpol(values)) => {
                 let mut parsed = Vec::new();
                 for value in values {
                     parsed.push(match value {
@@ -223,15 +221,15 @@ impl<I> Parser<I>
                         TokenInterpol::Tokens(tokens) => Interpol::AST(parse(tokens.into_iter())?)
                     });
                 }
-                AST(span, ASTType::Interpol(parsed))
+                AST(meta, ASTType::Interpol(parsed))
             },
-            (span, token) => return Err((Some(span), ParseError::Unexpected(token)))
+            (meta, token) => return Err((Some(meta.span), ParseError::Unexpected(token)))
         };
 
         while self.peek() == Some(&Token::Dot) {
             self.next()?;
             if let (end, Token::Ident(ident)) = self.next()? {
-                next = AST(next.0.until(end), ASTType::IndexSet(Box::new(next), ident));
+                next = AST(next.0.span.until(end.span).into(), ASTType::IndexSet(Box::new(next), ident));
             }
         }
 
@@ -277,19 +275,19 @@ impl<I> Parser<I>
                 let vars = self.parse_set()?;
                 self.expect(Token::In)?;
                 let AST(end, expr) = self.parse_expr()?;
-                AST(start.until(end), ASTType::LetIn(vars, Box::new(AST(end, expr))))
+                AST(start.until(&end), ASTType::LetIn(vars, Box::new(AST(end, expr))))
             },
             Some(Token::With) => {
                 let (start, _) = self.next()?;
                 let vars = self.parse_expr()?;
                 self.expect(Token::Semicolon)?;
                 let AST(end, expr) = self.parse_expr()?;
-                AST(start.until(end), ASTType::With(Box::new((vars, AST(end, expr)))))
+                AST(start.until(&end), ASTType::With(Box::new((vars, AST(end, expr)))))
             },
             Some(Token::Import) => {
                 let (start, _) = self.next()?;
                 let AST(end, expr) = self.parse_expr()?;
-                AST(start.until(end), ASTType::Import(Box::new(AST(end, expr))))
+                AST(start.until(&end), ASTType::Import(Box::new(AST(end, expr))))
             },
             _ => self.parse_add()?
         })
@@ -297,7 +295,7 @@ impl<I> Parser<I>
 }
 
 pub fn parse<I>(iter: I) -> Result<AST>
-    where I: IntoIterator<Item = (Span, Token)>
+    where I: IntoIterator<Item = (Meta, Token)>
 {
     Parser::new(iter.into_iter().peekable()).parse_expr()
 }
@@ -305,14 +303,14 @@ pub fn parse<I>(iter: I) -> Result<AST>
 #[cfg(test)]
 mod tests {
     use crate::{
-        tokenizer::{Interpol as TokenInterpol, Span, Token},
+        tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
         value::{Anchor, Value}
     };
     use super::{AST as ASTSpan, ASTNoSpan as AST, ASTType, InterpolNoSpan as Interpol, ParseError};
 
     macro_rules! parse {
         ($($token:expr),*) => {
-            super::parse(vec![$((Span::default(), $token)),*].into_iter())
+            super::parse(vec![$((Meta::default(), $token)),*].into_iter())
                 .map(AST::from)
         }
     }
@@ -349,11 +347,11 @@ mod tests {
         );
     }
     #[test]
-    fn spans() {
+    fn meta() {
         assert_eq!(
             super::parse(vec![
-                (Span::default(), Token::BracketOpen),
-                (Span { start: (4, 2), end: None }, Token::Semicolon),
+                (Meta::default(), Token::BracketOpen),
+                (meta! { start: (4, 2), end: None }, Token::Semicolon),
             ].into_iter()),
             Err((
                 Some(Span { start: (4, 2), end: None }),
@@ -362,28 +360,37 @@ mod tests {
         );
         assert_eq!(
             super::parse(vec![
-                (Span { start: (0, 0), end: Some((0, 1)) }, Token::Value(1.into())),
-                (Span { start: (0, 2), end: Some((0, 3)) }, Token::Add),
-                (Span { start: (0, 4), end: Some((0, 5)) }, Token::Value(2.into())),
-                (Span { start: (0, 6), end: Some((0, 7)) }, Token::Mul),
-                (Span { start: (0, 8), end: Some((0, 9)) }, Token::Value(3.into())),
+                (meta! { start: (0, 0), end: (0, 1) }, Token::Value(1.into())),
+                (meta! { start: (0, 2), end: (0, 3) }, Token::Add),
+                (
+                    Meta {
+                        comments: vec!["Hello World!".into()],
+                        span: Span { start: (0, 4), end: Some((0, 5)) }
+                    },
+                    Token::Value(2.into())
+                ),
+                (meta! { start: (0, 6), end: (0, 7) }, Token::Mul),
+                (meta! { start: (0, 8), end: (0, 9) }, Token::Value(3.into())),
             ].into_iter()),
             Ok(ASTSpan(
-                Span { start: (0, 0), end: Some((0, 9)) },
+                meta! { start: (0, 0), end: (0, 9) },
                 ASTType::Add(Box::new((
                     ASTSpan(
-                        Span { start: (0, 0), end: Some((0, 1)) },
+                        meta! { start: (0, 0), end: (0, 1) },
                         ASTType::Value(1.into())
                     ),
                     ASTSpan(
-                        Span { start: (0, 4), end: Some((0, 9)) },
+                        meta! { start: (0, 4), end: (0, 9) },
                         ASTType::Mul(Box::new((
                             ASTSpan(
-                                Span { start: (0, 4), end: Some((0, 5)) },
+                                Meta {
+                                    comments: vec!["Hello World!".into()],
+                                    span: Span { start: (0, 4), end: Some((0, 5)) }
+                                },
                                 ASTType::Value(2.into())
                             ),
                             ASTSpan(
-                                Span { start: (0, 8), end: Some((0, 9)) },
+                                meta! { start: (0, 8), end: (0, 9) },
                                 ASTType::Value(3.into())
                             )
                         )))
@@ -479,14 +486,14 @@ mod tests {
                 Token::Interpol(vec![
                     TokenInterpol::Literal("Hello, ".into()),
                     TokenInterpol::Tokens(vec![
-                        (Span { start: (0, 12), end: Some((0, 13)) }, Token::BracketOpen),
-                        (Span { start: (0, 14), end: Some((0, 19)) }, Token::Ident("world".into())),
-                        (Span { start: (0, 20), end: Some((0, 21)) }, Token::Equal),
-                        (Span { start: (0, 22), end: Some((0, 29)) }, Token::Value("World".into())),
-                        (Span { start: (0, 29), end: Some((0, 30)) }, Token::Semicolon),
-                        (Span { start: (0, 31), end: Some((0, 32)) }, Token::BracketClose),
-                        (Span { start: (0, 32), end: Some((0, 33)) }, Token::Dot),
-                        (Span { start: (0, 33), end: Some((0, 38)) }, Token::Ident("world".into()))
+                        (meta! { start: (0, 12), end: (0, 13) }, Token::BracketOpen),
+                        (meta! { start: (0, 14), end: (0, 19) }, Token::Ident("world".into())),
+                        (meta! { start: (0, 20), end: (0, 21) }, Token::Equal),
+                        (meta! { start: (0, 22), end: (0, 29) }, Token::Value("World".into())),
+                        (meta! { start: (0, 29), end: (0, 30) }, Token::Semicolon),
+                        (meta! { start: (0, 31), end: (0, 32) }, Token::BracketClose),
+                        (meta! { start: (0, 32), end: (0, 33) }, Token::Dot),
+                        (meta! { start: (0, 33), end: (0, 38) }, Token::Ident("world".into()))
                     ]),
                     TokenInterpol::Literal("!".into())
                 ])

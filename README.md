@@ -24,7 +24,6 @@ You can check the `tests/` directory to see what is currently implemented.
 
 **TODO**:
 
- - comments
  - lists
  - combining lists
  - lambdas

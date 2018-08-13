@@ -3,6 +3,16 @@
 #[macro_use]
 extern crate failure;
 
+#[cfg(test)]
+macro_rules! meta {
+    (start: $start:expr, end: None) => {{
+        Meta { span: Span { start: $start, end: None }, comments: Vec::new() }
+    }};
+    (start: $start:expr, end: $end:expr) => {{
+        Meta { span: Span { start: $start, end: Some($end) }, comments: Vec::new() }
+    }};
+}
+
 #[macro_use]
 pub mod macros;
 pub mod parser;
@@ -18,8 +28,7 @@ mod tests {
 
     fn parse(string: &str) -> AST {
         AST::from(inner_parse(
-            tokenize(string)
-                .map(|(span, result)| (span, result.expect("error while tokenizing")))
+            tokenize(string).map(|result| result.expect("error while tokenizing"))
         ).expect("error while parsing"))
     }
 
@@ -76,6 +85,13 @@ string :D
                     ])));
                 }
             )
-        )
+        );
+        assert_eq!(
+            parse(include_str!("../tests/comments.nix")),
+            nix!({
+                string = ("42");
+                password = ("hunter2");
+            })
+        );
     }
 }
