@@ -1,29 +1,36 @@
 #[macro_export]
 macro_rules! nix_inner {
+    (set (rec: $recursive:expr) {}) => {{ AST::EmptySet }};
     (set (rec: $recursive:expr) {
-        $($ident:ident = ($($val:tt)*);)*
+        $($ident:ident = ($($val:tt)*);)+
     }) => {{
         AST::Set {
             recursive: $recursive,
             values: vec![
-                $((String::from(stringify!($ident)), nix_inner!(parse $($val)*))),*
+                $(SetEntry(vec![String::from(stringify!($ident))], nix_inner!(parse $($val)*))),*
             ]
         }
     }};
+    (pat_default) => {{ None }};
+    (pat_default $($stuff:tt)+) => {{ Some(nix_inner!(parse $($stuff)+)) }};
+    (pat_bind) => {{ None }};
+    (pat_bind $name:ident) => {{ Some(String::from(stringify!($name))) }};
+    (pat_exact) => {{ true }};
+    (pat_exact $value:expr) => {{ $value }};
     (parse { $($token:tt)* }) => {{ nix_inner!(set (rec: false) { $($token)* }) }};
     (parse rec { $($token:tt)* }) => {{ nix_inner!(set (rec: true) { $($token)* }) }};
     (parse let {
         $($ident:ident = ($($val:tt)*);)*
     } in $($remaining:tt)*) => {{
         AST::LetIn(
-            vec![$((String::from(stringify!($ident)), nix_inner!(parse $($val)*))),*],
+            vec![$(SetEntry(vec![String::from(stringify!($ident))], nix_inner!(parse $($val)*))),*],
             Box::new(nix_inner!(parse $($remaining)*))
         )
     }};
     (parse let {
         $($ident:ident = ($($val:tt)*);)*
     }) => {{
-        AST::Let(vec![$((String::from(stringify!($ident)), nix_inner!(parse $($val)*))),*])
+        AST::Let(vec![$(SetEntry(vec![String::from(stringify!($ident))], nix_inner!(parse $($val)*))),*])
     }};
     (parse with ($($namespace:tt)*); $($remaining:tt)*) => {{
         AST::With(Box::new((
@@ -35,7 +42,23 @@ macro_rules! nix_inner {
         AST::Import(Box::new(nix_inner!(parse $($path)*)))
     }};
     (parse $fn:ident: $($body:tt)*) => {{
-        AST::Lambda(String::from(stringify!($fn)), Box::new(nix_inner!(parse $($body)*)))
+        AST::Lambda(FnArg::Ident(String::from(stringify!($fn))), Box::new(nix_inner!(parse $($body)*)))
+    }};
+    (parse $($bind:ident @)* {
+        $(( exact = $optional:expr ))*
+        // TODO: Use optional macro args if they become a thing
+        $($arg:ident $(? ($($default:tt)*))*),*
+    }: $($body:tt)*) => {{
+        AST::Lambda(
+            FnArg::Pattern {
+                args: vec![
+                    $(PatEntry(String::from(stringify!($arg)), nix_inner!(pat_default $($($default)*)*))),*
+                ],
+                bind: nix_inner!(pat_bind $($bind)*),
+                exact: nix_inner!(pat_exact $($optional)*)
+            },
+            Box::new(nix_inner!(parse $($body)*))
+        )
     }};
     (parse ($($val1:tt)*) + ($($val2:tt)*)) => {{
         AST::Add(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
@@ -78,7 +101,7 @@ macro_rules! nix {
     ($($tokens:tt)*) => {{
         #[allow(unused_imports)]
         use crate::{
-            parser::ASTNoSpan as AST,
+            nometa::*,
             value::{Anchor, Value}
         };
         nix_inner!(parse $($tokens)*)
@@ -88,7 +111,7 @@ macro_rules! nix {
 #[cfg(test)]
 #[test]
 fn test_macro() {
-    use crate::parser::ASTNoSpan as AST;
+    use crate::nometa::*;
     assert_eq!(
         nix!({
             string = ("Hello World");
@@ -97,8 +120,8 @@ fn test_macro() {
         AST::Set {
             recursive: false,
             values: vec![
-                ("string".into(), AST::Value("Hello World".into())),
-                ("number".into(), AST::Mul(Box::new((
+                SetEntry(vec!["string".into()], AST::Value("Hello World".into())),
+                SetEntry(vec!["number".into()], AST::Mul(Box::new((
                     AST::Value(3.into()),
                     AST::Add(Box::new((
                         AST::Value(4.into()),

@@ -1,48 +1,43 @@
 use crate::{
     tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
+    utils::stack::Stack,
     value::Value
 };
-use std::iter::Peekable;
 
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum ParseError {
-    #[fail(display = "unexpected eof")]
-    UnexpectedEOF,
     #[fail(display = "expected {:?}, found {:?}", _0, _1)]
     Expected(Token, Option<Token>),
+    #[fail(display = "expected {}, found {:?}", _0, _1)]
+    ExpectedType(&'static str, Token),
+    #[fail(display = "invalid type! expected {}", _0)]
+    InvalidType(&'static str),
+    #[fail(display = "unexpected eof")]
+    UnexpectedEOF,
     #[fail(display = "unexpected token {:?} not applicable in this context", _0)]
     Unexpected(Token)
 }
 
-pub type Set = Vec<(String, AST)>;
-pub type SetNoSpan = Vec<(String, ASTNoSpan)>;
-
 #[derive(Clone, Debug, PartialEq)]
-pub struct AST(Meta, ASTType);
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Interpol {
-    Literal(String),
-    AST(AST)
-}
-
+pub struct AST(pub Meta, pub ASTType);
 #[derive(Clone, Debug, PartialEq)]
 pub enum ASTType {
     // Types
+    EmptySet,
     Interpol(Vec<Interpol>),
-    Lambda(String, Box<AST>),
+    Lambda(FnArg, Box<AST>),
     List(Vec<AST>),
     Set {
         recursive: bool,
-        values: Set
+        values: Vec<SetEntry>
     },
     Value(Value),
     Var(String),
 
     // Expressions
     Import(Box<AST>),
-    Let(Set),
-    LetIn(Set, Box<AST>),
+    Let(Vec<SetEntry>),
+    LetIn(Vec<SetEntry>, Box<AST>),
     With(Box<(AST, AST)>),
 
     // Operators
@@ -56,100 +51,24 @@ pub enum ASTType {
     Mul(Box<(AST, AST)>),
     Div(Box<(AST, AST)>)
 }
-
 #[derive(Clone, Debug, PartialEq)]
-pub enum InterpolNoSpan {
+pub enum FnArg {
+    Ident(String),
+    Pattern {
+        args: Vec<PatEntry>,
+        bind: Option<String>,
+        exact: bool
+    }
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum Interpol {
     Literal(String),
-    AST(ASTNoSpan)
+    AST(AST)
 }
-
-impl From<Interpol> for InterpolNoSpan {
-    fn from(interpol: Interpol) -> Self {
-        match interpol {
-            Interpol::Literal(text) => InterpolNoSpan::Literal(text),
-            Interpol::AST(ast) => InterpolNoSpan::AST(ASTNoSpan::from(ast))
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
-pub enum ASTNoSpan {
-    // Types
-    Interpol(Vec<InterpolNoSpan>),
-    Lambda(String, Box<ASTNoSpan>),
-    List(Vec<ASTNoSpan>),
-    Set {
-        recursive: bool,
-        values: SetNoSpan
-    },
-    Value(Value),
-    Var(String),
-
-    // Expressions
-    Import(Box<ASTNoSpan>),
-    Let(SetNoSpan),
-    LetIn(SetNoSpan, Box<ASTNoSpan>),
-    With(Box<(ASTNoSpan, ASTNoSpan)>),
-
-    // Operators
-    Apply(Box<(ASTNoSpan, ASTNoSpan)>),
-    Concat(Box<(ASTNoSpan, ASTNoSpan)>),
-    IndexSet(Box<ASTNoSpan>, String),
-    Negate(Box<ASTNoSpan>),
-
-    Add(Box<(ASTNoSpan, ASTNoSpan)>),
-    Sub(Box<(ASTNoSpan, ASTNoSpan)>),
-    Mul(Box<(ASTNoSpan, ASTNoSpan)>),
-    Div(Box<(ASTNoSpan, ASTNoSpan)>)
-}
-
-fn set_discard_span(set: Set) -> SetNoSpan {
-    set.into_iter()
-        .map(|(name, ast)| (name, ASTNoSpan::from(ast)))
-        .collect()
-}
-fn vec_into<F, T: From<F>>(vec: Vec<F>) -> Vec<T> {
-    vec.into_iter()
-        .map(|item| T::from(item))
-        .collect()
-}
-fn discard_span(ast: Box<AST>) -> Box<ASTNoSpan> {
-    Box::new((*ast).into())
-}
-fn tuple_discard_span(ast: Box<(AST, AST)>) -> Box<(ASTNoSpan, ASTNoSpan)> {
-    Box::new((ast.0.into(), ast.1.into()))
-}
-
-impl From<AST> for ASTNoSpan {
-    fn from(ast: AST) -> ASTNoSpan {
-        match ast.1 {
-            // Types
-            ASTType::Interpol(inner) => ASTNoSpan::Interpol(vec_into(inner)),
-            ASTType::Lambda(args, body) => ASTNoSpan::Lambda(args, discard_span(body)),
-            ASTType::List(inner) => ASTNoSpan::List(vec_into(inner)),
-            ASTType::Set { recursive, values } => ASTNoSpan::Set { recursive, values: set_discard_span(values) },
-            ASTType::Value(inner) => ASTNoSpan::Value(inner),
-            ASTType::Var(inner) => ASTNoSpan::Var(inner),
-
-            // Expressions
-            ASTType::Import(inner) => ASTNoSpan::Import(discard_span(inner)),
-            ASTType::Let(set) => ASTNoSpan::Let(set_discard_span(set)),
-            ASTType::LetIn(set, ast) => ASTNoSpan::LetIn(set_discard_span(set), discard_span(ast)),
-            ASTType::With(inner) => ASTNoSpan::With(tuple_discard_span(inner)),
-
-            // Operators
-            ASTType::Apply(inner) => ASTNoSpan::Apply(tuple_discard_span(inner)),
-            ASTType::Concat(inner) => ASTNoSpan::Concat(tuple_discard_span(inner)),
-            ASTType::IndexSet(set, key) => ASTNoSpan::IndexSet(discard_span(set), key),
-            ASTType::Negate(inner) => ASTNoSpan::Negate(discard_span(inner)),
-
-            ASTType::Add(inner) => ASTNoSpan::Add(tuple_discard_span(inner)),
-            ASTType::Sub(inner) => ASTNoSpan::Sub(tuple_discard_span(inner)),
-            ASTType::Mul(inner) => ASTNoSpan::Mul(tuple_discard_span(inner)),
-            ASTType::Div(inner) => ASTNoSpan::Div(tuple_discard_span(inner))
-        }
-    }
-}
+pub struct PatEntry(pub String, pub Option<AST>);
+#[derive(Clone, Debug, PartialEq)]
+pub struct SetEntry(pub Vec<String>, pub AST);
 
 type Error = (Option<Span>, ParseError);
 type Result<T> = std::result::Result<T, Error>;
@@ -158,8 +77,8 @@ macro_rules! math {
     ($self:expr, $next:block, $($token:pat => $ast:expr),*) => {{
         let mut val = { $next };
         loop {
-            match $self.iter.peek() {
-                $(Some(&(_, $token)) => {
+            match $self.peek() {
+                $(Some(&$token) => {
                     $self.next()?;
                     let AST(end, expr) = { $next };
                     val = AST(val.0.span.until(end.span).into(), $ast(Box::new((val, AST(end, expr)))));
@@ -174,23 +93,36 @@ macro_rules! math {
 pub struct Parser<I>
     where I: Iterator<Item = (Meta, Token)>
 {
-    iter: Peekable<I>
+    iter: I,
+    buffer: Stack<I::Item>,
 }
 impl<I> Parser<I>
     where I: Iterator<Item = (Meta, Token)>
 {
-    pub fn new(iter: Peekable<I>) -> Self {
-        Self { iter }
+    pub fn new(iter: I) -> Self {
+        Self {
+            iter,
+            // Can't use [None; 2] because I::Item isn't Copy
+            buffer: Stack::new([None, None])
+        }
     }
 
-    fn peek(&mut self) -> Option<&Token> {
-        self.iter.peek().map(|(_, token)| token)
+    fn peek_meta(&mut self) -> Option<&(Meta, Token)> {
+        if self.buffer.is_empty() {
+            *self.buffer.first_free() = self.iter.next();
+        }
+        self.buffer.peek()
     }
-    fn next(&mut self) -> Result<(Meta, Token)> {
-        self.iter.next().ok_or((None, ParseError::UnexpectedEOF))
+    fn peek(&mut self) -> Option<&Token> {
+        self.peek_meta().map(|(_, token)| token)
+    }
+    fn next(&mut self) -> Result<I::Item> {
+        self.buffer.pop()
+            .or_else(|| self.iter.next())
+            .ok_or((None, ParseError::UnexpectedEOF))
     }
     fn expect(&mut self, expected: Token) -> Result<Meta> {
-        if let Some((meta, actual)) = self.iter.next() {
+        if let Ok((meta, actual)) = self.next() {
             if actual == expected {
                 Ok(meta)
             } else {
@@ -201,15 +133,37 @@ impl<I> Parser<I>
         }
     }
     fn expect_peek(&mut self, expected: Token) -> Result<()> {
-        if let Some((meta, actual)) = self.iter.peek() {
+        if let Some((meta, actual)) = self.peek_meta() {
             if *actual == expected {
                 Ok(())
             } else {
-                Err((Some(meta.span), ParseError::Expected(expected, Some(actual.clone()))))
+                Err((Some(meta.span), ParseError::Expected(
+                    expected,
+                    Some(self.next().unwrap().1)
+                )))
             }
         } else {
             Err((None, ParseError::Expected(expected, None)))
         }
+    }
+
+    fn next_ident(&mut self) -> Result<(Meta, String)> {
+        match self.next()? {
+            (meta, Token::Ident(name)) => Ok((meta, name)),
+            (meta, token) => Err((Some(meta.span), ParseError::ExpectedType("ident", token)))
+        }
+    }
+    fn parse_ident(&mut self) -> Result<Vec<String>> {
+        let mut ident = Vec::with_capacity(1);
+        loop {
+            ident.push(self.next_ident()?.1);
+
+            if self.peek() != Some(&Token::Dot) {
+                break;
+            }
+            self.next().unwrap();
+        }
+        Ok(ident)
     }
     fn parse_val(&mut self) -> Result<AST> {
         let mut val = match self.next()? {
@@ -221,18 +175,80 @@ impl<I> Parser<I>
             (start, Token::Rec) => {
                 self.expect_peek(Token::CurlyBOpen)?;
                 let AST(end, mut set) = self.parse_val()?;
-                if let ASTType::Set { ref mut recursive, .. } = set {
-                    *recursive = true;
+                match set {
+                    ASTType::Set { ref mut recursive, .. } => *recursive = true,
+                    ASTType::EmptySet => (),
+                    _ => return Err((Some(end.span), ParseError::InvalidType("set")))
                 }
                 AST(start.until(&end), set)
             },
             (start, Token::CurlyBOpen) => {
-                let values = self.parse_set()?;
-                let end = self.expect(Token::CurlyBClose)?;
-                AST(start.until(&end), ASTType::Set {
-                    recursive: false,
-                    values
-                })
+                if self.peek() == Some(&Token::CurlyBClose) {
+                    let (end, _) = self.next().unwrap();
+                    return Ok(AST(start.until(&end), ASTType::EmptySet));
+                }
+                let (ident_span, mut ident) = self.next_ident()?;
+                match self.peek() {
+                    Some(Token::Comma) | Some(Token::Question) => {
+                        let mut args = Vec::with_capacity(1);
+                        let mut exact = true;
+                        loop {
+                            match self.next()? {
+                                (_, Token::Comma) => args.push(PatEntry(ident, None)),
+                                (_, Token::Question) => {
+                                    args.push(PatEntry(ident, Some(self.parse_expr()?)));
+                                    match self.peek_meta() {
+                                        Some((_, Token::CurlyBClose)) => (),
+                                        Some((_, Token::Comma)) => { self.next().unwrap(); },
+                                        Some((meta, _)) => return Err((
+                                            Some(meta.span),
+                                            ParseError::ExpectedType("comma or end", self.next().unwrap().1)
+                                        )),
+                                        None => return Err((Some(start.span), ParseError::UnexpectedEOF))
+                                    }
+                                },
+                                (meta, token) => return Err((Some(meta.span), ParseError::Unexpected(token)))
+                            }
+                            ident = match self.peek() {
+                                Some(&Token::Ident(_)) => self.next_ident()?.1,
+                                Some(&Token::Ellipsis) => {
+                                    self.next().unwrap();
+                                    exact = false;
+                                    break;
+                                },
+                                _ => break
+                            }
+                        }
+                        self.expect(Token::CurlyBClose)?;
+
+                        let bind = if self.peek() == Some(&Token::At) {
+                            self.next().unwrap();
+                            Some(self.next_ident()?.1)
+                        } else {
+                            None
+                        };
+
+                        self.expect(Token::Colon)?;
+
+                        let AST(end, expr) = self.parse_expr()?;
+
+                        AST(start.until(&end), ASTType::Lambda(
+                            FnArg::Pattern { args, bind, exact },
+                            Box::new(AST(end, expr))
+                        ))
+                    },
+                    _ => {
+                        // We did a lookahead, put it back
+                        *self.buffer.first_free() = Some((ident_span, Token::Ident(ident)));
+
+                        let values = self.parse_set()?;
+                        let end = self.expect(Token::CurlyBClose)?;
+                        AST(start.until(&end), ASTType::Set {
+                            recursive: false,
+                            values
+                        })
+                    }
+                }
             },
             (start, Token::SquareBOpen) => {
                 let mut values = Vec::new();
@@ -305,18 +321,15 @@ impl<I> Parser<I>
             Token::Concat => ASTType::Concat
         )
     }
-    fn parse_set(&mut self) -> Result<Set> {
+    fn parse_set(&mut self) -> Result<Vec<SetEntry>> {
         let mut values = Vec::new();
         while let Some(&Token::Ident(_)) = self.peek() {
-            let key = match self.next()? {
-                (_, Token::Ident(name)) => name,
-                _ => unreachable!()
-            };
+            let key = self.parse_ident()?;
             self.expect(Token::Equal)?;
             let value = self.parse_expr()?;
             self.expect(Token::Semicolon)?;
 
-            values.push((key, value));
+            values.push(SetEntry(key, value));
         }
         Ok(values)
     }
@@ -352,7 +365,7 @@ impl<I> Parser<I>
                 AST(start, ASTType::Var(name)) => if self.peek() == Some(&Token::Colon) {
                     self.next()?;
                     let AST(end, expr) = self.parse_expr()?;
-                    AST(start.until(&end), ASTType::Lambda(name, Box::new(AST(end, expr))))
+                    AST(start.until(&end), ASTType::Lambda(FnArg::Ident(name), Box::new(AST(end, expr))))
                 } else {
                     AST(start, ASTType::Var(name))
                 },
@@ -371,10 +384,11 @@ pub fn parse<I>(iter: I) -> Result<AST>
 #[cfg(test)]
 mod tests {
     use crate::{
+        nometa::*,
         tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
         value::{Anchor, Value}
     };
-    use super::{AST as ASTSpan, ASTNoSpan as AST, ASTType, InterpolNoSpan as Interpol, ParseError};
+    use super::{AST as ASTSpan, ASTType, ParseError};
 
     macro_rules! parse {
         ($($token:expr),*) => {
@@ -397,8 +411,8 @@ mod tests {
             Ok(AST::Set {
                 recursive: false,
                 values: vec![
-                    ("meaning_of_life".into(), AST::Value(42.into())),
-                    ("H4X0RNUM83R".into(), AST::Value(1.337.into()))
+                    SetEntry(vec!["meaning_of_life".into()], AST::Value(42.into())),
+                    SetEntry(vec!["H4X0RNUM83R".into()], AST::Value(1.337.into()))
                 ]
             })
         );
@@ -410,8 +424,16 @@ mod tests {
             ],
             Ok(AST::Set {
                 recursive: true,
-                values: vec![("test".into(), AST::Value(1.into()))]
+                values: vec![SetEntry(vec!["test".into()], AST::Value(1.into()))]
             })
+        );
+        assert_eq!(
+            parse![Token::CurlyBOpen, Token::CurlyBClose],
+            Ok(AST::EmptySet)
+        );
+        assert_eq!(
+            parse![Token::Rec, Token::CurlyBOpen, Token::CurlyBClose],
+            Ok(AST::EmptySet)
         );
     }
     #[test]
@@ -423,7 +445,7 @@ mod tests {
             ].into_iter()),
             Err((
                 Some(Span { start: (4, 2), end: None }),
-                ParseError::Expected(Token::CurlyBClose, Some(Token::Semicolon))
+                ParseError::ExpectedType("ident", Token::Semicolon)
             ))
         );
         assert_eq!(
@@ -507,7 +529,7 @@ mod tests {
                     Token::Ident("a".into())
             ],
             Ok(AST::LetIn(
-                vec![("a".into(), AST::Value(42.into()))],
+                vec![SetEntry(vec!["a".into()], AST::Value(42.into()))],
                 Box::new(AST::Var("a".into()))
             ))
         );
@@ -522,8 +544,8 @@ mod tests {
                 Token::CurlyBClose
             ],
             Ok(AST::Let(vec![
-                ("a".into(), AST::Value(42.into())),
-                ("body".into(), AST::Var("a".into()))
+                SetEntry(vec!["a".into()], AST::Value(42.into())),
+                SetEntry(vec!["body".into()], AST::Var("a".into()))
             ]))
         );
     }
@@ -555,11 +577,34 @@ mod tests {
     #[test]
     fn index_set() {
         assert_eq!(
-            parse![Token::Ident("hello".into()), Token::Dot, Token::Ident("world".into())],
+            parse![
+                Token::Ident("a".into()),
+                Token::Dot, Token::Ident("b".into()),
+                Token::Dot, Token::Ident("c".into())
+            ],
             Ok(AST::IndexSet(
-                Box::new(AST::Var("hello".into())),
-                "world".into()
+                Box::new(AST::IndexSet(
+                    Box::new(AST::Var("a".into())),
+                    "b".into()
+                )),
+                "c".into()
             ))
+        );
+        assert_eq!(
+            parse![
+                Token::CurlyBOpen,
+                    Token::Ident("a".into()),
+                        Token::Dot, Token::Ident("b".into()),
+                        Token::Dot, Token::Ident("c".into()),
+                    Token::Equal, Token::Value(1.into()), Token::Semicolon,
+                Token::CurlyBClose
+            ],
+            Ok(AST::Set {
+                recursive: false,
+                values: vec![
+                    SetEntry(vec!["a".into(), "b".into(), "c".into()], AST::Value(1.into()))
+                ]
+            })
         );
     }
     #[test]
@@ -586,7 +631,7 @@ mod tests {
                 Interpol::AST(AST::IndexSet(
                     Box::new(AST::Set {
                         recursive: false,
-                        values: vec![("world".into(), AST::Value("World".into()))]
+                        values: vec![SetEntry(vec!["world".into()], AST::Value("World".into()))]
                     }),
                     "world".into()
                 )),
@@ -631,9 +676,9 @@ mod tests {
                Token::Ident("a".into()), Token::Add, Token::Ident("b".into())
             ],
             Ok(AST::Lambda(
-                "a".into(),
+                FnArg::Ident("a".into()),
                 Box::new(AST::Lambda(
-                    "b".into(),
+                    FnArg::Ident("b".into()),
                     Box::new(AST::Add(Box::new((
                         AST::Var("a".into()),
                         AST::Var("b".into())
@@ -658,5 +703,32 @@ mod tests {
                 AST::Value(3.into())
             ))))
         );
+    }
+    #[test]
+    fn patterns() {
+        assert_eq!(
+            parse![
+               Token::CurlyBOpen,
+                   Token::Ident("a".into()), Token::Comma,
+                   Token::Ident("b".into()), Token::Question, Token::Value("default".into()), Token::Comma,
+                   Token::Ellipsis,
+               Token::CurlyBClose,
+               Token::At,
+               Token::Ident("outer".into()),
+               Token::Colon,
+               Token::Ident("outer".into())
+            ],
+            Ok(AST::Lambda(
+                FnArg::Pattern {
+                    args: vec![
+                        PatEntry("a".into(), None),
+                        PatEntry("b".into(), Some(AST::Value("default".into()))),
+                    ],
+                    bind: Some("outer".into()),
+                    exact: false
+                },
+                Box::new(AST::Var("outer".into()))
+            ))
+        )
     }
 }

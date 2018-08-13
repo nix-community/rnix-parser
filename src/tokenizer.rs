@@ -28,9 +28,13 @@ pub enum Token {
     CurlyBClose,
     SquareBOpen,
     SquareBClose,
-    Dot,
-    Equal,
+    At,
     Colon,
+    Comma,
+    Dot,
+    Ellipsis,
+    Equal,
+    Question,
     Semicolon,
 
     // Operators
@@ -166,23 +170,23 @@ impl<'a> Tokenizer<'a> {
         self.input.chars().next()
     }
 
-    fn next_ident<F>(&mut self, prefix: Option<char>, include: F) -> String
-        where F: Fn(char) -> bool
+    fn next_ident<P, F>(&mut self, prefix: P, include: F) -> String
+        where
+            P: IntoIterator<Item = char>,
+            F: Fn(char) -> bool
     {
-        let capacity = self.input.chars().take_while(|&c| include(c)).count()
-            + if prefix.is_some() { 1 } else { 0 };
-        let mut ident = String::with_capacity(capacity);
-        let initial_pointer = ident.as_ptr();
-        if let Some(c) = prefix {
+        let mut ident = String::with_capacity(self.input.chars().take_while(|&c| include(c)).count());
+
+        for c in prefix.into_iter() {
             ident.push(c);
         }
+
         loop {
             match self.peek() {
                 Some(c) if include(c) => ident.push(self.next().unwrap()),
                 _ => break,
             }
         }
-        assert_eq!(ident.as_ptr(), initial_pointer, "String reallocated, wasn't given enough capacity");
         ident
     }
     fn next_string(&mut self, meta: Meta, multiline: bool) -> Option<Item> {
@@ -307,6 +311,13 @@ impl<'a> Iterator for Tokenizer<'a> {
             }
         }
 
+        meta.span = self.span_start();
+
+        if self.input.starts_with("...") {
+            for _ in 0..3 { self.next().unwrap(); }
+            return self.span_end(meta, Token::Ellipsis);
+        }
+
         // Check if it's a path
         let mut lookahead = self.input.chars().skip_while(|c| match c {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' | '+' | '-' => true,
@@ -318,7 +329,6 @@ impl<'a> Iterator for Tokenizer<'a> {
             _ => None
         };
 
-        meta.span = self.span_start();
         let c = self.next()?;
 
         if c == '~' || kind == Some(IdentType::Path) {
@@ -343,9 +353,12 @@ impl<'a> Iterator for Tokenizer<'a> {
             '}' => self.span_end(meta, Token::CurlyBClose),
             '[' => self.span_end(meta, Token::SquareBOpen),
             ']' => self.span_end(meta, Token::SquareBClose),
+            '@' => self.span_end(meta, Token::At),
+            ':' => self.span_end(meta, Token::Colon),
+            ',' => self.span_end(meta, Token::Comma),
             '.' => self.span_end(meta, Token::Dot),
             '=' => self.span_end(meta, Token::Equal),
-            ':' => self.span_end(meta, Token::Colon),
+            '?' => self.span_end(meta, Token::Question),
             ';' => self.span_end(meta, Token::Semicolon),
             '(' => self.span_end(meta, Token::ParenOpen),
             ')' => self.span_end(meta, Token::ParenClose),
@@ -365,7 +378,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 let kind = kind.unwrap_or(IdentType::Ident);
                 assert_ne!(kind, IdentType::Path, "paths are checked earlier");
                 let ident = self.next_ident(Some(c), |c| match c {
-                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => true,
+                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' => true,
                     ':' | '?' | '@' | '&' | '=' | '$' | ',' | '!'
                         | '~' | '*' | '\'' | '%' => kind == IdentType::Uri,
                     c => kind == IdentType::Uri && is_valid_path_char(c),
@@ -657,6 +670,21 @@ string :D
             Ok(vec![
                Token::Ident("a".into()), Token::Colon, Token::Ident("b".into()), Token::Colon,
                Token::Ident("a".into()), Token::Add, Token::Ident("b".into())
+            ])
+        );
+    }
+    #[test]
+    fn patterns() {
+        assert_eq!(
+            tokenize(r#"{ a, b ? "default", ... } @ outer"#),
+            Ok(vec![
+               Token::CurlyBOpen,
+                   Token::Ident("a".into()), Token::Comma,
+                   Token::Ident("b".into()), Token::Question, Token::Value("default".into()), Token::Comma,
+                   Token::Ellipsis,
+               Token::CurlyBClose,
+               Token::At,
+               Token::Ident("outer".into())
             ])
         );
     }

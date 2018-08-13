@@ -13,18 +13,16 @@ macro_rules! meta {
     }};
 }
 
-#[macro_use]
-pub mod macros;
+pub mod nometa;
 pub mod parser;
 pub mod tokenizer;
+#[macro_use]
+pub mod utils;
 pub mod value;
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        parser::{parse as inner_parse, ASTNoSpan as AST, InterpolNoSpan as Interpol},
-        tokenizer::tokenize
-    };
+    use super::{nometa::*, parser::parse as inner_parse, tokenizer::tokenize};
 
     fn parse(string: &str) -> AST {
         AST::from(inner_parse(
@@ -112,6 +110,14 @@ string :D
             } in {
                 result = (((add) (2)) (5));
             })
+        );
+        assert_eq!(
+            parse(include_str!("../tests/pattern.nix")),
+            nix!(
+                { a ? ({ b ? ("test") }: b) }:
+                bind @ { (exact = false) value }:
+                1
+            )
         );
     }
 }
