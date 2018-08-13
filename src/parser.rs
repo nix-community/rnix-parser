@@ -41,6 +41,7 @@ pub enum ASTType {
 
     // Expressions
     Import(Box<AST>),
+    Let(Set),
     LetIn(Set, Box<AST>),
     With(Box<(AST, AST)>),
 
@@ -86,6 +87,7 @@ pub enum ASTNoSpan {
 
     // Expressions
     Import(Box<ASTNoSpan>),
+    Let(SetNoSpan),
     LetIn(SetNoSpan, Box<ASTNoSpan>),
     With(Box<(ASTNoSpan, ASTNoSpan)>),
 
@@ -131,6 +133,7 @@ impl From<AST> for ASTNoSpan {
 
             // Expressions
             ASTType::Import(inner) => ASTNoSpan::Import(discard_span(inner)),
+            ASTType::Let(set) => ASTNoSpan::Let(set_discard_span(set)),
             ASTType::LetIn(set, ast) => ASTNoSpan::LetIn(set_discard_span(set), discard_span(ast)),
             ASTType::With(inner) => ASTNoSpan::With(tuple_discard_span(inner)),
 
@@ -321,10 +324,17 @@ impl<I> Parser<I>
         Ok(match self.peek() {
             Some(Token::Let) => {
                 let (start, _) = self.next()?;
-                let vars = self.parse_set()?;
-                self.expect(Token::In)?;
-                let AST(end, expr) = self.parse_expr()?;
-                AST(start.until(&end), ASTType::LetIn(vars, Box::new(AST(end, expr))))
+                if self.peek() == Some(&Token::CurlyBOpen) {
+                    self.next()?;
+                    let vars = self.parse_set()?;
+                    let end = self.expect(Token::CurlyBClose)?;
+                    AST(start.until(&end), ASTType::Let(vars))
+                } else {
+                    let vars = self.parse_set()?;
+                    self.expect(Token::In)?;
+                    let AST(end, expr) = self.parse_expr()?;
+                    AST(start.until(&end), ASTType::LetIn(vars, Box::new(AST(end, expr))))
+                }
             },
             Some(Token::With) => {
                 let (start, _) = self.next()?;
@@ -500,6 +510,21 @@ mod tests {
                 vec![("a".into(), AST::Value(42.into()))],
                 Box::new(AST::Var("a".into()))
             ))
+        );
+    }
+    #[test]
+    fn let_legacy_syntax() {
+        assert_eq!(
+            parse![
+                Token::Let, Token::CurlyBOpen,
+                    Token::Ident("a".into()), Token::Equal, Token::Value(42.into()), Token::Semicolon,
+                    Token::Ident("body".into()), Token::Equal, Token::Ident("a".into()), Token::Semicolon,
+                Token::CurlyBClose
+            ],
+            Ok(AST::Let(vec![
+                ("a".into(), AST::Value(42.into())),
+                ("body".into(), AST::Var("a".into()))
+            ]))
         );
     }
     #[test]

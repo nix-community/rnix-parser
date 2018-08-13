@@ -9,12 +9,19 @@ pub enum Anchor {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
-    Integer(i64),
+    Bool(bool),
     Float(f64),
-    Str(String),
-    Path(Anchor, String)
+    Integer(i64),
+    Null,
+    Path(Anchor, String),
+    Str(String)
 }
 
+impl From<bool> for Value {
+    fn from(val: bool) -> Value {
+        Value::Bool(val)
+    }
+}
 impl From<i64> for Value {
     fn from(val: i64) -> Value {
         Value::Integer(val)

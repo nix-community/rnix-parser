@@ -20,6 +20,11 @@ macro_rules! nix_inner {
             Box::new(nix_inner!(parse $($remaining)*))
         )
     }};
+    (parse let {
+        $($ident:ident = ($($val:tt)*);)*
+    }) => {{
+        AST::Let(vec![$((String::from(stringify!($ident)), nix_inner!(parse $($val)*))),*])
+    }};
     (parse with ($($namespace:tt)*); $($remaining:tt)*) => {{
         AST::With(Box::new((
             nix_inner!(parse $($namespace)*),
@@ -56,6 +61,9 @@ macro_rules! nix_inner {
     (parse [$(($($item:tt)*))*]) => {{
         AST::List(vec![$(nix_inner!(parse $($item)*)),*])
     }};
+    (parse true) => {{ AST::Value(Value::Bool(true)) }};
+    (parse false) => {{ AST::Value(Value::Bool(false)) }};
+    (parse null) => {{ AST::Value(Value::Bool(null)) }};
     (parse $val:ident) => {{
         AST::Var(String::from(stringify!($val)))
     }};

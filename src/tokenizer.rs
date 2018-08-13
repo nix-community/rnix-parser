@@ -377,6 +377,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                         "with" => Token::With,
                         "import" => Token::Import,
                         "rec" => Token::Rec,
+
+                        "true" => Token::Value(Value::Bool(true)),
+                        "false" => Token::Value(Value::Bool(false)),
+                        "null" => Token::Value(Value::Null),
                         _ => Token::Ident(ident),
                     })
                 } else {

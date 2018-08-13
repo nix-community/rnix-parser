@@ -25,7 +25,9 @@ You can check the `tests/` directory to see what is currently implemented.
 **TODO**:
 
  - argument patterns (optionals, ellipsis, @)
+ - boolean operations (==, !=, !)
  - if..then..else
+ - assert
  - inherit
 
 I also want to add built-in utilities for cleaning up the AST by for example
