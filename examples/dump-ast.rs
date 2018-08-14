@@ -1,5 +1,6 @@
 extern crate rnix;
 
+use rnix::nometa::AST as ASTNoMeta;
 use std::{env, fs};
 
 fn main() {
@@ -18,7 +19,7 @@ fn main() {
         }
     };
     match rnix::parse(&content) {
-        Ok(ast) => println!("{:?}", ast),
+        Ok(ast) => println!("{:#?}", ASTNoMeta::from(ast)),
         Err(err) => eprintln!("error: {}", err)
     }
 }

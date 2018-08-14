@@ -427,9 +427,9 @@ impl<'a> Iterator for Tokenizer<'a> {
                 let kind = kind.unwrap_or(IdentType::Ident);
                 assert_ne!(kind, IdentType::Path, "paths are checked earlier");
                 let ident = self.next_ident(Some(c), |c| match c {
-                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' => true,
+                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '\'' => true,
                     ':' | '?' | '@' | '&' | '=' | '$' | ',' | '!'
-                        | '~' | '*' | '\'' | '%' => kind == IdentType::Uri,
+                        | '~' | '*' | '%' => kind == IdentType::Uri,
                     c => kind == IdentType::Uri && is_valid_path_char(c),
                 });
                 if kind == IdentType::Ident {
