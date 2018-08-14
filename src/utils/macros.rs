@@ -154,6 +154,9 @@ macro_rules! nix_inner {
     (parse !$($val:tt)*) => {{
         AST::Invert(Box::new((nix_inner!(parse $($val)*))))
     }};
+    (parse dyn{$($val:tt)*}) => {{
+        AST::Dynamic(Box::new((nix_inner!(parse $($val)*))))
+    }};
     (parse true) => {{ AST::Value(Value::Bool(true)) }};
     (parse false) => {{ AST::Value(Value::Bool(false)) }};
     (parse null) => {{ AST::Value(Value::Null) }};

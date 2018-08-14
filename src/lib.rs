@@ -165,8 +165,8 @@ string :D
         assert_eq!(
             parse(include_str!("../tests/inherit.nix")),
             nix!(let {
-                 y = (2);
-                 set = ({ z = (3); a = (4); b = (5); });
+                y = (2);
+                set = ({ z = (3); a = (4); b = (5); });
             } in {
                 x = (1);
                 inherit y;
@@ -176,10 +176,13 @@ string :D
         assert_eq!(
             parse(include_str!("../tests/dynamic-attrs.nix")),
             nix!(let {
-                define = (name: val: { (name) = (val); });
+                define = (name: val: { (dyn {name}) = (val); });
                 key = ("hello");
+                set = ({ a = (1); b = (2); });
+                dynamic_key = ("c");
             } in (((define) ("key")) ("value")) merge ({
                     (raw AST::Interpol(vec![Interpol::AST(AST::Var("key".into()))])).(world) = (":D");
+                    dynamic_key_set = ((set) ? (dyn {dynamic_key}));
             }))
         );
         assert_eq!(

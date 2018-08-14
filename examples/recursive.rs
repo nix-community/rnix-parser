@@ -5,53 +5,79 @@ extern crate failure;
 extern crate rnix;
 
 use failure::Error;
-use rnix::{parser::*, value::*};
-use std::{env, fs};
+use rnix::{nometa::*, value::*};
+use std::{env, fs, path::{PathBuf, Path}};
 
 fn main() -> Result<(), Error> {
-    let mut nixpkgs = env::var("NIX_PATH")?.split(':')
-        .find(|s| s.starts_with("nixpkgs="))
-        .ok_or_else(|| format_err!("no store path found"))?
-        .to_string();
-    nixpkgs.drain(0.."nixpkgs=".len());
+    let nixpkgs = PathBuf::from(
+        &env::var("NIX_PATH")?.split(':')
+            .find(|s| s.starts_with("nixpkgs="))
+            .ok_or_else(|| format_err!("no store path found"))?
+            ["nixpkgs=".len()..]
+    );
 
-    println!("Nix store path: {}", nixpkgs);
+    println!("Nix store path: {}", nixpkgs.display());
 
-    let default = nixpkgs.clone() + "/lib/default.nix";
-    App { nixpkgs }.parse(&default)
+    let default = nixpkgs.join("lib/default.nix");
+    if let Err(err) = (App { nixpkgs }.parse(&default)) {
+        println!("failure: {}", err);
+    }
+    Ok(())
 }
 
 struct App {
-    nixpkgs: String
+    nixpkgs: PathBuf
 }
 
 impl App {
-    fn parse(&self, file: &str) -> Result<(), Error> {
-        print!("Trying {}... ", file);
+    fn parse(&self, file: &Path) -> Result<(), Error> {
+        print!("Trying {}... ", file.display());
         let content = fs::read_to_string(file)?;
         let ast = rnix::parse(&content)?.into(); // Drop all metadata
         println!("success!");
 
-        self.resolve(&ast)
+        self.resolve(file, &ast)
     }
-    fn resolve(&self, ast: &AST) -> Result<(), Error> {
-        match &ast.1 {
-            ASTType::Import(path) => {
-                match &path.1 {
-                    ASTType::Value(Value::Path(Anchor::Store, path)) => {
-                        self.parse(&(self.nixpkgs.clone() + &path))?;
-                    },
-                    _ => bail!("tried to import something that wasn't a store path")
-                }
+    fn parse_file_from_ast(&self, file: &Path, ast: &AST) -> Result<(), Error> {
+        match ast {
+            AST::Value(Value::Path(Anchor::Store, path)) => {
+                self.parse(&self.nixpkgs.join(&path))?;
             },
-            ASTType::Set { values, .. } => {
-                for entry in values {
-                    if let SetEntry::Assign(_, value) = entry {
-                        self.resolve(value)?;
+            AST::Value(Value::Path(Anchor::Relative, path)) => {
+                self.parse(&file.parent().unwrap().join(path))?;
+            },
+            ast => bail!("importing on something that's not a good path: {:?}", ast)
+        }
+        Ok(())
+    }
+    fn resolve(&self, file: &Path, ast: &AST) -> Result<(), Error> {
+        match ast {
+            AST::Apply(box (name, arg)) => {
+                if let AST::Var(name) = name {
+                    if name == "callLibs" {
+                        self.parse_file_from_ast(file, arg)?;
                     }
                 }
             },
-            ASTType::With(box (one, two)) => { self.resolve(one)?; self.resolve(two)?; }
+            AST::Import(path) => {
+                self.parse_file_from_ast(file, path)?;
+            },
+            AST::Set { values, .. } => {
+                for entry in values {
+                    if let SetEntry::Assign(_, value) = entry {
+                        self.resolve(file, value)?;
+                    }
+                }
+            },
+            AST::LetIn(values, body) => {
+                self.resolve(file, body)?;
+                for entry in values {
+                    if let SetEntry::Assign(_, value) = entry {
+                        self.resolve(file, value)?;
+                    }
+                }
+            },
+            AST::With(box (one, two)) => { self.resolve(file, one)?; self.resolve(file, two)?; }
             _ => ()
         }
         Ok(())

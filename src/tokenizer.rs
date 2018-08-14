@@ -83,7 +83,7 @@ impl Token {
     /// | true
     pub fn is_fn_arg(&self) -> bool {
         match self {
-            Token::CurlyBOpen | Token::SquareBOpen | Token::ParenOpen
+            Token::Rec | Token::CurlyBOpen | Token::SquareBOpen | Token::ParenOpen
                 | Token::Ident(_) | Token::Value(_) | Token::Interpol(_) => true,
             _ => false
         }
@@ -423,7 +423,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 Ok(tokens) => self.span_end(meta, Token::Dynamic(tokens)),
                 Err(err) => Some(Err(err))
             },
-            'a'..='z' | 'A'..='Z' if kind != Some(IdentType::Store) => {
+            'a'..='z' | 'A'..='Z' | '_' if kind != Some(IdentType::Store) => {
                 let kind = kind.unwrap_or(IdentType::Ident);
                 assert_ne!(kind, IdentType::Path, "paths are checked earlier");
                 let ident = self.next_ident(Some(c), |c| match c {

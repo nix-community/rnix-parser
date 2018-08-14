@@ -49,6 +49,7 @@ pub enum ASTType {
     // Operators
     Apply(Box<(AST, AST)>),
     Concat(Box<(AST, AST)>),
+    Dynamic(Box<AST>),
     IndexSet(Box<(AST, AST)>),
     Invert(Box<AST>),
     IsSet(Box<(AST, AST)>),
@@ -181,7 +182,7 @@ impl<I> Parser<I>
         match self.next()? {
             (meta, Token::Ident(ident)) => Ok(AST(meta, ASTType::Var(ident))),
             (meta, Token::Value(value)) => Ok(AST(meta, ASTType::Value(value))),
-            (_, Token::Dynamic(values)) => Ok(parse(values)?),
+            (meta, Token::Dynamic(values)) => Ok(AST(meta, ASTType::Dynamic(Box::new(parse(values)?)))),
             (meta, Token::Interpol(values)) => Ok(AST(meta, parse_interpol(values)?)),
             (meta, token) => Err((Some(meta.span), ParseError::ExpectedType("attribute", token)))
         }
@@ -314,7 +315,7 @@ impl<I> Parser<I>
                 }
                 let temporary = self.next()?;
                 match self.peek() {
-                    Some(Token::Comma) | Some(Token::Question) => {
+                    Some(Token::Comma) | Some(Token::Question) | Some(Token::CurlyBClose) => {
                         // We did a lookahead, put it back
                         self.buffer.push(temporary);
                         self.parse_pattern(start, None)?
@@ -351,6 +352,7 @@ impl<I> Parser<I>
                 let AST(end, expr) = self.parse_val()?;
                 AST(start.until(&end), ASTType::Invert(Box::new(AST(end, expr))))
             },
+            (meta, Token::Dynamic(values)) => AST(meta, ASTType::Dynamic(Box::new(parse(values)?))),
             (meta, Token::Value(val)) => AST(meta, ASTType::Value(val)),
             (start, Token::Ident(name)) => if self.peek() == Some(&Token::At) {
                 self.next().unwrap();
@@ -589,7 +591,7 @@ mod tests {
                     ], AST::Value(1.into())),
                     SetEntry::Assign(vec![
                         AST::Interpol(vec![Interpol::Literal("c".into())]),
-                        AST::Var("d".into())
+                        AST::Dynamic(Box::new(AST::Var("d".into())))
                     ], AST::Value(2.into()))
                 ]
             })
@@ -786,7 +788,7 @@ mod tests {
                     ))),
                     AST::Interpol(vec![Interpol::Literal("hi".into())])
                 ))),
-                AST::Var("a".into())
+                AST::Dynamic(Box::new(AST::Var("a".into())))
             ))))
         );
     }

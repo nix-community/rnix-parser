@@ -26,6 +26,7 @@ pub enum AST {
 
     // Expressions
     Assert(Box<(AST, AST)>),
+    Dynamic(Box<AST>),
     IfElse(Box<(AST, AST, AST)>),
     Import(Box<AST>),
     Let(Vec<SetEntry>),
@@ -144,6 +145,7 @@ impl From<ASTMeta> for AST {
 
             // Operators
             ASTType::Apply(inner) => AST::Apply(tuple_into(inner)),
+            ASTType::Dynamic(inner) => AST::Dynamic(box_into(inner)),
             ASTType::Concat(inner) => AST::Concat(tuple_into(inner)),
             ASTType::IndexSet(inner) => AST::IndexSet(tuple_into(inner)),
             ASTType::Invert(inner) => AST::Invert(box_into(inner)),
