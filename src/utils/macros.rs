@@ -4,7 +4,14 @@
 macro_rules! nix_inner {
     (entry($vec:expr)) => {};
     (entry($vec:expr) $ident:ident = ($($val:tt)*); $($remaining:tt)*) => {
-        $vec.push(SetEntry::Assign(vec![String::from(stringify!($ident))], nix_inner!(parse $($val)*)));
+        $vec.push(SetEntry::Assign(vec![AST::Var(String::from(stringify!($ident)))], nix_inner!(parse $($val)*)));
+        nix_inner!(entry($vec) $($remaining)*);
+    };
+    (entry($vec:expr) $(($($ident:tt)*))* = ($($val:tt)*); $($remaining:tt)*) => {
+        $vec.push(SetEntry::Assign(
+            vec![$(nix_inner!(parse $($ident)*)),*],
+            nix_inner!(parse $($val)*)
+        ));
         nix_inner!(entry($vec) $($remaining)*);
     };
     (entry($vec:expr) inherit ($($from:tt)*) $($var:ident)*; $($remaining:tt)*) => {
@@ -19,12 +26,12 @@ macro_rules! nix_inner {
         nix_inner!(entry($vec) $($remaining)*);
     }};
     (set (rec: $recursive:expr) {}) => {{ AST::EmptySet }};
-    (set (rec: $recursive:expr) { $($inner:tt)* }) => {{
+    (set (rec: $recursive:expr) { $($inner:tt)+ }) => {{
         AST::Set {
             recursive: $recursive,
             values: {{
                 let mut vec = Vec::new();
-                nix_inner!(entry(vec) $($inner)*);
+                nix_inner!(entry(vec) $($inner)+);
                 vec
             }}
         }
@@ -41,14 +48,14 @@ macro_rules! nix_inner {
         $($ident:ident = ($($val:tt)*);)*
     } in $($remaining:tt)*) => {{
         AST::LetIn(
-            vec![$(SetEntry::Assign(vec![String::from(stringify!($ident))], nix_inner!(parse $($val)*))),*],
+            vec![$(SetEntry::Assign(vec![AST::Var(String::from(stringify!($ident)))], nix_inner!(parse $($val)*))),*],
             Box::new(nix_inner!(parse $($remaining)*))
         )
     }};
     (parse let {
         $($ident:ident = ($($val:tt)*);)*
     }) => {{
-        AST::Let(vec![$(SetEntry::Assign(vec![String::from(stringify!($ident))], nix_inner!(parse $($val)*))),*])
+        AST::Let(vec![$(SetEntry::Assign(vec![AST::Var(String::from(stringify!($ident)))], nix_inner!(parse $($val)*))),*])
     }};
     (parse with ($($namespace:tt)*); $($remaining:tt)*) => {{
         AST::With(Box::new((
@@ -123,11 +130,14 @@ macro_rules! nix_inner {
     (parse ($($val1:tt)*) > ($($val2:tt)*)) => {{
         AST::More(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
     }};
+    (parse ($($val1:tt)*) merge ($($val2:tt)*)) => {{
+        AST::Merge(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    }};
     (parse ($($fn:tt)*) ($($arg:tt)*)) => {{
         AST::Apply(Box::new((nix_inner!(parse $($fn)*), nix_inner!(parse $($arg)*))))
     }};
     (parse ($($set:tt)*).$field:ident) => {{
-        AST::IndexSet(Box::new(nix_inner!(parse $($set)*)), String::from(stringify!($field)))
+        AST::IndexSet(Box::new((nix_inner!(parse $($set)*), AST::Var(String::from(stringify!($field))))))
     }};
     (parse [$(($($item:tt)*))*]) => {{
         AST::List(vec![$(nix_inner!(parse $($item)*)),*])
@@ -174,8 +184,8 @@ fn test_macro() {
         AST::Set {
             recursive: false,
             values: vec![
-                SetEntry::Assign(vec!["string".into()], AST::Value("Hello World".into())),
-                SetEntry::Assign(vec!["number".into()], AST::Mul(Box::new((
+                SetEntry::Assign(vec![AST::Var("string".into())], AST::Value("Hello World".into())),
+                SetEntry::Assign(vec![AST::Var("number".into())], AST::Mul(Box::new((
                     AST::Value(3.into()),
                     AST::Add(Box::new((
                         AST::Value(4.into()),

@@ -20,14 +20,45 @@ pub mod tokenizer;
 pub mod utils;
 pub mod value;
 
+use self::{
+    parser::ParseError,
+    tokenizer::{Meta, Span, Token, TokenizeError}
+};
+
+#[derive(Clone, Debug, Fail, PartialEq)]
+pub enum Error {
+    #[fail(display = "parse error: {}", _1)]
+    ParseError(Option<Span>, #[cause] ParseError),
+    #[fail(display = "parse error: {}", _1)]
+    TokenizeError(Span, #[cause] TokenizeError)
+}
+impl From<(Span, TokenizeError)> for Error {
+    fn from(err: (Span, TokenizeError)) -> Self {
+        let (span, err) = err;
+        Error::TokenizeError(span, err)
+    }
+}
+impl From<(Option<Span>, ParseError)> for Error {
+    fn from(err: (Option<Span>, ParseError)) -> Self {
+        let (span, err) = err;
+        Error::ParseError(span, err)
+    }
+}
+
+pub fn parse(input: &str) -> Result<parser::AST, Error> {
+    let tokens: Result<Vec<(Meta, Token)>, (Span, TokenizeError)> = tokenizer::tokenize(input).collect();
+    if input.contains("define") {
+        println!("{:#?}", tokens);
+    }
+    parser::parse(tokens?).map_err(Error::from)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{nometa::*, parser::parse as inner_parse, tokenizer::tokenize};
+    use super::{nometa::*, parse as inner_parse};
 
-    fn parse(string: &str) -> AST {
-        AST::from(inner_parse(
-            tokenize(string).map(|result| result.expect("error while tokenizing"))
-        ).expect("error while parsing"))
+    fn parse(input: &str) -> AST {
+        inner_parse(input).expect("error while parsing").into()
     }
 
     #[test]
@@ -144,6 +175,15 @@ string :D
               inherit y;
               inherit (set) z a;
             })
+        );
+        assert_eq!(
+            parse(include_str!("../tests/dynamic-attrs.nix")),
+            nix!(let {
+              define = (name: val: { (name) = (val); });
+              key = ("hello");
+            } in (((define) ("key")) ("value")) merge ({
+                (raw AST::Interpol(vec![Interpol::AST(AST::Var("key".into()))])) (world) = (":D");
+            }))
         );
     }
 }

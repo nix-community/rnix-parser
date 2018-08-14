@@ -35,7 +35,7 @@ pub enum AST {
     // Operators
     Apply(Box<(AST, AST)>),
     Concat(Box<(AST, AST)>),
-    IndexSet(Box<AST>, String),
+    IndexSet(Box<(AST, AST)>),
     Invert(Box<AST>),
     Merge(Box<(AST, AST)>),
     Negate(Box<AST>),
@@ -72,7 +72,7 @@ pub enum Interpol {
 pub struct PatEntry(pub String, pub Option<AST>);
 #[derive(Clone, Debug, PartialEq)]
 pub enum SetEntry {
-    Assign(Vec<String>, AST),
+    Assign(Vec<AST>, AST),
     Inherit(Option<AST>, Vec<String>)
 }
 
@@ -99,7 +99,7 @@ impl From<PatEntryMeta> for PatEntry {
 impl From<SetEntryMeta> for SetEntry {
     fn from(entry: SetEntryMeta) -> Self {
         match entry {
-            SetEntryMeta::Assign(key, value) => SetEntry::Assign(key, AST::from(value)),
+            SetEntryMeta::Assign(key, value) => SetEntry::Assign(vec_into(key), AST::from(value)),
             SetEntryMeta::Inherit(from, values) => SetEntry::Inherit(from.map(AST::from), values),
         }
     }
@@ -143,7 +143,7 @@ impl From<ASTMeta> for AST {
             // Operators
             ASTType::Apply(inner) => AST::Apply(tuple_into(inner)),
             ASTType::Concat(inner) => AST::Concat(tuple_into(inner)),
-            ASTType::IndexSet(set, key) => AST::IndexSet(box_into(set), key),
+            ASTType::IndexSet(inner) => AST::IndexSet(tuple_into(inner)),
             ASTType::Invert(inner) => AST::Invert(box_into(inner)),
             ASTType::Merge(inner) => AST::Merge(tuple_into(inner)),
             ASTType::Negate(inner) => AST::Negate(box_into(inner)),

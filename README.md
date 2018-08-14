@@ -1,6 +1,6 @@
-# rust-nix
+# rnix
 
-rust-nix is a very early prototype of a Nix parser written in Rust.
+rnix is a Nix parser written in Rust.
 
 This can be used to manipulate the Nix AST and can for example be used for:
 
@@ -10,7 +10,7 @@ This can be used to manipulate the Nix AST and can for example be used for:
 
 and a lot more!
 
-rust-nix ...
+rnix ...
 
  - will always maintain span information (line number and column) so the error
    messages can be as useful as possible and any syntax highlighting plugin
@@ -18,9 +18,10 @@ rust-nix ...
  - works on top of Rust iterators, which are lazy by design. You get cool
    functions like `map` and `filter` at your fingertips!
 
-## Currently implemented
+# Unimplemented
 
-You can check the `tests/` directory to see what is currently implemented.
+Not everything is implemented yet. I don't know all of nix inside my head, but what I do know:
 
-I also want to add built-in utilities for cleaning up the AST by for example
-evaluating math expressions and expanding imports.
+**TODO**:
+
+ - `or` keyword

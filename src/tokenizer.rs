@@ -65,9 +65,10 @@ pub enum Token {
     Or,
 
     // Identifiers and values
+    Dynamic(Vec<(Meta, Token)>),
     Ident(String),
+    Interpol(Vec<Interpol>),
     Value(Value),
-    Interpol(Vec<Interpol>)
 }
 impl Token {
     /// Returns true if this token should be used as a function argument.
@@ -141,7 +142,8 @@ fn is_valid_path_char(c: char) -> bool {
     }
 }
 
-type Item = Result<(Meta, Token), (Span, TokenizeError)>;
+type Result<T> = std::result::Result<T, (Span, TokenizeError)>;
+type Item = Result<(Meta, Token)>;
 
 pub struct Tokenizer<'a> {
     input: &'a str,
@@ -207,6 +209,32 @@ impl<'a> Tokenizer<'a> {
         }
         ident
     }
+    fn next_interpol(&mut self, start: Span) -> Result<Vec<(Meta, Token)>> {
+        self.next().expect("next_interpol was called in an invalid context");
+
+        let mut tokens = Vec::new();
+        let mut count = 0;
+        loop {
+            match Iterator::next(self) {
+                None => return Err((start, TokenizeError::UnexpectedEOF)),
+                Some(token) => {
+                    let token = match token {
+                        Ok(inner) => inner,
+                        Err(err) => return Err(err)
+                    };
+                    match token.1 {
+                        Token::CurlyBOpen => count += 1,
+                        Token::CurlyBClose if count == 0 => break,
+                        Token::CurlyBClose => count -= 1,
+                        _ => ()
+                    }
+                    tokens.push(token);
+                }
+            }
+        }
+
+        Ok(tokens)
+    }
     fn next_string(&mut self, meta: Meta, multiline: bool) -> Option<Item> {
         let mut interpol = Vec::new();
         let mut literal = String::new();
@@ -236,31 +264,13 @@ impl<'a> Tokenizer<'a> {
                 },
                 Some('$') => match { self.next(); self.peek() } {
                     Some('{') => {
-                        self.next()?;
-                        interpol.push(Interpol::Literal(mem::replace(&mut literal, String::new())));
-
-                        let mut tokens = Vec::new();
-                        let mut count = 0;
-                        loop {
-                            match Iterator::next(self) {
-                                None => return self.span_err(meta, TokenizeError::UnexpectedEOF),
-                                Some(token) => {
-                                    let token = match token {
-                                        Ok(inner) => inner,
-                                        result @ Err(_) => return Some(result)
-                                    };
-                                    match token.1 {
-                                        Token::CurlyBOpen => count += 1,
-                                        Token::CurlyBClose if count == 0 => break,
-                                        Token::CurlyBClose => count -= 1,
-                                        _ => ()
-                                    }
-                                    tokens.push(token);
-                                }
-                            }
+                        if !literal.is_empty() {
+                            interpol.push(Interpol::Literal(mem::replace(&mut literal, String::new())));
                         }
-
-                        interpol.push(Interpol::Tokens(tokens));
+                        interpol.push(Interpol::Tokens(match self.next_interpol(meta.span) {
+                            Ok(inner) => inner,
+                            Err(err) => return Some(Err(err))
+                        }));
                     },
                     _ => literal.push('$')
                 }
@@ -408,6 +418,10 @@ impl<'a> Iterator for Tokenizer<'a> {
             '<' => self.span_end(meta, Token::Less),
             '>' if self.peek() == Some('=') => { self.next()?; self.span_end(meta, Token::MoreOrEq) },
             '>' => self.span_end(meta, Token::More),
+            '$' if self.peek() == Some('{') => match self.next_interpol(meta.span) {
+                Ok(tokens) => self.span_end(meta, Token::Dynamic(tokens)),
+                Err(err) => Some(Err(err))
+            },
             'a'..='z' | 'A'..='Z' if kind != Some(IdentType::Store) => {
                 let kind = kind.unwrap_or(IdentType::Ident);
                 assert_ne!(kind, IdentType::Path, "paths are checked earlier");
@@ -777,6 +791,21 @@ string :D
                         Token::Value(2.into()),
                     Token::Else,
                         Token::Value(3.into())
+            ])
+        );
+    }
+    #[test]
+    fn dynamic_attrs() {
+        assert_eq!(
+            tokenize("a.${b}.c"),
+            Ok(vec![
+               Token::Ident("a".into()),
+               Token::Dot,
+               Token::Dynamic(vec![
+                    (meta! { start: (0, 4), end: (0, 5) }, Token::Ident("b".into()))
+               ]),
+               Token::Dot,
+               Token::Ident("c".into())
             ])
         );
     }
