@@ -27,7 +27,6 @@ pub struct AST(pub Meta, pub ASTType);
 #[derive(Clone, Debug, PartialEq)]
 pub enum ASTType {
     // Types
-    EmptySet,
     Interpol(Vec<Interpol>),
     Lambda(FnArg, Box<AST>),
     List(Vec<AST>),
@@ -216,6 +215,7 @@ impl<I> Parser<I>
                     exact = false;
                     break;
                 },
+                Some((_, Token::CurlyBClose)) => break,
                 _ => self.next_ident()?.1,
             };
             let default = if self.peek() == Some(&Token::Question) {
@@ -297,12 +297,6 @@ impl<I> Parser<I>
             },
             (start, Token::Rec) => {
                 self.expect(Token::CurlyBOpen)?;
-
-                if self.peek() == Some(&Token::CurlyBClose) {
-                    let (end, _) = self.next().unwrap();
-                    return Ok(AST(start.until(&end), ASTType::EmptySet));
-                }
-
                 let (end, values) = self.parse_set(&Token::CurlyBClose)?;
                 AST(start.until(&end), ASTType::Set {
                     recursive: true,
@@ -310,13 +304,9 @@ impl<I> Parser<I>
                 })
             },
             (start, Token::CurlyBOpen) => {
-                if self.peek() == Some(&Token::CurlyBClose) {
-                    let (end, _) = self.next().unwrap();
-                    return Ok(AST(start.until(&end), ASTType::EmptySet));
-                }
                 let temporary = self.next()?;
                 match self.peek() {
-                    Some(Token::Comma) | Some(Token::Question) | Some(Token::CurlyBClose) => {
+                    Some(Token::Comma) | Some(Token::Question) | Some(Token::CurlyBClose) | Some(Token::Colon) => {
                         // We did a lookahead, put it back
                         self.buffer.push(temporary);
                         self.parse_pattern(start, None)?
@@ -350,12 +340,6 @@ impl<I> Parser<I>
             (start, Token::Ident(name)) => if self.peek() == Some(&Token::At) {
                 self.next().unwrap();
                 self.expect(Token::CurlyBOpen)?;
-
-                if self.peek() == Some(&Token::CurlyBClose) {
-                    let (end, _) = self.next().unwrap();
-                    return Ok(AST(start.until(&end), ASTType::EmptySet));
-                }
-
                 self.parse_pattern(start, Some(name))?
             } else {
                 AST(start, ASTType::Var(name))
@@ -594,11 +578,10 @@ mod tests {
         );
         assert_eq!(
             parse![Token::CurlyBOpen, Token::CurlyBClose],
-            Ok(AST::EmptySet)
-        );
-        assert_eq!(
-            parse![Token::Rec, Token::CurlyBOpen, Token::CurlyBClose],
-            Ok(AST::EmptySet)
+            Ok(AST::Set {
+                recursive: false,
+                values: Vec::new()
+            })
         );
         assert_eq!(
             parse![
@@ -901,6 +884,28 @@ mod tests {
                         AST::Var("b".into())
                     ))))
                 ))
+            ))
+        );
+        assert_eq!(
+            parse![Token::CurlyBOpen, Token::CurlyBClose, Token::Colon, Token::Value(1.into())],
+            Ok(AST::Lambda(
+                FnArg::Pattern {
+                    args: Vec::new(),
+                    bind: None,
+                    exact: true
+                },
+                Box::new(AST::Value(1.into()))
+            ))
+        );
+        assert_eq!(
+            parse![Token::CurlyBOpen, Token::Ellipsis, Token::CurlyBClose, Token::Colon, Token::Value(1.into())],
+            Ok(AST::Lambda(
+                FnArg::Pattern {
+                    args: Vec::new(),
+                    bind: None,
+                    exact: false
+                },
+                Box::new(AST::Value(1.into()))
             ))
         );
         assert_eq!(

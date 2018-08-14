@@ -13,7 +13,6 @@ use crate::{
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
     // Types
-    EmptySet,
     Interpol(Vec<Interpol>),
     Lambda(FnArg, Box<AST>),
     List(Vec<AST>),
@@ -128,7 +127,6 @@ impl From<ASTMeta> for AST {
     fn from(ast: ASTMeta) -> Self {
         match ast.1 {
             // Types
-            ASTType::EmptySet => AST::EmptySet,
             ASTType::Interpol(inner) => AST::Interpol(vec_into(inner)),
             ASTType::Lambda(args, body) => AST::Lambda(args.into(), box_into(body)),
             ASTType::List(inner) => AST::List(vec_into(inner)),

@@ -25,13 +25,12 @@ macro_rules! nix_inner {
         $vec.push(SetEntry::Inherit(None, vec![$(String::from(stringify!($var))),*]));
         nix_inner!(entry($vec) $($remaining)*);
     }};
-    (set (rec: $recursive:expr) {}) => {{ AST::EmptySet }};
-    (set (rec: $recursive:expr) { $($inner:tt)+ }) => {{
+    (set (rec: $recursive:expr) { $($inner:tt)* }) => {{
         AST::Set {
             recursive: $recursive,
             values: {{
                 let mut vec = Vec::new();
-                nix_inner!(entry(vec) $($inner)+);
+                nix_inner!(entry(vec) $($inner)*);
                 vec
             }}
         }
