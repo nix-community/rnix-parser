@@ -7,4 +7,8 @@
         else if !life
           then 1337
           else 42;
+
+  enabled = false;
+  value = null;
+  valid = assert enabled -> value != null; true;
 }

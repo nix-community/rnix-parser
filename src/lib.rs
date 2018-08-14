@@ -159,6 +159,10 @@ string :D
                         else if (!life)
                           then (1337)
                           else 42);
+
+                  enabled = (false);
+                  value = (null);
+                  valid = (assert ((enabled) -> ((value) != (null))); true);
                 }
             )
         );
@@ -189,7 +193,7 @@ string :D
             parse(include_str!("../tests/isset.nix")),
             nix!(rec {
                 x = (({ a = (1); }) ? (b));
-                y = ((({ b = (2); }).c) or (5));
+                y = (({ b = (2); }).(c) or (5));
             })
         );
     }

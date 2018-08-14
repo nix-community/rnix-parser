@@ -41,7 +41,7 @@ pub enum AST {
     IsSet(Box<(AST, AST)>),
     Merge(Box<(AST, AST)>),
     Negate(Box<AST>),
-    OrDefault(Box<(AST, AST)>),
+    OrDefault(Box<(AST, AST, AST)>),
 
     Add(Box<(AST, AST)>),
     Sub(Box<(AST, AST)>),
@@ -50,6 +50,7 @@ pub enum AST {
 
     And(Box<(AST, AST)>),
     Equal(Box<(AST, AST)>),
+    Implication(Box<(AST, AST)>),
     Less(Box<(AST, AST)>),
     LessOrEq(Box<(AST, AST)>),
     More(Box<(AST, AST)>),
@@ -152,7 +153,7 @@ impl From<ASTMeta> for AST {
             ASTType::IsSet(inner) => AST::IsSet(tuple_into(inner)),
             ASTType::Merge(inner) => AST::Merge(tuple_into(inner)),
             ASTType::Negate(inner) => AST::Negate(box_into(inner)),
-            ASTType::OrDefault(inner) => AST::OrDefault(tuple_into(inner)),
+            ASTType::OrDefault(inner) => AST::OrDefault(triple_into(inner)),
 
             ASTType::Add(inner) => AST::Add(tuple_into(inner)),
             ASTType::Sub(inner) => AST::Sub(tuple_into(inner)),
@@ -161,6 +162,7 @@ impl From<ASTMeta> for AST {
 
             ASTType::And(inner) => AST::And(tuple_into(inner)),
             ASTType::Equal(inner) => AST::Equal(tuple_into(inner)),
+            ASTType::Implication(inner) => AST::Implication(tuple_into(inner)),
             ASTType::Less(inner) => AST::Less(tuple_into(inner)),
             ASTType::LessOrEq(inner) => AST::LessOrEq(tuple_into(inner)),
             ASTType::More(inner) => AST::More(tuple_into(inner)),

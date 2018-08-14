@@ -55,7 +55,7 @@ pub enum ASTType {
     IsSet(Box<(AST, AST)>),
     Merge(Box<(AST, AST)>),
     Negate(Box<AST>),
-    OrDefault(Box<(AST, AST)>),
+    OrDefault(Box<(AST, AST, AST)>),
 
     Add(Box<(AST, AST)>),
     Sub(Box<(AST, AST)>),
@@ -64,6 +64,7 @@ pub enum ASTType {
 
     And(Box<(AST, AST)>),
     Equal(Box<(AST, AST)>),
+    Implication(Box<(AST, AST)>),
     Less(Box<(AST, AST)>),
     LessOrEq(Box<(AST, AST)>),
     More(Box<(AST, AST)>),
@@ -344,14 +345,6 @@ impl<I> Parser<I>
                 let end = self.expect(Token::SquareBClose)?;
                 AST(start.until(&end), ASTType::List(values))
             },
-            (start, Token::Sub) => {
-                let AST(end, expr) = self.parse_val()?;
-                AST(start.until(&end), ASTType::Negate(Box::new(AST(end, expr))))
-            },
-            (start, Token::Invert) => {
-                let AST(end, expr) = self.parse_val()?;
-                AST(start.until(&end), ASTType::Invert(Box::new(AST(end, expr))))
-            },
             (meta, Token::Dynamic(values)) => AST(meta, ASTType::Dynamic(Box::new(parse(values)?))),
             (meta, Token::Value(val)) => AST(meta, ASTType::Value(val)),
             (start, Token::Ident(name)) => if self.peek() == Some(&Token::At) {
@@ -374,26 +367,29 @@ impl<I> Parser<I>
         while self.peek() == Some(&Token::Dot) {
             self.next().unwrap();
             let attr = self.next_attr()?;
-            val = AST(
-                val.0.span.until(attr.0.span).into(),
-                ASTType::IndexSet(Box::new((val, attr)))
-            );
+            match self.peek() {
+                Some(Token::Ident(s)) if s == OR => {
+                    self.next().unwrap();
+                    let default = self.parse_val()?;
+                    val = AST(
+                        val.0.span.until(attr.0.span).into(),
+                        ASTType::OrDefault(Box::new((val, attr, default)))
+                    );
+                },
+                _ => val = AST(
+                    val.0.span.until(attr.0.span).into(),
+                    ASTType::IndexSet(Box::new((val, attr)))
+                )
+            }
         }
 
         Ok(val)
     }
-    fn parse_isset(&mut self) -> Result<AST> {
-        math!(
-            self, { self.parse_val()? },
-            Token::Ident(ref ident) if ident == OR => ASTType::OrDefault,
-            Token::Question => ASTType::IsSet
-        )
-    }
     fn parse_fn(&mut self) -> Result<AST> {
-        let mut val = self.parse_isset()?;
+        let mut val = self.parse_val()?;
 
         while self.peek().map(|t| t.is_fn_arg()).unwrap_or(false) {
-            let arg = self.parse_isset()?;
+            let arg = self.parse_val()?;
             val = AST(
                 val.0.span.until(arg.0.span).into(),
                 ASTType::Apply(Box::new((val, arg)))
@@ -402,9 +398,27 @@ impl<I> Parser<I>
 
         Ok(val)
     }
+    fn parse_negate(&mut self) -> Result<AST> {
+        if self.peek() == Some(&Token::Sub) {
+            let (start, _) = self.next().unwrap();
+            let expr = self.parse_negate()?;
+            Ok(AST(start.until(&expr.0), ASTType::Negate(Box::new(expr))))
+        } else {
+            self.parse_fn()
+        }
+    }
+    fn parse_isset(&mut self) -> Result<AST> {
+        math!(
+            self, { self.parse_negate()? },
+            Token::Question => ASTType::IsSet
+        )
+    }
+    fn parse_concat(&mut self) -> Result<AST> {
+        math!(self, { self.parse_isset()? }, Token::Concat => ASTType::Concat)
+    }
     fn parse_mul(&mut self) -> Result<AST> {
         math!(
-            self, { self.parse_fn()? },
+            self, { self.parse_concat()? },
             Token::Mul => ASTType::Mul,
             Token::Div => ASTType::Div
         )
@@ -413,28 +427,40 @@ impl<I> Parser<I>
         math!(
             self, { self.parse_mul()? },
             Token::Add => ASTType::Add,
-            Token::Sub => ASTType::Sub,
-
-            // These are incompatible on the same types anyway, so
-            // no need to care about ordering.
-            Token::Concat => ASTType::Concat,
-            Token::Merge => ASTType::Merge
+            Token::Sub => ASTType::Sub
         )
+    }
+    fn parse_invert(&mut self) -> Result<AST> {
+        if self.peek() == Some(&Token::Invert) {
+            let (start, _) = self.next().unwrap();
+            let expr = self.parse_invert()?;
+            Ok(AST(start.until(&expr.0), ASTType::Invert(Box::new(expr))))
+        } else {
+            self.parse_add()
+        }
+    }
+    fn parse_merge(&mut self) -> Result<AST> {
+        math!(self, { self.parse_invert()? }, Token::Merge => ASTType::Merge)
     }
     fn parse_compare(&mut self) -> Result<AST> {
         math!(
-            only_once, self, { self.parse_add()? },
-            Token::Equal => ASTType::Equal,
+            only_once, self, { self.parse_merge()? },
             Token::Less => ASTType::Less,
             Token::LessOrEq => ASTType::LessOrEq,
             Token::More => ASTType::More,
-            Token::MoreOrEq => ASTType::MoreOrEq,
+            Token::MoreOrEq => ASTType::MoreOrEq
+        )
+    }
+    fn parse_equal(&mut self) -> Result<AST> {
+        math!(
+            only_once, self, { self.parse_compare()? },
+            Token::Equal => ASTType::Equal,
             Token::NotEqual => ASTType::NotEqual
         )
     }
     fn parse_and(&mut self) -> Result<AST> {
         math!(
-            self, { self.parse_compare()? },
+            self, { self.parse_equal()? },
             Token::And => ASTType::And
         )
     }
@@ -444,10 +470,16 @@ impl<I> Parser<I>
             Token::Or => ASTType::Or
         )
     }
+    fn parse_implication(&mut self) -> Result<AST> {
+        math!(
+            self, { self.parse_or()? },
+            Token::Implication => ASTType::Implication
+        )
+    }
     #[inline(always)]
     fn parse_math(&mut self) -> Result<AST> {
         // Always point this to the lowest-level math function there is
-        self.parse_or()
+        self.parse_implication()
     }
     pub fn parse_expr(&mut self) -> Result<AST> {
         Ok(match self.peek() {
@@ -981,18 +1013,22 @@ mod tests {
     fn ifs() {
         assert_eq!(
             parse![
+                Token::Value(false.into()), Token::Implication,
                 Token::Invert, Token::Value(false.into()),
                 Token::And,
                 Token::Value(false.into()), Token::Equal, Token::Value(true.into()),
                 Token::Or,
                 Token::Value(true.into())
             ],
-            Ok(AST::Or(Box::new((
-                AST::And(Box::new((
-                    AST::Invert(Box::new(AST::Value(false.into()))),
-                    AST::Equal(Box::new((AST::Value(false.into()), AST::Value(true.into()))))
-                ))),
-                AST::Value(true.into())
+            Ok(AST::Implication(Box::new((
+                AST::Value(false.into()),
+                AST::Or(Box::new((
+                    AST::And(Box::new((
+                        AST::Invert(Box::new(AST::Value(false.into()))),
+                        AST::Equal(Box::new((AST::Value(false.into()), AST::Value(true.into()))))
+                    ))),
+                    AST::Value(true.into())
+                )))
             ))))
         );
         assert_eq!(
@@ -1100,12 +1136,19 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::Ident("a".into()), Token::Ident(OR.into()), Token::Value(1.into()),
+                Token::Ident("a".into()),
+                    Token::Dot, Token::Ident("b".into()),
+                    Token::Dot, Token::Ident("c".into()),
+                Token::Ident(OR.into()), Token::Value(1.into()),
                 Token::Add, Token::Value(1.into())
             ],
             Ok(AST::Add(Box::new((
                 AST::OrDefault(Box::new((
-                    AST::Var("a".into()),
+                    AST::IndexSet(Box::new((
+                        AST::Var("a".into()),
+                        AST::Var("b".into())
+                    ))),
+                    AST::Var("c".into()),
                     AST::Value(1.into())
                 ))),
                 AST::Value(1.into())

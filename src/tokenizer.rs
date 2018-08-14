@@ -59,6 +59,7 @@ pub enum Token {
 
     And,
     Equal,
+    Implication,
     Less,
     LessOrEq,
     More,
@@ -401,6 +402,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             '(' => self.span_end(meta, Token::ParenOpen),
             ')' => self.span_end(meta, Token::ParenClose),
             '+' if self.peek() == Some('+') => { self.next()?; self.span_end(meta, Token::Concat) },
+            '-' if self.peek() == Some('>') => { self.next()?; self.span_end(meta, Token::Implication) },
             '/' if self.peek() == Some('/') => { self.next()?; self.span_end(meta, Token::Merge) },
             '+' => self.span_end(meta, Token::Add),
             '-' => self.span_end(meta, Token::Sub),
@@ -754,8 +756,9 @@ string :D
     #[test]
     fn ifs() {
         assert_eq!(
-            tokenize("!false && false == true || true"),
+            tokenize("false -> !false && false == true || true"),
             Ok(vec![
+                Token::Value(false.into()), Token::Implication,
                 Token::Invert, Token::Value(false.into()),
                 Token::And,
                 Token::Value(false.into()), Token::Equal, Token::Value(true.into()),

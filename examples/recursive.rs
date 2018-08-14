@@ -39,15 +39,19 @@ impl App {
         self.resolve(file, &ast)
     }
     fn parse_file_from_ast(&self, file: &Path, ast: &AST) -> Result<(), Error> {
-        match ast {
+        let mut file = match ast {
             AST::Value(Value::Path(Anchor::Store, path)) => {
-                self.parse(&self.nixpkgs.join(&path))?;
+                self.nixpkgs.join(&path)
             },
             AST::Value(Value::Path(Anchor::Relative, path)) => {
-                self.parse(&file.parent().unwrap().join(path))?;
+                file.parent().unwrap().join(path)
             },
             ast => bail!("importing on something that's not a good path: {:?}", ast)
+        };
+        if file.metadata()?.is_dir() {
+            file.push("default.nix");
         }
+        self.parse(&file)?;
         Ok(())
     }
     fn resolve(&self, file: &Path, ast: &AST) -> Result<(), Error> {

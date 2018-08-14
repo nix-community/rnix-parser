@@ -115,6 +115,9 @@ macro_rules! nix_inner {
     (parse ($($val1:tt)*) == ($($val2:tt)*)) => {{
         AST::Equal(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
     }};
+    (parse ($($val1:tt)*) -> ($($val2:tt)*)) => {{
+        AST::Implication(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    }};
     (parse ($($val1:tt)*) != ($($val2:tt)*)) => {{
         AST::NotEqual(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
     }};
@@ -136,8 +139,12 @@ macro_rules! nix_inner {
     (parse ($($val1:tt)*) ? ($($val2:tt)*)) => {{
         AST::IsSet(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
     }};
-    (parse ($($val1:tt)*) or ($($val2:tt)*)) => {{
-        AST::OrDefault(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    (parse ($($set:tt)*).($($index:tt)*) or ($($default:tt)*)) => {{
+        AST::OrDefault(Box::new((
+            nix_inner!(parse $($set)*),
+            nix_inner!(parse $($index)*),
+            nix_inner!(parse $($default)*)
+        )))
     }};
     (parse ($($fn:tt)*) ($($arg:tt)*)) => {{
         AST::Apply(Box::new((nix_inner!(parse $($fn)*), nix_inner!(parse $($arg)*))))
@@ -154,7 +161,7 @@ macro_rules! nix_inner {
     (parse !$($val:tt)*) => {{
         AST::Invert(Box::new((nix_inner!(parse $($val)*))))
     }};
-    (parse dyn{$($val:tt)*}) => {{
+    (parse dyn {$($val:tt)*}) => {{
         AST::Dynamic(Box::new((nix_inner!(parse $($val)*))))
     }};
     (parse true) => {{ AST::Value(Value::Bool(true)) }};
