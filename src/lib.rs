@@ -47,9 +47,6 @@ impl From<(Option<Span>, ParseError)> for Error {
 
 pub fn parse(input: &str) -> Result<parser::AST, Error> {
     let tokens: Result<Vec<(Meta, Token)>, (Span, TokenizeError)> = tokenizer::tokenize(input).collect();
-    if input.contains("define") {
-        println!("{:#?}", tokens);
-    }
     parser::parse(tokens?).map_err(Error::from)
 }
 
