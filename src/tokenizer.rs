@@ -3,9 +3,10 @@ use std::mem;
 
 #[derive(Debug, PartialEq, Eq)]
 enum IdentType {
-    Uri,
+    Ident,
     Path,
-    Ident
+    Store,
+    Uri,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -17,10 +18,14 @@ pub enum Interpol {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     // Keywords
+    Assert,
+    Else,
+    If,
     Import,
     In,
     Let,
     Rec,
+    Then,
     With,
 
     // Symbols
@@ -28,23 +33,35 @@ pub enum Token {
     CurlyBClose,
     SquareBOpen,
     SquareBClose,
+    Assign,
     At,
     Colon,
     Comma,
     Dot,
     Ellipsis,
-    Equal,
     Question,
     Semicolon,
 
     // Operators
-    ParenOpen,
     ParenClose,
+    ParenOpen,
     Concat,
+    Invert,
+    Merge,
+
     Add,
     Sub,
     Mul,
     Div,
+
+    And,
+    Equal,
+    Less,
+    LessOrEq,
+    More,
+    MoreOrEq,
+    NotEqual,
+    Or,
 
     // Identifiers and values
     Ident(String),
@@ -319,13 +336,19 @@ impl<'a> Iterator for Tokenizer<'a> {
         }
 
         // Check if it's a path
+        let store_path = self.peek() == Some('<');
         let mut lookahead = self.input.chars().skip_while(|c| match c {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' | '+' | '-' => true,
+            '<' | '/' => store_path,
             _ => false
         });
         let kind = match (lookahead.next(), lookahead.next()) {
-            (Some(':'), Some(c)) if !c.is_whitespace() => Some(IdentType::Uri),
+            // a//b parses as Merge(a, b)
+            (Some('/'), Some('/')) => None,
             (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
+            (Some('>'), None) => Some(IdentType::Store),
+            (Some('>'), Some(c)) if !c.is_whitespace() => Some(IdentType::Store),
+            (Some(':'), Some(c)) if !c.is_whitespace() => Some(IdentType::Uri),
             _ => None
         };
 
@@ -349,6 +372,9 @@ impl<'a> Iterator for Tokenizer<'a> {
         }
 
         match c {
+            '=' if self.peek() == Some('=') => { self.next()?; self.span_end(meta, Token::Equal) },
+            '!' if self.peek() == Some('=') => { self.next()?; self.span_end(meta, Token::NotEqual) },
+            '!' => self.span_end(meta, Token::Invert),
             '{' => self.span_end(meta, Token::CurlyBOpen),
             '}' => self.span_end(meta, Token::CurlyBClose),
             '[' => self.span_end(meta, Token::SquareBOpen),
@@ -357,24 +383,31 @@ impl<'a> Iterator for Tokenizer<'a> {
             ':' => self.span_end(meta, Token::Colon),
             ',' => self.span_end(meta, Token::Comma),
             '.' => self.span_end(meta, Token::Dot),
-            '=' => self.span_end(meta, Token::Equal),
+            '=' => self.span_end(meta, Token::Assign),
             '?' => self.span_end(meta, Token::Question),
             ';' => self.span_end(meta, Token::Semicolon),
             '(' => self.span_end(meta, Token::ParenOpen),
             ')' => self.span_end(meta, Token::ParenClose),
             '+' if self.peek() == Some('+') => { self.next()?; self.span_end(meta, Token::Concat) },
+            '/' if self.peek() == Some('/') => { self.next()?; self.span_end(meta, Token::Merge) },
             '+' => self.span_end(meta, Token::Add),
             '-' => self.span_end(meta, Token::Sub),
             '*' => self.span_end(meta, Token::Mul),
             '/' => self.span_end(meta, Token::Div),
-            '<' => {
+            '<' if kind == Some(IdentType::Store) => {
                 let ident = self.next_ident(None, is_valid_path_char);
                 if self.next() != Some('>') {
                     return self.span_err(meta, TokenizeError::UndefinedToken);
                 }
                 self.span_end(meta, Token::Value(Value::Path(Anchor::Store, ident)))
             },
-            'a'..='z' | 'A'..='Z' => {
+            '&' if self.peek() == Some('&') => { self.next()?; self.span_end(meta, Token::And) },
+            '|' if self.peek() == Some('|') => { self.next()?; self.span_end(meta, Token::Or) },
+            '<' if self.peek() == Some('=') => { self.next()?; self.span_end(meta, Token::LessOrEq) },
+            '<' => self.span_end(meta, Token::Less),
+            '>' if self.peek() == Some('=') => { self.next()?; self.span_end(meta, Token::MoreOrEq) },
+            '>' => self.span_end(meta, Token::More),
+            'a'..='z' | 'A'..='Z' if kind != Some(IdentType::Store) => {
                 let kind = kind.unwrap_or(IdentType::Ident);
                 assert_ne!(kind, IdentType::Path, "paths are checked earlier");
                 let ident = self.next_ident(Some(c), |c| match c {
@@ -385,11 +418,15 @@ impl<'a> Iterator for Tokenizer<'a> {
                 });
                 if kind == IdentType::Ident {
                     self.span_end(meta, match &*ident {
-                        "let" => Token::Let,
-                        "in" => Token::In,
-                        "with" => Token::With,
+                        "assert" => Token::Assert,
+                        "else" => Token::Else,
+                        "if" => Token::If,
                         "import" => Token::Import,
+                        "in" => Token::In,
+                        "let" => Token::Let,
                         "rec" => Token::Rec,
+                        "then" => Token::Then,
+                        "with" => Token::With,
 
                         "true" => Token::Value(Value::Bool(true)),
                         "false" => Token::Value(Value::Bool(false)),
@@ -400,6 +437,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     self.span_end(meta, match kind {
                         IdentType::Ident => Token::Ident(ident),
                         IdentType::Path => Token::Value(Value::Path(Anchor::Relative, ident)),
+                        IdentType::Store => unreachable!(),
                         IdentType::Uri => Token::Value(Value::Path(Anchor::Uri, ident)),
                     })
                 }
@@ -478,7 +516,7 @@ mod tests {
     fn basic_int_set() {
         assert_eq!(
             tokenize("{ int = 42; }"),
-            Ok(vec![Token::CurlyBOpen, Token::Ident("int".into()), Token::Equal,
+            Ok(vec![Token::CurlyBOpen, Token::Ident("int".into()), Token::Assign,
             Token::Value(42.into()), Token::Semicolon, Token::CurlyBClose])
         );
     }
@@ -486,7 +524,7 @@ mod tests {
     fn basic_float_set() {
         assert_eq!(
             tokenize("{ float = 1.234; }"),
-            Ok(vec![Token::CurlyBOpen, Token::Ident("float".into()), Token::Equal,
+            Ok(vec![Token::CurlyBOpen, Token::Ident("float".into()), Token::Assign,
             Token::Value(1.234.into()), Token::Semicolon, Token::CurlyBClose])
         );
     }
@@ -494,7 +532,7 @@ mod tests {
     fn basic_string_set() {
         assert_eq!(
             tokenize(r#"{ string = "Hello \"World\""; }"#),
-            Ok(vec![Token::CurlyBOpen, Token::Ident("string".into()), Token::Equal,
+            Ok(vec![Token::CurlyBOpen, Token::Ident("string".into()), Token::Assign,
             Token::Value("Hello \"World\"".into()), Token::Semicolon, Token::CurlyBClose])
         );
     }
@@ -510,7 +548,7 @@ mod tests {
                         comments: vec![" hi ".into()],
                         span: Span { start: (1, 17), end: Some((1, 18)) },
                     },
-                    Token::Equal
+                    Token::Assign
                 ),
                 (meta! { start: (1, 19), end: (1, 20) }, Token::Value(1.into())),
                 (meta! { start: (1, 20), end: (1, 21) }, Token::Semicolon),
@@ -541,7 +579,7 @@ mod tests {
 }"#),
             Ok(vec![
                 Token::CurlyBOpen,
-                    Token::Ident("multiline".into()), Token::Equal,
+                    Token::Ident("multiline".into()), Token::Assign,
                     Token::Value(r#"This is a
 multiline
 string :D
@@ -562,7 +600,7 @@ string :D
                     Interpol::Tokens(vec![
                         (meta! { start: (0, 12), end: (0, 13) }, Token::CurlyBOpen),
                         (meta! { start: (0, 14), end: (0, 19) }, Token::Ident("world".into())),
-                        (meta! { start: (0, 20), end: (0, 21) }, Token::Equal),
+                        (meta! { start: (0, 20), end: (0, 21) }, Token::Assign),
                         (meta! { start: (0, 22), end: (0, 29) }, Token::Value("World".into())),
                         (meta! { start: (0, 29), end: (0, 30) }, Token::Semicolon),
                         (meta! { start: (0, 31), end: (0, 32) }, Token::CurlyBClose),
@@ -600,7 +638,7 @@ string :D
             tokenize("let a = 3; in a"),
             Ok(vec![
                 Token::Let,
-                    Token::Ident("a".into()), Token::Equal, Token::Value(3.into()), Token::Semicolon,
+                    Token::Ident("a".into()), Token::Assign, Token::Value(3.into()), Token::Semicolon,
                 Token::In,
                     Token::Ident("a".into())
             ])
@@ -685,6 +723,58 @@ string :D
                Token::CurlyBClose,
                Token::At,
                Token::Ident("outer".into())
+            ])
+        );
+    }
+    #[test]
+    fn combine() {
+        assert_eq!(
+            tokenize("a//b"),
+            Ok(vec![Token::Ident("a".into()), Token::Merge, Token::Ident("b".into())])
+        );
+    }
+    #[test]
+    fn ifs() {
+        assert_eq!(
+            tokenize("!false && false == true || true"),
+            Ok(vec![
+                Token::Invert, Token::Value(false.into()),
+                Token::And,
+                Token::Value(false.into()), Token::Equal, Token::Value(true.into()),
+                Token::Or,
+                Token::Value(true.into())
+            ])
+        );
+        assert_eq!(
+            tokenize("1 < 2 && 2 <= 2 && 2 > 1 && 2 >= 2"),
+            Ok(vec![
+                Token::Value(1.into()), Token::Less, Token::Value(2.into()),
+                Token::And,
+                Token::Value(2.into()), Token::LessOrEq, Token::Value(2.into()),
+                Token::And,
+                Token::Value(2.into()), Token::More, Token::Value(1.into()),
+                Token::And,
+                Token::Value(2.into()), Token::MoreOrEq, Token::Value(2.into())
+            ])
+        );
+        assert_eq!(
+            tokenize("1 == 1 && 2 != 3"),
+            Ok(vec![
+                Token::Value(1.into()), Token::Equal, Token::Value(1.into()),
+                Token::And,
+                Token::Value(2.into()), Token::NotEqual, Token::Value(3.into())
+            ])
+        );
+        assert_eq!(
+            tokenize("if false then 1 else if true then 2 else 3"),
+            Ok(vec![
+                Token::If, Token::Value(false.into()), Token::Then,
+                    Token::Value(1.into()),
+                Token::Else,
+                    Token::If, Token::Value(true.into()), Token::Then,
+                        Token::Value(2.into()),
+                    Token::Else,
+                        Token::Value(3.into())
             ])
         );
     }

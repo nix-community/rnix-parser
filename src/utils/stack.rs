@@ -28,6 +28,10 @@ impl<I> Stack<I> {
         self.first_free_index() == 0
     }
     #[inline(always)]
+    crate fn push(&mut self, val: I) {
+        *self.first_free() = Some(val);
+    }
+    #[inline(always)]
     crate fn pop(&mut self) -> Option<I> {
         let pos = self.first_free_index().saturating_sub(1);
         self.buffer[pos].take()

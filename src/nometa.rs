@@ -25,6 +25,7 @@ pub enum AST {
     Var(String),
 
     // Expressions
+    IfElse(Box<(AST, AST, AST)>),
     Import(Box<AST>),
     Let(Vec<SetEntry>),
     LetIn(Vec<SetEntry>, Box<AST>),
@@ -34,12 +35,23 @@ pub enum AST {
     Apply(Box<(AST, AST)>),
     Concat(Box<(AST, AST)>),
     IndexSet(Box<AST>, String),
+    Invert(Box<AST>),
+    Merge(Box<(AST, AST)>),
     Negate(Box<AST>),
 
     Add(Box<(AST, AST)>),
     Sub(Box<(AST, AST)>),
     Mul(Box<(AST, AST)>),
-    Div(Box<(AST, AST)>)
+    Div(Box<(AST, AST)>),
+
+    And(Box<(AST, AST)>),
+    Equal(Box<(AST, AST)>),
+    Less(Box<(AST, AST)>),
+    LessOrEq(Box<(AST, AST)>),
+    More(Box<(AST, AST)>),
+    MoreOrEq(Box<(AST, AST)>),
+    NotEqual(Box<(AST, AST)>),
+    Or(Box<(AST, AST)>)
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum FnArg {
@@ -70,6 +82,9 @@ fn box_into<F, T: From<F>>(ast: Box<F>) -> Box<T> {
 }
 fn tuple_into<F, T: From<F>>(ast: Box<(F, F)>) -> Box<(T, T)> {
     Box::new((T::from(ast.0), T::from(ast.1)))
+}
+fn triple_into<F, T: From<F>>(ast: Box<(F, F, F)>) -> Box<(T, T, T)> {
+    Box::new((T::from(ast.0), T::from(ast.1), T::from(ast.2)))
 }
 
 impl From<PatEntryMeta> for PatEntry {
@@ -111,6 +126,7 @@ impl From<ASTMeta> for AST {
             ASTType::Var(inner) => AST::Var(inner),
 
             // Expressions
+            ASTType::IfElse(inner) => AST::IfElse(triple_into(inner)),
             ASTType::Import(inner) => AST::Import(box_into(inner)),
             ASTType::Let(set) => AST::Let(vec_into(set)),
             ASTType::LetIn(set, ast) => AST::LetIn(vec_into(set), box_into(ast)),
@@ -120,12 +136,23 @@ impl From<ASTMeta> for AST {
             ASTType::Apply(inner) => AST::Apply(tuple_into(inner)),
             ASTType::Concat(inner) => AST::Concat(tuple_into(inner)),
             ASTType::IndexSet(set, key) => AST::IndexSet(box_into(set), key),
+            ASTType::Invert(inner) => AST::Invert(box_into(inner)),
+            ASTType::Merge(inner) => AST::Merge(tuple_into(inner)),
             ASTType::Negate(inner) => AST::Negate(box_into(inner)),
 
             ASTType::Add(inner) => AST::Add(tuple_into(inner)),
             ASTType::Sub(inner) => AST::Sub(tuple_into(inner)),
             ASTType::Mul(inner) => AST::Mul(tuple_into(inner)),
-            ASTType::Div(inner) => AST::Div(tuple_into(inner))
+            ASTType::Div(inner) => AST::Div(tuple_into(inner)),
+
+            ASTType::And(inner) => AST::And(tuple_into(inner)),
+            ASTType::Equal(inner) => AST::Equal(tuple_into(inner)),
+            ASTType::Less(inner) => AST::Less(tuple_into(inner)),
+            ASTType::LessOrEq(inner) => AST::LessOrEq(tuple_into(inner)),
+            ASTType::More(inner) => AST::More(tuple_into(inner)),
+            ASTType::MoreOrEq(inner) => AST::MoreOrEq(tuple_into(inner)),
+            ASTType::NotEqual(inner) => AST::NotEqual(tuple_into(inner)),
+            ASTType::Or(inner) => AST::Or(tuple_into(inner))
         }
     }
 }

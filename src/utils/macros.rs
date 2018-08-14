@@ -19,6 +19,13 @@ macro_rules! nix_inner {
     (pat_exact $value:expr) => {{ $value }};
     (parse { $($token:tt)* }) => {{ nix_inner!(set (rec: false) { $($token)* }) }};
     (parse rec { $($token:tt)* }) => {{ nix_inner!(set (rec: true) { $($token)* }) }};
+    (parse if ($($cond:tt)*) then ($($body:tt)*) else $($otherwise:tt)*) => {{
+        AST::IfElse(Box::new((
+            nix_inner!(parse $($cond)*),
+            nix_inner!(parse $($body)*),
+            nix_inner!(parse $($otherwise)*)
+        )))
+    }};
     (parse let {
         $($ident:ident = ($($val:tt)*);)*
     } in $($remaining:tt)*) => {{
@@ -75,6 +82,24 @@ macro_rules! nix_inner {
     (parse ($($val1:tt)*) ++ ($($val2:tt)*)) => {{
         AST::Concat(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
     }};
+    (parse ($($val1:tt)*) == ($($val2:tt)*)) => {{
+        AST::Equal(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    }};
+    (parse ($($val1:tt)*) != ($($val2:tt)*)) => {{
+        AST::NotEqual(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    }};
+    (parse ($($val1:tt)*) <= ($($val2:tt)*)) => {{
+        AST::LessOrEq(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    }};
+    (parse ($($val1:tt)*) < ($($val2:tt)*)) => {{
+        AST::Less(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    }};
+    (parse ($($val1:tt)*) >= ($($val2:tt)*)) => {{
+        AST::MoreOrEq(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    }};
+    (parse ($($val1:tt)*) > ($($val2:tt)*)) => {{
+        AST::More(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    }};
     (parse ($($fn:tt)*) ($($arg:tt)*)) => {{
         AST::Apply(Box::new((nix_inner!(parse $($fn)*), nix_inner!(parse $($arg)*))))
     }};
@@ -84,9 +109,15 @@ macro_rules! nix_inner {
     (parse [$(($($item:tt)*))*]) => {{
         AST::List(vec![$(nix_inner!(parse $($item)*)),*])
     }};
+    (parse -$($val:tt)*) => {{
+        AST::Negate(Box::new((nix_inner!(parse $($val)*))))
+    }};
+    (parse !$($val:tt)*) => {{
+        AST::Invert(Box::new((nix_inner!(parse $($val)*))))
+    }};
     (parse true) => {{ AST::Value(Value::Bool(true)) }};
     (parse false) => {{ AST::Value(Value::Bool(false)) }};
-    (parse null) => {{ AST::Value(Value::Bool(null)) }};
+    (parse null) => {{ AST::Value(Value::Null) }};
     (parse $val:ident) => {{
         AST::Var(String::from(stringify!($val)))
     }};
