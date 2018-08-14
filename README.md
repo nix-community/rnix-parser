@@ -20,8 +20,6 @@ rnix ...
 
 # Unimplemented
 
-Not everything is implemented yet. I don't know all of nix inside my head, but what I do know:
-
-**TODO**:
-
- - `or` keyword
+I have implemented everything I can think of. Most, if not all of these, are
+tested inside the `tests/` directory. If some kind of syntax isn't tested
+there, you should report it as unimplemented.

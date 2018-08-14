@@ -7,7 +7,7 @@ macro_rules! nix_inner {
         $vec.push(SetEntry::Assign(vec![AST::Var(String::from(stringify!($ident)))], nix_inner!(parse $($val)*)));
         nix_inner!(entry($vec) $($remaining)*);
     };
-    (entry($vec:expr) $(($($ident:tt)*))* = ($($val:tt)*); $($remaining:tt)*) => {
+    (entry($vec:expr) $(($($ident:tt)*)).* = ($($val:tt)*); $($remaining:tt)*) => {
         $vec.push(SetEntry::Assign(
             vec![$(nix_inner!(parse $($ident)*)),*],
             nix_inner!(parse $($val)*)
@@ -132,6 +132,12 @@ macro_rules! nix_inner {
     }};
     (parse ($($val1:tt)*) merge ($($val2:tt)*)) => {{
         AST::Merge(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    }};
+    (parse ($($val1:tt)*) ? ($($val2:tt)*)) => {{
+        AST::IsSet(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+    }};
+    (parse ($($val1:tt)*) or ($($val2:tt)*)) => {{
+        AST::OrDefault(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
     }};
     (parse ($($fn:tt)*) ($($arg:tt)*)) => {{
         AST::Apply(Box::new((nix_inner!(parse $($fn)*), nix_inner!(parse $($arg)*))))

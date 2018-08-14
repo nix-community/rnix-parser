@@ -37,8 +37,10 @@ pub enum AST {
     Concat(Box<(AST, AST)>),
     IndexSet(Box<(AST, AST)>),
     Invert(Box<AST>),
+    IsSet(Box<(AST, AST)>),
     Merge(Box<(AST, AST)>),
     Negate(Box<AST>),
+    OrDefault(Box<(AST, AST)>),
 
     Add(Box<(AST, AST)>),
     Sub(Box<(AST, AST)>),
@@ -145,8 +147,10 @@ impl From<ASTMeta> for AST {
             ASTType::Concat(inner) => AST::Concat(tuple_into(inner)),
             ASTType::IndexSet(inner) => AST::IndexSet(tuple_into(inner)),
             ASTType::Invert(inner) => AST::Invert(box_into(inner)),
+            ASTType::IsSet(inner) => AST::IsSet(tuple_into(inner)),
             ASTType::Merge(inner) => AST::Merge(tuple_into(inner)),
             ASTType::Negate(inner) => AST::Negate(box_into(inner)),
+            ASTType::OrDefault(inner) => AST::OrDefault(tuple_into(inner)),
 
             ASTType::Add(inner) => AST::Add(tuple_into(inner)),
             ASTType::Sub(inner) => AST::Sub(tuple_into(inner)),

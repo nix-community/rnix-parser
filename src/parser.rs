@@ -49,8 +49,10 @@ pub enum ASTType {
     Concat(Box<(AST, AST)>),
     IndexSet(Box<(AST, AST)>),
     Invert(Box<AST>),
+    IsSet(Box<(AST, AST)>),
     Merge(Box<(AST, AST)>),
     Negate(Box<AST>),
+    OrDefault(Box<(AST, AST)>),
 
     Add(Box<(AST, AST)>),
     Sub(Box<(AST, AST)>),
@@ -376,11 +378,18 @@ impl<I> Parser<I>
 
         Ok(val)
     }
+    fn parse_isset(&mut self) -> Result<AST> {
+        math!(
+            self, { self.parse_val()? },
+            Token::OrDefault => ASTType::OrDefault,
+            Token::Question => ASTType::IsSet
+        )
+    }
     fn parse_fn(&mut self) -> Result<AST> {
-        let mut val = self.parse_val()?;
+        let mut val = self.parse_isset()?;
 
         while self.peek().map(|t| t.is_fn_arg()).unwrap_or(false) {
-            let arg = self.parse_val()?;
+            let arg = self.parse_isset()?;
             val = AST(
                 val.0.span.until(arg.0.span).into(),
                 ASTType::Apply(Box::new((val, arg)))
@@ -431,6 +440,11 @@ impl<I> Parser<I>
             Token::Or => ASTType::Or
         )
     }
+    #[inline(always)]
+    fn parse_math(&mut self) -> Result<AST> {
+        // Always point this to the lowest-level math function there is
+        self.parse_or()
+    }
     pub fn parse_expr(&mut self) -> Result<AST> {
         Ok(match self.peek() {
             Some(Token::Let) => {
@@ -476,7 +490,7 @@ impl<I> Parser<I>
                 let rest = self.parse_expr()?;
                 AST(start.until(&rest.0), ASTType::Assert(Box::new((condition, rest))))
             },
-            _ => match self.parse_or()? {
+            _ => match self.parse_math()? {
                 AST(start, ASTType::Var(name)) => if self.peek() == Some(&Token::Colon) {
                     self.next()?;
                     let AST(end, expr) = self.parse_expr()?;
@@ -1063,6 +1077,35 @@ mod tests {
                     SetEntry::Inherit(Some(AST::Var("set".into())), vec!["c".into()]),
                 ]
             })
+        );
+    }
+    #[test]
+    fn isset() {
+        assert_eq!(
+            parse![
+                Token::Ident("a".into()), Token::Question, Token::Value("b".into()),
+                Token::And, Token::Value(true.into())
+            ],
+            Ok(AST::And(Box::new((
+                AST::IsSet(Box::new((
+                    AST::Var("a".into()),
+                    AST::Value("b".into())
+                ))),
+                AST::Value(true.into())
+            ))))
+        );
+        assert_eq!(
+            parse![
+                Token::Ident("a".into()), Token::OrDefault, Token::Value(1.into()),
+                Token::Add, Token::Value(1.into())
+            ],
+            Ok(AST::Add(Box::new((
+                AST::OrDefault(Box::new((
+                    AST::Var("a".into()),
+                    AST::Value(1.into())
+                ))),
+                AST::Value(1.into())
+            ))))
         );
     }
 }

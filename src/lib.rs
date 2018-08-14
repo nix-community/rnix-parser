@@ -168,22 +168,29 @@ string :D
         assert_eq!(
             parse(include_str!("../tests/inherit.nix")),
             nix!(let {
-              y = (2);
-              set = ({ z = (3); a = (4); b = (5); });
+                 y = (2);
+                 set = ({ z = (3); a = (4); b = (5); });
             } in {
-              x = (1);
-              inherit y;
-              inherit (set) z a;
+                x = (1);
+                inherit y;
+                inherit (set) z a;
             })
         );
         assert_eq!(
             parse(include_str!("../tests/dynamic-attrs.nix")),
             nix!(let {
-              define = (name: val: { (name) = (val); });
-              key = ("hello");
+                define = (name: val: { (name) = (val); });
+                key = ("hello");
             } in (((define) ("key")) ("value")) merge ({
-                (raw AST::Interpol(vec![Interpol::AST(AST::Var("key".into()))])) (world) = (":D");
+                    (raw AST::Interpol(vec![Interpol::AST(AST::Var("key".into()))])).(world) = (":D");
             }))
+        );
+        assert_eq!(
+            parse(include_str!("../tests/isset.nix")),
+            nix!(rec {
+                x = (({ a = (1); }) ? (b));
+                y = ((({ b = (2); }).c) or (5));
+            })
         );
     }
 }
