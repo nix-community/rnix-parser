@@ -25,6 +25,7 @@ pub enum AST {
     Var(String),
 
     // Expressions
+    Assert(Box<(AST, AST)>),
     IfElse(Box<(AST, AST, AST)>),
     Import(Box<AST>),
     Let(Vec<SetEntry>),
@@ -70,7 +71,10 @@ pub enum Interpol {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatEntry(pub String, pub Option<AST>);
 #[derive(Clone, Debug, PartialEq)]
-pub struct SetEntry(pub Vec<String>, pub AST);
+pub enum SetEntry {
+    Assign(Vec<String>, AST),
+    Inherit(Option<AST>, Vec<String>)
+}
 
 fn vec_into<F, T: From<F>>(vec: Vec<F>) -> Vec<T> {
     vec.into_iter()
@@ -94,7 +98,10 @@ impl From<PatEntryMeta> for PatEntry {
 }
 impl From<SetEntryMeta> for SetEntry {
     fn from(entry: SetEntryMeta) -> Self {
-        SetEntry(entry.0, AST::from(entry.1))
+        match entry {
+            SetEntryMeta::Assign(key, value) => SetEntry::Assign(key, AST::from(value)),
+            SetEntryMeta::Inherit(from, values) => SetEntry::Inherit(from.map(AST::from), values),
+        }
     }
 }
 impl From<InterpolMeta> for Interpol {
@@ -126,6 +133,7 @@ impl From<ASTMeta> for AST {
             ASTType::Var(inner) => AST::Var(inner),
 
             // Expressions
+            ASTType::Assert(inner) => AST::Assert(tuple_into(inner)),
             ASTType::IfElse(inner) => AST::IfElse(triple_into(inner)),
             ASTType::Import(inner) => AST::Import(box_into(inner)),
             ASTType::Let(set) => AST::Let(vec_into(set)),

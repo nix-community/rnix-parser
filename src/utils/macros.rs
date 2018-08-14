@@ -1,14 +1,32 @@
+// TODO: Use optional macro args if they become a thing
+
 #[macro_export]
 macro_rules! nix_inner {
+    (entry($vec:expr)) => {};
+    (entry($vec:expr) $ident:ident = ($($val:tt)*); $($remaining:tt)*) => {
+        $vec.push(SetEntry::Assign(vec![String::from(stringify!($ident))], nix_inner!(parse $($val)*)));
+        nix_inner!(entry($vec) $($remaining)*);
+    };
+    (entry($vec:expr) inherit ($($from:tt)*) $($var:ident)*; $($remaining:tt)*) => {
+        $vec.push(SetEntry::Inherit(
+            Some(nix_inner!(parse $($from)*)),
+            vec![$(String::from(stringify!($var))),*]
+        ));
+        nix_inner!(entry($vec) $($remaining)*);
+    };
+    (entry($vec:expr) inherit $($var:ident)*; $($remaining:tt)*) => {{
+        $vec.push(SetEntry::Inherit(None, vec![$(String::from(stringify!($var))),*]));
+        nix_inner!(entry($vec) $($remaining)*);
+    }};
     (set (rec: $recursive:expr) {}) => {{ AST::EmptySet }};
-    (set (rec: $recursive:expr) {
-        $($ident:ident = ($($val:tt)*);)+
-    }) => {{
+    (set (rec: $recursive:expr) { $($inner:tt)* }) => {{
         AST::Set {
             recursive: $recursive,
-            values: vec![
-                $(SetEntry(vec![String::from(stringify!($ident))], nix_inner!(parse $($val)*))),*
-            ]
+            values: {{
+                let mut vec = Vec::new();
+                nix_inner!(entry(vec) $($inner)*);
+                vec
+            }}
         }
     }};
     (pat_default) => {{ None }};
@@ -19,25 +37,18 @@ macro_rules! nix_inner {
     (pat_exact $value:expr) => {{ $value }};
     (parse { $($token:tt)* }) => {{ nix_inner!(set (rec: false) { $($token)* }) }};
     (parse rec { $($token:tt)* }) => {{ nix_inner!(set (rec: true) { $($token)* }) }};
-    (parse if ($($cond:tt)*) then ($($body:tt)*) else $($otherwise:tt)*) => {{
-        AST::IfElse(Box::new((
-            nix_inner!(parse $($cond)*),
-            nix_inner!(parse $($body)*),
-            nix_inner!(parse $($otherwise)*)
-        )))
-    }};
     (parse let {
         $($ident:ident = ($($val:tt)*);)*
     } in $($remaining:tt)*) => {{
         AST::LetIn(
-            vec![$(SetEntry(vec![String::from(stringify!($ident))], nix_inner!(parse $($val)*))),*],
+            vec![$(SetEntry::Assign(vec![String::from(stringify!($ident))], nix_inner!(parse $($val)*))),*],
             Box::new(nix_inner!(parse $($remaining)*))
         )
     }};
     (parse let {
         $($ident:ident = ($($val:tt)*);)*
     }) => {{
-        AST::Let(vec![$(SetEntry(vec![String::from(stringify!($ident))], nix_inner!(parse $($val)*))),*])
+        AST::Let(vec![$(SetEntry::Assign(vec![String::from(stringify!($ident))], nix_inner!(parse $($val)*))),*])
     }};
     (parse with ($($namespace:tt)*); $($remaining:tt)*) => {{
         AST::With(Box::new((
@@ -48,12 +59,24 @@ macro_rules! nix_inner {
     (parse import ($($path:tt)*)) => {{
         AST::Import(Box::new(nix_inner!(parse $($path)*)))
     }};
+    (parse if ($($cond:tt)*) then ($($body:tt)*) else $($otherwise:tt)*) => {{
+        AST::IfElse(Box::new((
+            nix_inner!(parse $($cond)*),
+            nix_inner!(parse $($body)*),
+            nix_inner!(parse $($otherwise)*)
+        )))
+    }};
+    (parse assert ($($cond:tt)*); $($remaining:tt)*) => {{
+        AST::Assert(Box::new((
+            nix_inner!(parse $($cond)*),
+            nix_inner!(parse $($remaining)*)
+        )))
+    }};
     (parse $fn:ident: $($body:tt)*) => {{
         AST::Lambda(FnArg::Ident(String::from(stringify!($fn))), Box::new(nix_inner!(parse $($body)*)))
     }};
     (parse $($bind:ident @)* {
         $(( exact = $optional:expr ))*
-        // TODO: Use optional macro args if they become a thing
         $($arg:ident $(? ($($default:tt)*))*),*
     }: $($body:tt)*) => {{
         AST::Lambda(
@@ -151,8 +174,8 @@ fn test_macro() {
         AST::Set {
             recursive: false,
             values: vec![
-                SetEntry(vec!["string".into()], AST::Value("Hello World".into())),
-                SetEntry(vec!["number".into()], AST::Mul(Box::new((
+                SetEntry::Assign(vec!["string".into()], AST::Value("Hello World".into())),
+                SetEntry::Assign(vec!["number".into()], AST::Mul(Box::new((
                     AST::Value(3.into()),
                     AST::Add(Box::new((
                         AST::Value(4.into()),

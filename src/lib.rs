@@ -126,13 +126,24 @@ string :D
                 {
                   x = (if ((value) != (null))
                         then (if ((value) <= (5))
-                          then (value)
+                          then (assert ((value) >= (0)); value)
                           else 5)
                         else if (!life)
                           then (1337)
                           else 42);
                 }
             )
-        )
+        );
+        assert_eq!(
+            parse(include_str!("../tests/inherit.nix")),
+            nix!(let {
+              y = (2);
+              set = ({ z = (3); a = (4); b = (5); });
+            } in {
+              x = (1);
+              inherit y;
+              inherit (set) z a;
+            })
+        );
     }
 }

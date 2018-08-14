@@ -2,7 +2,7 @@
 {
   x = if value != null
         then if value <= 5
-          then value
+          then (assert (value >= 0); value)
           else 5
         else if !life
           then 1337

@@ -22,10 +22,5 @@ rust-nix ...
 
 You can check the `tests/` directory to see what is currently implemented.
 
-**TODO**:
-
- - assert
- - inherit
-
 I also want to add built-in utilities for cleaning up the AST by for example
 evaluating math expressions and expanding imports.
