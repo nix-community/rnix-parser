@@ -24,7 +24,6 @@ You can check the `tests/` directory to see what is currently implemented.
 
 **TODO**:
 
- - pattern binding by specifying it BEFORE (after already implemented)
  - assert
  - inherit
 

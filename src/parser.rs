@@ -6,6 +6,8 @@ use crate::{
 
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum ParseError {
+    #[fail(display = "can't bind pattern here, already bound before")]
+    AlreadyBound,
     #[fail(display = "expected {:?}, found {:?}", _0, _1)]
     Expected(Token, Option<Token>),
     #[fail(display = "expected {}, found {:?}", _0, _1)]
@@ -174,7 +176,7 @@ impl<I> Parser<I>
         }
         Ok(ident)
     }
-    fn parse_pattern(&mut self, start: Meta) -> Result<AST> {
+    fn parse_pattern(&mut self, start: Meta, mut bind: Option<String>) -> Result<AST> {
         let mut args = Vec::with_capacity(1);
         let mut exact = true;
         loop {
@@ -200,17 +202,18 @@ impl<I> Parser<I>
                 _ => break
             }
         }
+
         self.expect(Token::CurlyBClose)?;
 
-        let bind = if self.peek() == Some(&Token::At) {
+        if let Some((meta, Token::At)) = self.peek_meta() {
+            if bind.is_some() {
+                return Err((Some(meta.span), ParseError::AlreadyBound));
+            }
             self.next().unwrap();
-            Some(self.next_ident()?.1)
-        } else {
-            None
-        };
+            bind = Some(self.next_ident()?.1);
+        }
 
         self.expect(Token::Colon)?;
-
         let AST(end, expr) = self.parse_expr()?;
 
         Ok(AST(start.until(&end), ASTType::Lambda(
@@ -262,7 +265,7 @@ impl<I> Parser<I>
                     Some(Token::Comma) | Some(Token::Question) => {
                         // We did a lookahead, put it back
                         self.buffer.push(temporary);
-                        self.parse_pattern(start)?
+                        self.parse_pattern(start, None)?
                     },
                     _ => {
                         // We did a lookahead, put it back
@@ -298,7 +301,19 @@ impl<I> Parser<I>
                 AST(start.until(&end), ASTType::Invert(Box::new(AST(end, expr))))
             },
             (meta, Token::Value(val)) => AST(meta, ASTType::Value(val)),
-            (meta, Token::Ident(name)) => AST(meta, ASTType::Var(name)),
+            (start, Token::Ident(name)) => if self.peek() == Some(&Token::At) {
+                self.next().unwrap();
+                self.expect(Token::CurlyBOpen)?;
+
+                if self.peek() == Some(&Token::CurlyBClose) {
+                    let (end, _) = self.next().unwrap();
+                    return Ok(AST(start.until(&end), ASTType::EmptySet));
+                }
+
+                self.parse_pattern(start, Some(name))?
+            } else {
+                AST(start, ASTType::Var(name))
+            },
             (meta, Token::Interpol(values)) => {
                 let mut parsed = Vec::new();
                 for value in values {
@@ -766,12 +781,12 @@ mod tests {
     fn patterns() {
         assert_eq!(
             parse![
-               Token::CurlyBOpen,
-                   Token::Ident("a".into()), Token::Comma,
-                   Token::Ident("b".into()), Token::Question, Token::Value("default".into()),
-               Token::CurlyBClose,
-               Token::Colon,
-               Token::Ident("a".into())
+                Token::CurlyBOpen,
+                    Token::Ident("a".into()), Token::Comma,
+                    Token::Ident("b".into()), Token::Question, Token::Value("default".into()),
+                Token::CurlyBClose,
+                Token::Colon,
+                Token::Ident("a".into())
             ],
             Ok(AST::Lambda(
                 FnArg::Pattern {
@@ -787,15 +802,15 @@ mod tests {
         );
         assert_eq!(
             parse![
-               Token::CurlyBOpen,
-                   Token::Ident("a".into()), Token::Comma,
-                   Token::Ident("b".into()), Token::Question, Token::Value("default".into()), Token::Comma,
-                   Token::Ellipsis,
-               Token::CurlyBClose,
-               Token::At,
-               Token::Ident("outer".into()),
-               Token::Colon,
-               Token::Ident("outer".into())
+                Token::CurlyBOpen,
+                    Token::Ident("a".into()), Token::Comma,
+                    Token::Ident("b".into()), Token::Question, Token::Value("default".into()), Token::Comma,
+                    Token::Ellipsis,
+                Token::CurlyBClose,
+                Token::At,
+                Token::Ident("outer".into()),
+                Token::Colon,
+                Token::Ident("outer".into())
             ],
             Ok(AST::Lambda(
                 FnArg::Pattern {
@@ -805,6 +820,22 @@ mod tests {
                     ],
                     bind: Some("outer".into()),
                     exact: false
+                },
+                Box::new(AST::Var("outer".into()))
+            ))
+        );
+        assert_eq!(
+            parse![
+                Token::Ident("outer".into()), Token::At,
+                Token::CurlyBOpen, Token::Ident("a".into()), Token::CurlyBClose,
+                Token::Colon,
+                Token::Ident("outer".into())
+            ],
+            Ok(AST::Lambda(
+                FnArg::Pattern {
+                    args: vec![PatEntry("a".into(), None)],
+                    bind: Some("outer".into()),
+                    exact: true
                 },
                 Box::new(AST::Var("outer".into()))
             ))
