@@ -4,6 +4,8 @@ use crate::{
     value::Value
 };
 
+const OR: &'static str = "or";
+
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum ParseError {
     #[fail(display = "can't bind pattern here, already bound before")]
@@ -94,10 +96,10 @@ type Error = (Option<Span>, ParseError);
 type Result<T> = std::result::Result<T, Error>;
 
 macro_rules! math {
-    (only_once, $self:expr, $next:block, $($token:pat => $ast:expr),*) => {{
+    (only_once, $self:expr, $next:block, $($token:pat $(if $cond:expr)* => $ast:expr),*) => {{
         let val = { $next };
         Ok(match $self.peek() {
-            $(Some(&$token) => {
+            $(Some(&$token) $(if $cond)* => {
                 $self.next()?;
                 let expr = { $next };
                 AST(val.0.span.until(expr.0.span).into(), $ast(Box::new((val, expr))))
@@ -105,11 +107,11 @@ macro_rules! math {
             _ => val
         })
     }};
-    ($self:expr, $next:block, $($token:pat => $ast:expr),*) => {{
+    ($self:expr, $next:block, $($token:pat $(if $cond:expr)* => $ast:expr),*) => {{
         let mut val = { $next };
         loop {
             match $self.peek() {
-                $(Some(&$token) => {
+                $(Some(&$token) $(if $cond)* => {
                     $self.next()?;
                     let AST(end, expr) = { $next };
                     val = AST(val.0.span.until(end.span).into(), $ast(Box::new((val, AST(end, expr)))));
@@ -381,7 +383,7 @@ impl<I> Parser<I>
     fn parse_isset(&mut self) -> Result<AST> {
         math!(
             self, { self.parse_val()? },
-            Token::OrDefault => ASTType::OrDefault,
+            Token::Ident(ref ident) if ident == OR => ASTType::OrDefault,
             Token::Question => ASTType::IsSet
         )
     }
@@ -517,7 +519,7 @@ mod tests {
         tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
         value::{Anchor, Value}
     };
-    use super::{AST as ASTSpan, ASTType, ParseError};
+    use super::{AST as ASTSpan, ASTType, OR, ParseError};
 
     macro_rules! parse {
         ($($token:expr),*) => {
@@ -1096,7 +1098,7 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::Ident("a".into()), Token::OrDefault, Token::Value(1.into()),
+                Token::Ident("a".into()), Token::Ident(OR.into()), Token::Value(1.into()),
                 Token::Add, Token::Value(1.into())
             ],
             Ok(AST::Add(Box::new((

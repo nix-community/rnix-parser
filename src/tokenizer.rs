@@ -25,7 +25,8 @@ pub enum Token {
     In,
     Inherit,
     Let,
-    OrDefault,
+    // or, for some reason, is also a valid identifier
+    // OrDefault,
     Rec,
     Then,
     With,
@@ -358,8 +359,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             // a//b parses as Merge(a, b)
             (Some('/'), Some('/')) => None,
             (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
-            (Some('>'), None) => Some(IdentType::Store),
-            (Some('>'), Some(c)) if !c.is_whitespace() => Some(IdentType::Store),
+            (Some('>'), _) => Some(IdentType::Store),
             (Some(':'), Some(c)) if !c.is_whitespace() => Some(IdentType::Uri),
             _ => None
         };
@@ -441,7 +441,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                         "in" => Token::In,
                         "inherit" => Token::Inherit,
                         "let" => Token::Let,
-                        "or" => Token::OrDefault,
+                        // "or" => Token::OrDefault,
                         "rec" => Token::Rec,
                         "then" => Token::Then,
                         "with" => Token::With,
