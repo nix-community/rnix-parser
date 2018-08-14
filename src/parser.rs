@@ -305,8 +305,12 @@ impl<I> Parser<I>
             },
             (start, Token::CurlyBOpen) => {
                 let temporary = self.next()?;
-                match self.peek() {
-                    Some(Token::Comma) | Some(Token::Question) | Some(Token::CurlyBClose) | Some(Token::Colon) => {
+                match (&temporary.1, self.peek()) {
+                    (Token::Ident(_), Some(Token::Comma))
+                            | (Token::Ident(_), Some(Token::Question))
+                            | (_, Some(Token::CurlyBClose))
+                            | (Token::CurlyBClose, Some(Token::Colon))
+                            | (Token::CurlyBClose, Some(Token::At)) => {
                         // We did a lookahead, put it back
                         self.buffer.push(temporary);
                         self.parse_pattern(start, None)?
@@ -892,6 +896,20 @@ mod tests {
                 FnArg::Pattern {
                     args: Vec::new(),
                     bind: None,
+                    exact: true
+                },
+                Box::new(AST::Value(1.into()))
+            ))
+        );
+        assert_eq!(
+            parse![
+                Token::CurlyBOpen, Token::CurlyBClose, Token::At, Token::Ident("outer".into()),
+                Token::Colon, Token::Value(1.into())
+            ],
+            Ok(AST::Lambda(
+                FnArg::Pattern {
+                    args: Vec::new(),
+                    bind: Some("outer".into()),
                     exact: true
                 },
                 Box::new(AST::Value(1.into()))
