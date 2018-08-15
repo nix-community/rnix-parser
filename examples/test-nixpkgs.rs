@@ -70,8 +70,7 @@ impl App {
         if file.metadata()?.is_dir() {
             file.push("default.nix");
         }
-        self.parse(&file)?;
-        self.resolve(&file, ast)
+        self.parse(file)
     }
     fn resolve(&mut self, file: &Path, ast: &AST) -> Result<(), Error> {
         ast.recurse(&mut |ast| -> Result<(), Error> {
