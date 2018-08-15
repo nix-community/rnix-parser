@@ -329,7 +329,8 @@ impl<I> Parser<I>
                 match (&temporary.1, self.peek()) {
                     (Token::Ident(_), Some(Token::Comma))
                             | (Token::Ident(_), Some(Token::Question))
-                            | (_, Some(Token::CurlyBClose))
+                            | (Token::Ellipsis, Some(Token::CurlyBClose))
+                            | (Token::Ident(_), Some(Token::CurlyBClose))
                             | (Token::CurlyBClose, Some(Token::Colon))
                             | (Token::CurlyBClose, Some(Token::At)) => {
                         // We did a lookahead, put it back
@@ -1036,6 +1037,21 @@ mod tests {
                     exact: true
                 },
                 Box::new(AST::Var("outer".into()))
+            ))
+        );
+        assert_eq!(
+            parse![
+                Token::CurlyBOpen,
+                    Token::Ident("a".into()), Token::Question, Token::CurlyBOpen, Token::CurlyBClose,
+                Token::CurlyBClose, Token::Colon, Token::Ident("a".into())
+            ],
+            Ok(AST::Lambda(
+                LambdaArg::Pattern {
+                    args: vec![PatEntry("a".into(), Some(AST::Var("a".into())))],
+                    bind: None,
+                    exact: true
+                },
+                Box::new(AST::Var("a".into()))
             ))
         );
     }

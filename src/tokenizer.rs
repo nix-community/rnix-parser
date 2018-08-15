@@ -461,6 +461,7 @@ impl<'a> Iterator for Tokenizer<'a> {
         let kind = match (lookahead.next(), lookahead.next()) {
             // a//b parses as Merge(a, b)
             (Some('/'), Some('/')) => None,
+            (Some('/'), Some('*')) => None,
             (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
             (Some('>'), _) => Some(IdentType::Store),
             (Some(':'), Some(c)) if !c.is_whitespace() => Some(IdentType::Uri),

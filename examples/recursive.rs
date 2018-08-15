@@ -18,9 +18,16 @@ fn main() -> Result<(), Error> {
 
     println!("Nix store path: {}", nixpkgs.display());
 
-    let default = nixpkgs.join("lib/default.nix");
-    if let Err(err) = (App { nixpkgs }.parse(&default)) {
-        println!("failure: {}", err);
+    let app = App {
+        nixpkgs: nixpkgs.clone()
+    };
+
+    for path in &["lib/default.nix", "pkgs/top-level/all-packages.nix"] {
+        let default = nixpkgs.join(&path);
+        if let Err(err) = app.parse(&default) {
+            println!("failure: {}", err);
+            break;
+        }
     }
     Ok(())
 }
@@ -58,7 +65,7 @@ impl App {
         match ast {
             AST::Apply(box (name, arg)) => {
                 if let AST::Var(name) = name {
-                    if name == "callLibs" {
+                    if name == "callLibs" || name == "callPackage" {
                         self.parse_file_from_ast(file, arg)?;
                     }
                 }
@@ -81,7 +88,20 @@ impl App {
                     }
                 }
             },
-            AST::With(box (one, two)) => { self.resolve(file, one)?; self.resolve(file, two)?; }
+            AST::With(box (namespace, body)) => {
+                self.resolve(file, namespace)?;
+                self.resolve(file, body)?;
+            },
+            AST::Lambda(arg, body) => {
+                if let LambdaArg::Pattern { args, .. } = arg {
+                    for PatEntry(_, default) in args {
+                        if let Some(default) = default {
+                            self.resolve(file, default)?;
+                        }
+                    }
+                }
+                self.resolve(file, body)?;
+            },
             _ => ()
         }
         Ok(())
