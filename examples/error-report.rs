@@ -10,11 +10,11 @@ fn main() {
     let file = match env::args().skip(1).next() {
         Some(file) => file,
         None => {
-            eprintln!("Usage: dump-ast <file>");
+            eprintln!("Usage: error-report <file>");
             return;
         }
     };
-    let content = match fs::read_to_string(file) {
+    let content = match fs::read_to_string(&file) {
         Ok(content) => content,
         Err(err) => {
             eprintln!("error reading file: {}", err);
@@ -33,9 +33,6 @@ fn main() {
         }
     };
 
-    writeln!(stdout, "{:?}", span);
-    writeln!(stdout).unwrap();
-
     let start = span.start;
     let end = span.end.unwrap_or(start+1);
 
@@ -43,6 +40,12 @@ fn main() {
     let prev_line = content[..prev_line_end.unwrap_or(0)].rfind('\n').map(|n| n+1).unwrap_or(0);
     let next_line = content[end..].find('\n').map(|n| n + 1 + end).unwrap_or(content.len());
     let next_line_end = content[next_line..].find('\n').map(|n| n + next_line).unwrap_or(content.len());
+
+    let line = content[..start].chars().filter(|c| *c == '\n').count() + 1;
+    let col = start - prev_line_end.map(|n| n+1).unwrap_or(0) + 1;
+
+    writeln!(stdout, "At {}:{}:{}", file, line, col);
+    writeln!(stdout).unwrap();
 
     let mut pos = prev_line;
     loop {
