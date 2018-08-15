@@ -239,33 +239,80 @@ impl<'a> Tokenizer<'a> {
         Ok(tokens)
     }
     fn next_string(&mut self, meta: Meta, multiline: bool) -> Option<Item> {
+        fn remove_shared_indent(indent: usize, string: &mut String) {
+            let mut pos = 0;
+            while let Some(newline) = string[pos..].find('\n') {
+                pos += newline + 1;
+                let end = string.len().min(pos + indent);
+                string.drain(pos..end);
+            }
+        }
+
         let mut interpol = Vec::new();
         let mut literal = String::new();
+
+        let mut min_indent = None;
+        let mut last_indent = 0;
+        let mut first_newline = true;
+        while multiline && self.peek().map(char::is_whitespace).unwrap_or(false) {
+            if self.peek() == Some('\n') {
+                last_indent = 0;
+                if !first_newline {
+                    literal.push(self.next().unwrap());
+                } else {
+                    literal.clear();
+                    self.next().unwrap();
+                    first_newline = false;
+                }
+                continue;
+            }
+
+            // Will later remove common indention
+            last_indent += 1;
+            literal.push(self.next().unwrap());
+        }
+
         loop {
+            let whitespace = self.peek().map(char::is_whitespace).unwrap_or(false);
             match self.peek() {
                 None => return self.span_err(meta, TokenizeError::UnexpectedEOF),
-                Some('"') if !multiline => { self.next(); break },
-                Some('\'') if multiline => match { self.next()?; self.peek() } {
+                Some('"') if !multiline => { self.next().unwrap(); break },
+                Some('\'') if multiline => match { self.next().unwrap(); self.peek() } {
                     None => return self.span_err(meta, TokenizeError::UnexpectedEOF),
-                    Some('\'') => { self.next()?; break; },
+                    Some('\'') => match { self.next().unwrap(); self.peek() } {
+                        Some('n') => { self.next().unwrap(); literal.push('\n'); },
+                        Some('r') => { self.next().unwrap(); literal.push('\r'); },
+                        Some('t') => { self.next().unwrap(); literal.push('\t'); },
+                        Some('\'') => { self.next().unwrap(); literal.push_str("''"); },
+                        Some('$') => { self.next().unwrap(); literal.push('$'); },
+                        Some('\\') => { self.next().unwrap(); literal.push(self.next()?); },
+                        _ => break
+                    }
                     Some(_) => literal.push('\''),
                 },
                 Some('\n') if multiline => {
                     // Don't push initial newline
                     self.next()?;
-                    if !literal.is_empty() {
-                        literal.push('\n');
-                    }
-                    while self.peek() == Some(' ')
-                            || self.peek() == Some('\t') {
-                        self.next();
+
+                    literal.push('\n');
+
+                    last_indent = 0;
+                    while self.peek().map(|c| c.is_whitespace() && c != '\n').unwrap_or(false) {
+                        last_indent += 1;
+                        // Will later remove common indention
+                        literal.push(self.next().unwrap());
                     }
                 },
                 Some('\\') if !multiline => {
                     self.next()?;
-                    literal.push(self.next()?);
+                    literal.push(match self.next()? {
+                        'n' => '\n',
+                        'r' => '\r',
+                        't' => '\t',
+                        c => c
+                    });
                 },
-                Some('$') => match { self.next(); self.peek() } {
+                Some('$') => match { self.next().unwrap(); self.peek() } {
                     Some('{') => {
                         if !literal.is_empty() {
                             interpol.push(Interpol::Literal(mem::replace(&mut literal, String::new())));
@@ -275,16 +322,57 @@ impl<'a> Tokenizer<'a> {
                             Err(err) => return Some(Err(err))
                         }));
                     },
+                    Some('$') => { self.next().unwrap(); literal.push_str("$$"); }
                     _ => literal.push('$')
                 }
                 Some(_) => {
                     literal.push(self.next()?);
                 }
             }
+            // Set indent after because then if it's the end of the string we
+            // won't get here
+            if multiline && !whitespace {
+                min_indent = Some(min_indent.unwrap_or(std::usize::MAX).min(last_indent));
+            }
+        }
+
+        if let Some(indent) = min_indent {
+            if indent > 0 {
+                // Trim from first line first
+                if interpol.is_empty() {
+                    literal.drain(..indent);
+                } else {
+                    for entry in &mut interpol {
+                        if let Interpol::Literal(ref mut inner) = entry {
+                            inner.drain(..indent);
+                            break;
+                        }
+                    }
+                }
+
+                // Trim rest of the lines
+                remove_shared_indent(indent, &mut literal);
+                for entry in &mut interpol {
+                    if let Interpol::Literal(ref mut inner) = entry {
+                        remove_shared_indent(indent, inner);
+                    }
+                }
+            }
+        } else if multiline {
+            // Must be all whitespace
+            literal.retain(|c| c == '\n');
+            for entry in &mut interpol {
+                if let Interpol::Literal(ref mut inner) = entry {
+                    inner.retain(|c| c == '\n');
+                }
+            }
         }
 
         if interpol.is_empty() {
-            self.span_end(meta, Token::Value(Value::Str(literal)))
+            self.span_end(meta, Token::Value(Value::Str {
+                multiline,
+                content: literal
+            }))
         } else {
             if !literal.is_empty() {
                 interpol.push(Interpol::Literal(literal));
@@ -591,22 +679,63 @@ mod tests {
         assert_eq!(
             tokenize(r#"{
     multiline = ''
-        This is a
-        multiline
-        string :D
+            
+                  
+        This is a multiline string :D
+          indented by two
         \'\'\'\'\
+        ''${ interpolation was escaped }
+        two single quotes: '''
+        three single quotes: ''''
     '';
 }"#),
             Ok(vec![
                 Token::CurlyBOpen,
                     Token::Ident("multiline".into()), Token::Assign,
-                    Token::Value(r#"This is a
-multiline
-string :D
-\'\'\'\'\
-"#.into()),
+                    Token::Value(Value::Str {
+                        multiline: true,
+                        // Generate the below with nix-shell
+                        content: "    \n          \nThis is a multiline string :D\n  \
+                            indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\n\
+                            two single quotes: ''\nthree single quotes: '''\n".into()
+                    }),
                 Token::Semicolon, Token::CurlyBClose
             ])
+        );
+        assert_eq!(
+            tokenize("''\n  \n    \n \n ''"),
+            Ok(vec![Token::Value(Value::Str {
+                multiline: true,
+                content: "\n\n\n".into()
+            })])
+        );
+        assert_eq!(
+            tokenize("''\n  \n    \n a\n''"),
+            Ok(vec![Token::Value(Value::Str {
+                multiline: true,
+                content: " \n   \na\n".into()
+            })])
+        );
+        assert_eq!(
+            tokenize("''  \n    \n a\n''"),
+            Ok(vec![Token::Value(Value::Str {
+                multiline: true,
+                content: "   \na\n".into()
+            })])
+        );
+    }
+    #[test]
+    fn special_escape() {
+        assert_eq!(
+            tokenize(r#" "$${test}" "#),
+            Ok(vec![Token::Value("$${test}".into())])
+        );
+        assert_eq!(
+            tokenize(r#" ''$${test}'' "#),
+            Ok(vec![Token::Value(Value::Str {
+                multiline: true,
+                content: "$${test}".into()
+            })])
         );
     }
     #[test]
@@ -628,6 +757,30 @@ string :D
                         (meta! { start: (0, 33), end: (0, 38) }, Token::Ident("world".into()))
                     ]),
                     Interpol::Literal("!".into())
+                ])
+            )])
+        );
+        assert_eq!(
+            tokenize_span(r#" "\$${test}" "#),
+            Ok(vec![(
+                meta! { start: (0, 1), end: (0, 12) },
+                Token::Interpol(vec![
+                    Interpol::Literal("$".into()),
+                    Interpol::Tokens(vec![
+                        (meta! { start: (0, 6), end: (0, 10) }, Token::Ident("test".into()))
+                    ])
+                ])
+            )])
+        );
+        assert_eq!(
+            tokenize_span(r#" ''''$${test}'' "#),
+            Ok(vec![(
+                meta! { start: (0, 1), end: (0, 15) },
+                Token::Interpol(vec![
+                    Interpol::Literal("$".into()),
+                    Interpol::Tokens(vec![
+                        (meta! { start: (0, 8), end: (0, 12) }, Token::Ident("test".into()))
+                    ])
                 ])
             )])
         );

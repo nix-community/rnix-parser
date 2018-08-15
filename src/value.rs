@@ -1,5 +1,3 @@
-use std::fmt;
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Anchor {
     Absolute,
@@ -16,7 +14,10 @@ pub enum Value {
     Integer(i64),
     Null,
     Path(Anchor, String),
-    Str(String)
+    Str {
+        multiline: bool,
+        content: String
+    }
 }
 
 impl From<bool> for Value {
@@ -36,24 +37,14 @@ impl From<f64> for Value {
 }
 impl From<String> for Value {
     fn from(val: String) -> Value {
-        Value::Str(val)
+        Value::Str {
+            multiline: false,
+            content: val
+        }
     }
 }
 impl From<&str> for Value {
     fn from(val: &str) -> Value {
-        Value::Str(String::from(val))
-    }
-}
-
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Value::Bool(value) => write!(f, "{}", value),
-            Value::Float(value) => write!(f, "{}", value),
-            Value::Integer(value) => write!(f, "{}", value),
-            Value::Null => write!(f, "null"),
-            Value::Path(_, value) => write!(f, "{}", value),
-            Value::Str(value) => write!(f, "{:?}", value)
-        }
+        Value::from(String::from(val))
     }
 }

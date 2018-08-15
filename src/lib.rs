@@ -66,10 +66,13 @@ mod tests {
                 int = (3);
                 float = (2.1);
                 string = ("Hello World");
-                multiline = (r#"This is a
-multiline
-string :D
+                multiline = (multiline r#"This is a multiline string :D
 \'\'\'\'\
+multiline = ''
+  Two single quotes: ''',
+  Interpolation: ${test},
+  Escape interpolation: ''${test}
+''
 "#);
             })
         );
@@ -112,7 +115,8 @@ string :D
                                 x = ("1");
                                 y = ("2");
                             }).x
-                        ))
+                        )),
+                        Interpol::Literal("\n".into())
                     ])));
                 }
             )

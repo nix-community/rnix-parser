@@ -1,7 +1,9 @@
+#![feature(box_patterns)]
+
 extern crate rnix;
 
 use std::{env, fs, io::{self, Write}};
-use rnix::parser::*;
+use rnix::{parser::*, value::*};
 
 fn main() {
     let file = match env::args().skip(1).next() {
@@ -32,13 +34,67 @@ fn pad<W: Write>(w: &mut W, indent: usize) -> io::Result<()> {
 }
 
 fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
+    //if !ast.0.comments.is_empty() {
+    //    writeln!(w)?;
+    //    pad(w, indent)?;
+    //}
     for comment in &ast.0.comments {
-        writeln!(w, "# {}", comment.trim())?;
+        let mut leading = 0;
+        while comment.bytes().nth(leading) == Some(b'#') {
+            leading += 1;
+        }
+        writeln!(w, "#{} {}", &comment[..leading], comment[leading..].trim())?;
         pad(w, indent)?;
     }
+    macro_rules! math {
+        ($($op:path => $str:expr),*) => {
+            match &ast.1 {
+                $($op(box (one, two)) => {
+                    print(w, indent + 2, one)?;
+                    write!(w, concat!(' ', $str, ' '))?;
+                    print(w, indent + 2, two)?;
+                    return Ok(());
+                }),*
+                _ => ()
+            }
+        }
+    }
+    math! (
+        ASTType::Add => "+",
+        ASTType::Sub => "-",
+        ASTType::Mul => "*",
+        ASTType::Div => "/"
+    );
     match &ast.1 {
-        ASTType::Value(val) => write!(w, "{}", val)?,
+        ASTType::Value(Value::Bool(val)) => write!(w, "{}", val)?,
+        ASTType::Value(Value::Integer(val)) => write!(w, "{}", val)?,
+        ASTType::Value(Value::Float(val)) => write!(w, "{}", val)?,
+        ASTType::Value(Value::Path(_anchor, val)) => write!(w, "{}", val)?,
+        ASTType::Value(Value::Str { content, .. }) => write!(w, "{:?}", content)?,
         ASTType::Var(name) => write!(w, "{}", name)?,
+        ASTType::Interpol(parts) => {
+            writeln!(w, "''")?;
+            pad(w, indent + 2)?;
+            for part in parts {
+                match part {
+                    Interpol::Literal(literal) => for (i, line) in literal.lines().enumerate() {
+                        if i > 0 {
+                            writeln!(w)?;
+                            pad(w, indent + 2)?;
+                        }
+                        write!(w, "{}", line)?;
+                    },
+                    Interpol::AST(ast) => {
+                        write!(w, "${{")?;
+                        print(w, indent + 2, ast)?;
+                        write!(w, "}}")?;
+                    }
+                }
+            }
+            writeln!(w)?;
+            pad(w, indent)?;
+            write!(w, "''")?;
+        },
         ASTType::Set { recursive, values } => {
             if *recursive {
                 write!(w, "rec ")?;
@@ -77,6 +133,7 @@ fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
             write!(w, "}}")?;
         },
         ASTType::Lambda(arg, body) => {
+            write!(w, "(")?;
             match arg {
                 FnArg::Ident(name) => write!(w, "{}", name)?,
                 FnArg::Pattern { args, bind, exact } => {
@@ -105,6 +162,7 @@ fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
             }
             write!(w, ": ")?;
             print(w, indent, body)?;
+            write!(w, ")")?;
         },
         ASTType::List(list) => {
             writeln!(w, "[")?;
@@ -114,9 +172,21 @@ fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
                 writeln!(w)?;
             }
             pad(w, indent)?;
-            write!(w, "]");
+            write!(w, "]")?;
         },
-        _ => write!(w, "TODO")?,
+        ASTType::IndexSet(box (set, index)) => {
+            print(w, indent+2, set)?;
+            write!(w, ".")?;
+            print(w, indent+2, index)?;
+        },
+        ASTType::Apply(box (f, arg)) => {
+            write!(w, "(")?;
+            print(w, indent+2, f)?;
+            write!(w, " ")?;
+            print(w, indent+2, arg)?;
+            write!(w, ")")?;
+        },
+        ast => write!(w, "TODO: {:?}", ast)?,
     }
     Ok(())
 }

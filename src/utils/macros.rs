@@ -173,6 +173,10 @@ macro_rules! nix_inner {
         AST::Value(Value::Path(Anchor::Relative, String::from(concat!("./", $val))))
     }};
     (parse raw $ast:expr) => {{ $ast }};
+    (parse multiline $val:expr) => {{ AST::Value(Value::Str {
+        multiline: true,
+        content: $val.into()
+    }) }};
     (parse $val:expr) => {{ AST::Value(Value::from($val)) }};
 }
 #[macro_export]
