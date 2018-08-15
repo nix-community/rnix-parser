@@ -39,17 +39,17 @@ fn main() {
     let start = span.start;
     let end = span.end.unwrap_or(start+1);
 
-    let start_line = content[..start].rfind('\n').unwrap_or(0);
-    let prev_line = content[..start_line].rfind('\n').map(|n| n+1).unwrap_or(0);
-    let end_line = end + content[end..].find('\n').map(|n| n + 1).unwrap_or(content.len());
-    let next_line = end_line + content[end_line..].find('\n').unwrap_or(content.len());
+    let prev_line_end = content[..start].rfind('\n');
+    let prev_line = content[..prev_line_end.unwrap_or(0)].rfind('\n').map(|n| n+1).unwrap_or(0);
+    let next_line = content[end..].find('\n').map(|n| n + 1 + end).unwrap_or(content.len());
+    let next_line_end = content[next_line..].find('\n').map(|n| n + next_line).unwrap_or(content.len());
 
     let mut pos = prev_line;
     loop {
-        let line = pos + content[pos..].find('\n').unwrap_or(content.len());
+        let line = content[pos..].find('\n').map(|n| n + pos).unwrap_or(content.len() - 1);
 
         writeln!(stdout, "{}", &content[pos..line]).unwrap();
-        if pos >= start_line && line <= end_line {
+        if pos >= prev_line_end.map(|n| n + 1).unwrap_or(0) && line < next_line {
             for i in pos..line {
                 if i >= start && i < end {
                     stdout.write_all(&[b'^']).unwrap();
@@ -61,7 +61,7 @@ fn main() {
         }
 
         pos = line+1;
-        if pos >= next_line {
+        if pos >= next_line_end {
             break;
         }
     }
