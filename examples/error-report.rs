@@ -28,44 +28,41 @@ fn main() {
             match err {
                 NixError::TokenizeError(span, _) => span,
                 NixError::ParseError(Some(span), _) => span,
-                _ => return
+                NixError::ParseError(None, _) => return
             }
         }
     };
 
-    println!("{:?}", span);
-
+    writeln!(stdout, "{:?}", span);
     writeln!(stdout).unwrap();
 
     let start = span.start;
-    let end = span.end.unwrap_or(start);
+    let end = span.end.unwrap_or(start+1);
 
-    for (row, line) in content.lines().enumerate() {
-        let row = row as u64;
-        if row < start.0.saturating_sub(1) || row > end.0 + 1 {
-            continue;
+    let start_line = content[..start].rfind('\n').unwrap_or(0);
+    let prev_line = content[..start_line].rfind('\n').map(|n| n+1).unwrap_or(0);
+    let end_line = end + content[end..].find('\n').map(|n| n + 1).unwrap_or(content.len());
+    let next_line = end_line + content[end_line..].find('\n').unwrap_or(content.len());
+
+    let mut pos = prev_line;
+    loop {
+        let line = pos + content[pos..].find('\n').unwrap_or(content.len());
+
+        writeln!(stdout, "{}", &content[pos..line]).unwrap();
+        if pos >= start_line && line <= end_line {
+            for i in pos..line {
+                if i >= start && i < end {
+                    stdout.write_all(&[b'^']).unwrap();
+                } else {
+                    stdout.write_all(&[b' ']).unwrap();
+                }
+            }
+            writeln!(stdout).unwrap();
         }
 
-        writeln!(stdout, "{}", line).unwrap();
-
-        if row == start.0 {
-            draw_line(&mut stdout, line, Some(start.1), Some(end.1).into_iter().filter(|_| start.0 == end.0).next());
-        } else if row == end.0 {
-            draw_line(&mut stdout, line, Some(start.1).into_iter().filter(|_| start.0 == end.0).next(), Some(end.1));
-        } else if row > start.0 && row < end.0 {
-            draw_line(&mut stdout, line, None, None);
+        pos = line+1;
+        if pos >= next_line {
+            break;
         }
     }
-}
-fn draw_line<W: Write>(stdout: &mut W, line: &str, start: Option<u64>, end: Option<u64>) {
-    let start = start.unwrap_or(0);
-    let end = end.unwrap_or(line.len() as u64);
-    for col in 0..line.len() as u64 {
-        if col < start || (col != start && col >= end) {
-            stdout.write_all(&[b' ']).unwrap();
-        } else {
-            stdout.write_all(&[b'^']).unwrap();
-        }
-    }
-    writeln!(stdout).unwrap();
 }

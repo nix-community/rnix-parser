@@ -113,8 +113,8 @@ impl From<Span> for Meta {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Span {
-    pub start: (u64, u64),
-    pub end: Option<(u64, u64)>
+    pub start: usize,
+    pub end: Option<usize>
 }
 impl Span {
     pub fn until(self, other: Span) -> Span {
@@ -153,21 +153,19 @@ type Item = Result<(Meta, Token)>;
 
 pub struct Tokenizer<'a> {
     input: &'a str,
-    row: u64,
-    col: u64
+    cursor: usize
 }
 impl<'a> Tokenizer<'a> {
     pub fn new(input: &'a str) -> Self {
         Self {
             input,
-            row: 0,
-            col: 0
+            cursor: 0
         }
     }
 
     fn span_start(&mut self) -> Span {
         Span {
-            start: (self.row, self.col),
+            start: self.cursor,
             end: None
         }
     }
@@ -175,7 +173,7 @@ impl<'a> Tokenizer<'a> {
         Some(Err((meta.span, error)))
     }
     fn span_end(&self, mut meta: Meta, token: Token) -> Option<Item> {
-        meta.span.end = Some((self.row, self.col));
+        meta.span.end = Some(self.cursor);
         Some(Ok((meta, token)))
     }
 
@@ -183,12 +181,7 @@ impl<'a> Tokenizer<'a> {
         let c = self.peek();
         if let Some(c) = c {
             self.input = &self.input[c.len_utf8()..];
-            if c == '\n' {
-                self.col = 0;
-                self.row += 1;
-            } else {
-                self.col += 1;
-            }
+            self.cursor += 1;
         }
         c
     }
@@ -409,9 +402,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 
                     meta.comments.push(self.input[1..end].to_string());
                     self.input = &self.input[end..];
-
-                    self.row += 1;
-                    self.col = 0;
+                    self.cursor += end;
                 },
                 Some('/') => {
                     if self.input[1..].chars().next() != Some('*') {
@@ -439,7 +430,8 @@ impl<'a> Iterator for Tokenizer<'a> {
         meta.span = self.span_start();
 
         if self.input.starts_with("...") {
-            for _ in 0..3 { self.next().unwrap(); }
+            self.cursor += 3;
+            self.input = &self.input[3..];
             return self.span_end(meta, Token::Ellipsis);
         }
 
@@ -655,21 +647,21 @@ mod tests {
         assert_eq!(
             tokenize_span("{\n    int /* hi */ = 1; # testing comments!\n}"),
             Ok(vec![
-                (meta! { start: (0,  0), end: (0,  1) }, Token::CurlyBOpen),
-                (meta! { start: (1,  4), end: (1,  7) }, Token::Ident("int".to_string())),
+                (meta! { start: 0, end: 1 }, Token::CurlyBOpen),
+                (meta! { start: 6, end: 9 }, Token::Ident("int".to_string())),
                 (
                     Meta {
                         comments: vec![" hi ".into()],
-                        span: Span { start: (1, 17), end: Some((1, 18)) },
+                        span: Span { start: 19, end: Some(20) },
                     },
                     Token::Assign
                 ),
-                (meta! { start: (1, 19), end: (1, 20) }, Token::Value(1.into())),
-                (meta! { start: (1, 20), end: (1, 21) }, Token::Semicolon),
+                (meta! { start: 21, end: 22 }, Token::Value(1.into())),
+                (meta! { start: 22, end: 23 }, Token::Semicolon),
                 (
                     Meta {
                         comments: vec![" testing comments!\n".into()],
-                        span: Span { start: (2,  0), end: Some((2,  1)) }
+                        span: Span { start: 44, end: Some(45) }
                     },
                     Token::CurlyBClose
                 )
@@ -677,7 +669,7 @@ mod tests {
         );
         assert_eq!(
             tokenize_span("{\n    overflow = 9999999999999999999999999999"),
-            Err((Span { start: (1, 15), end: None }, TokenizeError::IntegerOverflow))
+            Err((Span { start: 17, end: None }, TokenizeError::IntegerOverflow))
         );
     }
     #[test]
@@ -749,20 +741,20 @@ mod tests {
         assert_eq!(
             tokenize_span(r#" "Hello, ${ { world = "World"; }.world }!" "#),
             Ok(vec![(
-                meta! { start: (0, 1), end: (0, 42) },
+                meta! { start: 1, end: 42 },
                 Token::Interpol {
                     multiline: false,
                     parts: vec![
                         Interpol::Literal("Hello, ".into()),
                         Interpol::Tokens(vec![
-                            (meta! { start: (0, 12), end: (0, 13) }, Token::CurlyBOpen),
-                            (meta! { start: (0, 14), end: (0, 19) }, Token::Ident("world".into())),
-                            (meta! { start: (0, 20), end: (0, 21) }, Token::Assign),
-                            (meta! { start: (0, 22), end: (0, 29) }, Token::Value("World".into())),
-                            (meta! { start: (0, 29), end: (0, 30) }, Token::Semicolon),
-                            (meta! { start: (0, 31), end: (0, 32) }, Token::CurlyBClose),
-                            (meta! { start: (0, 32), end: (0, 33) }, Token::Dot),
-                            (meta! { start: (0, 33), end: (0, 38) }, Token::Ident("world".into()))
+                            (meta! { start: 12, end: 13 }, Token::CurlyBOpen),
+                            (meta! { start: 14, end: 19 }, Token::Ident("world".into())),
+                            (meta! { start: 20, end: 21 }, Token::Assign),
+                            (meta! { start: 22, end: 29 }, Token::Value("World".into())),
+                            (meta! { start: 29, end: 30 }, Token::Semicolon),
+                            (meta! { start: 31, end: 32 }, Token::CurlyBClose),
+                            (meta! { start: 32, end: 33 }, Token::Dot),
+                            (meta! { start: 33, end: 38 }, Token::Ident("world".into()))
                         ]),
                         Interpol::Literal("!".into())
                     ]
@@ -772,13 +764,13 @@ mod tests {
         assert_eq!(
             tokenize_span(r#" "\$${test}" "#),
             Ok(vec![(
-                meta! { start: (0, 1), end: (0, 12) },
+                meta! { start: 1, end: 12 },
                 Token::Interpol {
                     multiline: false,
                     parts: vec![
                         Interpol::Literal("$".into()),
                         Interpol::Tokens(vec![
-                            (meta! { start: (0, 6), end: (0, 10) }, Token::Ident("test".into()))
+                            (meta! { start: 6, end: 10 }, Token::Ident("test".into()))
                         ])
                     ]
                 }
@@ -787,13 +779,13 @@ mod tests {
         assert_eq!(
             tokenize_span(r#" ''''$${test}'' "#),
             Ok(vec![(
-                meta! { start: (0, 1), end: (0, 15) },
+                meta! { start: 1, end: 15 },
                 Token::Interpol {
                     multiline: true,
                     parts: vec![
                         Interpol::Literal("$".into()),
                         Interpol::Tokens(vec![
-                            (meta! { start: (0, 8), end: (0, 12) }, Token::Ident("test".into()))
+                            (meta! { start: 8, end: 12 }, Token::Ident("test".into()))
                         ])
                     ]
                 }
@@ -975,7 +967,7 @@ mod tests {
                Token::Ident("a".into()),
                Token::Dot,
                Token::Dynamic(vec![
-                    (meta! { start: (0, 4), end: (0, 5) }, Token::Ident("b".into()))
+                    (meta! { start: 4, end: 5 }, Token::Ident("b".into()))
                ]),
                Token::Dot,
                Token::Ident("c".into())

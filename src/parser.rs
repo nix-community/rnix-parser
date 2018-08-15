@@ -626,46 +626,46 @@ mod tests {
         assert_eq!(
             super::parse(vec![
                 (Meta::default(), Token::CurlyBOpen),
-                (meta! { start: (4, 2), end: None }, Token::Semicolon),
+                (meta! { start: 1, end: 2 }, Token::Semicolon),
             ].into_iter()),
             Err((
-                Some(Span { start: (4, 2), end: None }),
+                Some(Span { start: 1, end: Some(2) }),
                 ParseError::ExpectedType("attribute", Token::Semicolon)
             ))
         );
         assert_eq!(
             super::parse(vec![
-                (meta! { start: (0, 0), end: (0, 1) }, Token::Value(1.into())),
-                (meta! { start: (0, 2), end: (0, 3) }, Token::Add),
+                (meta! { start: 0, end: 1 }, Token::Value(1.into())),
+                (meta! { start: 2, end: 3 }, Token::Add),
                 (
                     Meta {
                         comments: vec!["Hello World!".into()],
-                        span: Span { start: (0, 4), end: Some((0, 5)) }
+                        span: Span { start: 4, end: Some(5) }
                     },
                     Token::Value(2.into())
                 ),
-                (meta! { start: (0, 6), end: (0, 7) }, Token::Mul),
-                (meta! { start: (0, 8), end: (0, 9) }, Token::Value(3.into())),
+                (meta! { start: 6, end: 7 }, Token::Mul),
+                (meta! { start: 8, end: 9 }, Token::Value(3.into())),
             ].into_iter()),
             Ok(ASTSpan(
-                meta! { start: (0, 0), end: (0, 9) },
+                meta! { start: 0, end: 9 },
                 ASTType::Add(Box::new((
                     ASTSpan(
-                        meta! { start: (0, 0), end: (0, 1) },
+                        meta! { start: 0, end: 1 },
                         ASTType::Value(1.into())
                     ),
                     ASTSpan(
-                        meta! { start: (0, 4), end: (0, 9) },
+                        meta! { start: 4, end: 9 },
                         ASTType::Mul(Box::new((
                             ASTSpan(
                                 Meta {
                                     comments: vec!["Hello World!".into()],
-                                    span: Span { start: (0, 4), end: Some((0, 5)) }
+                                    span: Span { start: 4, end: Some(5) }
                                 },
                                 ASTType::Value(2.into())
                             ),
                             ASTSpan(
-                                meta! { start: (0, 8), end: (0, 9) },
+                                meta! { start: 8, end: 9 },
                                 ASTType::Value(3.into())
                             )
                         )))
@@ -832,14 +832,14 @@ mod tests {
                     parts: vec![
                         TokenInterpol::Literal("Hello, ".into()),
                         TokenInterpol::Tokens(vec![
-                            (meta! { start: (0, 12), end: (0, 13) }, Token::CurlyBOpen),
-                            (meta! { start: (0, 14), end: (0, 19) }, Token::Ident("world".into())),
-                            (meta! { start: (0, 20), end: (0, 21) }, Token::Assign),
-                            (meta! { start: (0, 22), end: (0, 29) }, Token::Value("World".into())),
-                            (meta! { start: (0, 29), end: (0, 30) }, Token::Semicolon),
-                            (meta! { start: (0, 31), end: (0, 32) }, Token::CurlyBClose),
-                            (meta! { start: (0, 32), end: (0, 33) }, Token::Dot),
-                            (meta! { start: (0, 33), end: (0, 38) }, Token::Ident("world".into()))
+                            (Meta::default(), Token::CurlyBOpen),
+                            (Meta::default(), Token::Ident("world".into())),
+                            (Meta::default(), Token::Assign),
+                            (Meta::default(), Token::Value("World".into())),
+                            (Meta::default(), Token::Semicolon),
+                            (Meta::default(), Token::CurlyBClose),
+                            (Meta::default(), Token::Dot),
+                            (Meta::default(), Token::Ident("world".into()))
                         ]),
                         TokenInterpol::Literal("!".into())
                     ]
