@@ -18,6 +18,14 @@ rnix ...
  - works on top of Rust iterators, which are lazy by design. You get cool
    functions like `map` and `filter` at your fingertips!
 
+# Demo
+
+Examples can be found in the `examples/` directory.  
+
+You may also want to see [nix-explorer](https://gitlab.com/jD91mZM2/nix-explorer):
+An example that highlights AST nodes in valid Nix code.
+This demonstrates how span information is preserved.
+
 # Unimplemented
 
 I have implemented everything I can think of. Most, if not all of these, are
