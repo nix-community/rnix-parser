@@ -59,11 +59,9 @@ impl App {
     fn parse_file_from_ast(&mut self, file: &Path, ast: &AST) -> Result<(), Error> {
         let mut file = match ast {
             AST::Value(Value::Path(Anchor::Store, path)) => {
-                println!("{:?}", path);
                 self.nixpkgs.join(&path)
             },
             AST::Value(Value::Path(Anchor::Relative, path)) => {
-                println!("{:?}", path);
                 file.parent().unwrap().join(path)
             },
             //ast => bail!("importing on something that's not a good path: {:?}", ast)
