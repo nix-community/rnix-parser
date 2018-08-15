@@ -5,7 +5,7 @@ extern crate failure;
 extern crate rnix;
 
 use failure::Error;
-use rnix::{nometa::*, value::*};
+use rnix::{parser::nometa::*, value::*};
 use std::{env, fs, path::{PathBuf, Path}};
 
 fn main() -> Result<(), Error> {

@@ -13,7 +13,6 @@ macro_rules! meta {
     }};
 }
 
-pub mod nometa;
 pub mod parser;
 pub mod tokenizer;
 #[macro_use]
@@ -60,7 +59,7 @@ pub fn parse(input: &str) -> Result<parser::AST, Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::{nometa::*, parse as inner_parse};
+    use super::{parser::nometa::*, parse as inner_parse};
 
     fn parse(input: &str) -> AST {
         inner_parse(input).expect("error while parsing").into()

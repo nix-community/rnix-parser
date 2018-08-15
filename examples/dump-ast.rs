@@ -1,6 +1,6 @@
 extern crate rnix;
 
-use rnix::nometa::AST as ASTNoMeta;
+use rnix::parser::nometa::AST as ASTNoMeta;
 use std::{env, fs};
 
 fn main() {

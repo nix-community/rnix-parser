@@ -1,5 +1,7 @@
 //! The parser: turns a series of tokens into an AST
 
+pub mod nometa;
+
 use crate::{
     tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
     utils::stack::Stack,
@@ -556,11 +558,10 @@ pub fn parse<I>(iter: I) -> Result<AST>
 #[cfg(test)]
 mod tests {
     use crate::{
-        nometa::*,
         tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
         value::{Anchor, Value}
     };
-    use super::{AST as ASTSpan, ASTType, OR, ParseError};
+    use super::{nometa::*, AST as ASTSpan, ASTType, OR, ParseError};
 
     macro_rules! parse {
         ($($token:expr),*) => {
@@ -1047,7 +1048,7 @@ mod tests {
             ],
             Ok(AST::Lambda(
                 LambdaArg::Pattern {
-                    args: vec![PatEntry("a".into(), Some(AST::Var("a".into())))],
+                    args: vec![PatEntry("a".into(), Some(AST::Set { recursive: false, values: Vec::new() }))],
                     bind: None,
                     exact: true
                 },

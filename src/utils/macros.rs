@@ -189,7 +189,7 @@ macro_rules! nix {
     ($($tokens:tt)*) => {{
         #[allow(unused_imports)]
         use crate::{
-            nometa::*,
+            parser::nometa::*,
             value::{Anchor, Value}
         };
         nix_inner!(parse $($tokens)*)
@@ -199,7 +199,7 @@ macro_rules! nix {
 #[cfg(test)]
 #[test]
 fn test_macro() {
-    use crate::nometa::*;
+    use crate::parser::nometa::*;
     assert_eq!(
         nix!({
             string = ("Hello World");
