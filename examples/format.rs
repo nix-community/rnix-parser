@@ -189,8 +189,8 @@ fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
         ASTType::Lambda(arg, body) => {
             write!(w, "(")?;
             match arg {
-                FnArg::Ident(name) => write!(w, "{}", name)?,
-                FnArg::Pattern { args, bind, exact } => {
+                LambdaArg::Ident(name) => write!(w, "{}", name)?,
+                LambdaArg::Pattern { args, bind, exact } => {
                     if let Some(bind) = bind {
                         write!(w, "{} @ ", bind)?;
                     }

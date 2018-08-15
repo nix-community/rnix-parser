@@ -1,6 +1,7 @@
 // TODO: Use optional macro args if they become a thing
 
-#[macro_export]
+/// Technical detail, don't mind this macro
+// #[macro_export]
 macro_rules! nix_inner {
     (entry($vec:expr)) => {};
     (entry($vec:expr) $ident:ident = ($($val:tt)*); $($remaining:tt)*) => {
@@ -79,14 +80,14 @@ macro_rules! nix_inner {
         )))
     }};
     (parse $fn:ident: $($body:tt)*) => {{
-        AST::Lambda(FnArg::Ident(String::from(stringify!($fn))), Box::new(nix_inner!(parse $($body)*)))
+        AST::Lambda(LambdaArg::Ident(String::from(stringify!($fn))), Box::new(nix_inner!(parse $($body)*)))
     }};
     (parse $($bind:ident @)* {
         $(( exact = $optional:expr ))*
         $($arg:ident $(? ($($default:tt)*))*),*
     }: $($body:tt)*) => {{
         AST::Lambda(
-            FnArg::Pattern {
+            LambdaArg::Pattern {
                 args: vec![
                     $(PatEntry(String::from(stringify!($arg)), nix_inner!(pat_default $($($default)*)*))),*
                 ],
@@ -179,7 +180,11 @@ macro_rules! nix_inner {
     }) }};
     (parse $val:expr) => {{ AST::Value(Value::from($val)) }};
 }
-#[macro_export]
+/// A macro that turns Nix-like code into a Nix AST.
+/// Useful for unit testing, where typing the AST manually can get annoying.
+// #[macro_export]
+// Can't export because `use crate::` isn't valid from outside, and
+// I can't use `use rnix::` because that's not valid from inside.
 macro_rules! nix {
     ($($tokens:tt)*) => {{
         #[allow(unused_imports)]

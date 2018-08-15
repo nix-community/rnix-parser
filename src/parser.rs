@@ -1,3 +1,5 @@
+//! The parser: turns a series of tokens into an AST
+
 use crate::{
     tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
     utils::stack::Stack,
@@ -6,6 +8,7 @@ use crate::{
 
 const OR: &'static str = "or";
 
+/// An error that occured during parsing
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum ParseError {
     #[fail(display = "can't bind pattern here, already bound before")]
@@ -22,8 +25,10 @@ pub enum ParseError {
     Unexpected(Token)
 }
 
+/// An AST node, with metadata
 #[derive(Clone, Debug, PartialEq)]
 pub struct AST(pub Meta, pub ASTType);
+/// An AST node type
 #[derive(Clone, Debug, PartialEq)]
 pub enum ASTType {
     // Types
@@ -31,7 +36,7 @@ pub enum ASTType {
         multiline: bool,
         parts: Vec<Interpol>
     },
-    Lambda(FnArg, Box<AST>),
+    Lambda(LambdaArg, Box<AST>),
     List(Vec<AST>),
     Set {
         recursive: bool,
@@ -74,8 +79,9 @@ pub enum ASTType {
     NotEqual(Box<(AST, AST)>),
     Or(Box<(AST, AST)>)
 }
+/// A lambda argument type
 #[derive(Clone, Debug, PartialEq)]
-pub enum FnArg {
+pub enum LambdaArg {
     Ident(String),
     Pattern {
         args: Vec<PatEntry>,
@@ -83,13 +89,16 @@ pub enum FnArg {
         exact: bool
     }
 }
+/// An interpolation part
 #[derive(Clone, Debug, PartialEq)]
 pub enum Interpol {
     Literal(String),
     AST(AST)
 }
+/// An entry in a pattern
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatEntry(pub String, pub Option<AST>);
+/// An entry in a set
 #[derive(Clone, Debug, PartialEq)]
 pub enum SetEntry {
     Assign(Vec<AST>, AST),
@@ -141,6 +150,7 @@ fn parse_interpol(multiline: bool, values: Vec<TokenInterpol>) -> Result<ASTType
     })
 }
 
+/// The parser. You may want to use the `parse` convenience function from this module instead.
 pub struct Parser<I>
     where I: Iterator<Item = (Meta, Token)>
 {
@@ -150,6 +160,7 @@ pub struct Parser<I>
 impl<I> Parser<I>
     where I: Iterator<Item = (Meta, Token)>
 {
+    /// Create a new instance
     pub fn new(iter: I) -> Self {
         Self {
             iter,
@@ -253,7 +264,7 @@ impl<I> Parser<I>
         let AST(end, expr) = self.parse_expr()?;
 
         Ok(AST(start.until(&end), ASTType::Lambda(
-            FnArg::Pattern { args, bind, exact },
+            LambdaArg::Pattern { args, bind, exact },
             Box::new(AST(end, expr))
         )))
     }
@@ -479,6 +490,7 @@ impl<I> Parser<I>
         // Always point this to the lowest-level math function there is
         self.parse_implication()
     }
+    /// Parse Nix code into an AST
     pub fn parse_expr(&mut self) -> Result<AST> {
         Ok(match self.peek() {
             Some(Token::Let) => {
@@ -523,7 +535,7 @@ impl<I> Parser<I>
                 AST(start, ASTType::Var(name)) => if self.peek() == Some(&Token::Colon) {
                     self.next()?;
                     let AST(end, expr) = self.parse_expr()?;
-                    AST(start.until(&end), ASTType::Lambda(FnArg::Ident(name), Box::new(AST(end, expr))))
+                    AST(start.until(&end), ASTType::Lambda(LambdaArg::Ident(name), Box::new(AST(end, expr))))
                 } else {
                     AST(start, ASTType::Var(name))
                 },
@@ -533,10 +545,11 @@ impl<I> Parser<I>
     }
 }
 
+/// Convenience function for turning an iterator of tokens into an AST
 pub fn parse<I>(iter: I) -> Result<AST>
     where I: IntoIterator<Item = (Meta, Token)>
 {
-    Parser::new(iter.into_iter().peekable()).parse_expr()
+    Parser::new(iter.into_iter()).parse_expr()
 }
 
 #[cfg(test)]
@@ -898,9 +911,9 @@ mod tests {
                Token::Ident("a".into()), Token::Add, Token::Ident("b".into())
             ],
             Ok(AST::Lambda(
-                FnArg::Ident("a".into()),
+                LambdaArg::Ident("a".into()),
                 Box::new(AST::Lambda(
-                    FnArg::Ident("b".into()),
+                    LambdaArg::Ident("b".into()),
                     Box::new(AST::Add(Box::new((
                         AST::Var("a".into()),
                         AST::Var("b".into())
@@ -911,7 +924,7 @@ mod tests {
         assert_eq!(
             parse![Token::CurlyBOpen, Token::CurlyBClose, Token::Colon, Token::Value(1.into())],
             Ok(AST::Lambda(
-                FnArg::Pattern {
+                LambdaArg::Pattern {
                     args: Vec::new(),
                     bind: None,
                     exact: true
@@ -925,7 +938,7 @@ mod tests {
                 Token::Colon, Token::Value(1.into())
             ],
             Ok(AST::Lambda(
-                FnArg::Pattern {
+                LambdaArg::Pattern {
                     args: Vec::new(),
                     bind: Some("outer".into()),
                     exact: true
@@ -936,7 +949,7 @@ mod tests {
         assert_eq!(
             parse![Token::CurlyBOpen, Token::Ellipsis, Token::CurlyBClose, Token::Colon, Token::Value(1.into())],
             Ok(AST::Lambda(
-                FnArg::Pattern {
+                LambdaArg::Pattern {
                     args: Vec::new(),
                     bind: None,
                     exact: false
@@ -974,7 +987,7 @@ mod tests {
                 Token::Ident("a".into())
             ],
             Ok(AST::Lambda(
-                FnArg::Pattern {
+                LambdaArg::Pattern {
                     args: vec![
                         PatEntry("a".into(), None),
                         PatEntry("b".into(), Some(AST::Value("default".into()))),
@@ -998,7 +1011,7 @@ mod tests {
                 Token::Ident("outer".into())
             ],
             Ok(AST::Lambda(
-                FnArg::Pattern {
+                LambdaArg::Pattern {
                     args: vec![
                         PatEntry("a".into(), None),
                         PatEntry("b".into(), Some(AST::Value("default".into()))),
@@ -1017,7 +1030,7 @@ mod tests {
                 Token::Ident("outer".into())
             ],
             Ok(AST::Lambda(
-                FnArg::Pattern {
+                LambdaArg::Pattern {
                     args: vec![PatEntry("a".into(), None)],
                     bind: Some("outer".into()),
                     exact: true

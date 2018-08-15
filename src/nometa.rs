@@ -1,8 +1,12 @@
+//! Alternative AST representation that discards all metadata, such as comments and span information.
+//! Useful for unit testing, where entering span information can get very tedious.
+//! You can convert an AST with metadata to this type using `.into()`
+
 use crate::{
     parser::{
         AST as ASTMeta,
         ASTType,
-        FnArg as FnArgMeta,
+        LambdaArg as LambdaArgMeta,
         Interpol as InterpolMeta,
         PatEntry as PatEntryMeta,
         SetEntry as SetEntryMeta,
@@ -10,6 +14,7 @@ use crate::{
     value::Value
 };
 
+/// An AST node
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
     // Types
@@ -17,7 +22,7 @@ pub enum AST {
         multiline: bool,
         parts: Vec<Interpol>
     },
-    Lambda(FnArg, Box<AST>),
+    Lambda(LambdaArg, Box<AST>),
     List(Vec<AST>),
     Set {
         recursive: bool,
@@ -60,8 +65,9 @@ pub enum AST {
     NotEqual(Box<(AST, AST)>),
     Or(Box<(AST, AST)>)
 }
+/// A lambda argument type
 #[derive(Clone, Debug, PartialEq)]
-pub enum FnArg {
+pub enum LambdaArg {
     Ident(String),
     Pattern {
         args: Vec<PatEntry>,
@@ -69,13 +75,16 @@ pub enum FnArg {
         exact: bool
     }
 }
+/// An interpolation part
 #[derive(Clone, Debug, PartialEq)]
 pub enum Interpol {
     Literal(String),
     AST(AST)
 }
+/// An entry in a pattern
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatEntry(pub String, pub Option<AST>);
+/// An entry in a set
 #[derive(Clone, Debug, PartialEq)]
 pub enum SetEntry {
     Assign(Vec<AST>, AST),
@@ -118,11 +127,11 @@ impl From<InterpolMeta> for Interpol {
         }
     }
 }
-impl From<FnArgMeta> for FnArg {
-    fn from(arg: FnArgMeta) -> Self {
+impl From<LambdaArgMeta> for LambdaArg {
+    fn from(arg: LambdaArgMeta) -> Self {
         match arg {
-            FnArgMeta::Ident(name) => FnArg::Ident(name),
-            FnArgMeta::Pattern { args, bind, exact } => FnArg::Pattern { args: vec_into(args), bind, exact },
+            LambdaArgMeta::Ident(name) => LambdaArg::Ident(name),
+            LambdaArgMeta::Pattern { args, bind, exact } => LambdaArg::Pattern { args: vec_into(args), bind, exact },
         }
     }
 }

@@ -1,3 +1,5 @@
+//! The tokenizer: turns a string into tokens, such as numbers, strings, and keywords
+
 use crate::value::{Anchor, Value};
 use std::mem;
 
@@ -6,15 +8,17 @@ enum IdentType {
     Ident,
     Path,
     Store,
-    Uri,
+    Uri
 }
 
+/// An interpolation part
 #[derive(Clone, Debug, PartialEq)]
 pub enum Interpol {
     Literal(String),
     Tokens(Vec<(Meta, Token)>)
 }
 
+/// A token, such as a string literal, a number, or a keyword
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     // Keywords
@@ -78,13 +82,15 @@ pub enum Token {
 }
 impl Token {
     /// Returns true if this token should be used as a function argument.
+    /// ```ignore
     /// Example:
     /// add 1 2 + 3
     /// ^   ^ ^ ^
-    /// |   | | | false
-    /// |   | | true
-    /// |   | true
-    /// | true
+    /// |   | | +- false
+    /// |   | +- true
+    /// |   +- true
+    /// +- true
+    /// ```
     pub fn is_fn_arg(&self) -> bool {
         match self {
             Token::Rec | Token::CurlyBOpen | Token::SquareBOpen | Token::ParenOpen
@@ -94,12 +100,14 @@ impl Token {
     }
 }
 
+/// Metadata for a token, such as span information and leading comments
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Meta {
     pub span: Span,
     pub comments: Vec<String>
 }
 impl Meta {
+    /// Join the inner spans
     pub fn until(mut self, other: &Meta) -> Meta {
         self.span = self.span.until(other.span);
         self
@@ -111,12 +119,16 @@ impl From<Span> for Meta {
     }
 }
 
+/// A span, information about where in the original string a token started and ended
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Span {
+    /// Offset (in bytes) in the original string where the token started
     pub start: usize,
+    /// Offset (in bytes) in the original string where the token ended, including the next char
     pub end: Option<usize>
 }
 impl Span {
+    /// Set the end of `self` to `other`
     pub fn until(self, other: Span) -> Span {
         Span {
             start: self.start,
@@ -125,6 +137,7 @@ impl Span {
     }
 }
 
+/// An error that occured during tokenizing
 #[derive(Clone, Copy, Debug, Fail, PartialEq)]
 pub enum TokenizeError {
     #[fail(display = "error parsing integer: overflow")]
@@ -138,7 +151,7 @@ pub enum TokenizeError {
     #[fail(display = "paths cannot have a trailing slash")]
     TrailingSlash,
     #[fail(display = "unclosed multiline comment")]
-    UnclosedComment,
+    UnclosedComment
 }
 
 fn is_valid_path_char(c: char) -> bool {
@@ -151,11 +164,13 @@ fn is_valid_path_char(c: char) -> bool {
 type Result<T> = std::result::Result<T, (Span, TokenizeError)>;
 type Item = Result<(Meta, Token)>;
 
+/// The tokenizer. You may want to use the `tokenize` convenience function from this module instead.
 pub struct Tokenizer<'a> {
     input: &'a str,
     cursor: usize
 }
 impl<'a> Tokenizer<'a> {
+    /// Create a new instance
     pub fn new(input: &'a str) -> Self {
         Self {
             input,
@@ -180,8 +195,9 @@ impl<'a> Tokenizer<'a> {
     fn next(&mut self) -> Option<char> {
         let c = self.peek();
         if let Some(c) = c {
-            self.input = &self.input[c.len_utf8()..];
-            self.cursor += 1;
+            let len = c.len_utf8();
+            self.input = &self.input[len..];
+            self.cursor += len;
         }
         c
     }
@@ -598,6 +614,7 @@ impl<'a> Iterator for Tokenizer<'a> {
     }
 }
 
+/// Convenience function for turning a string into an iterator of tokens
 pub fn tokenize<'a>(input: &'a str) -> impl Iterator<Item = Item> + 'a {
     Tokenizer::new(input)
 }

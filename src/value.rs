@@ -1,3 +1,6 @@
+//! The types: Such as strings or integers
+
+/// An anchor point for a path, such as if it's relative or absolute
 #[derive(Clone, Debug, PartialEq)]
 pub enum Anchor {
     Absolute,
@@ -7,6 +10,7 @@ pub enum Anchor {
     Uri
 }
 
+/// A value, such as a string or integer
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Bool(bool),
