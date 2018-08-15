@@ -9,6 +9,7 @@
       Two single quotes: '''',
       Interpolation: ''${test},
       Escape interpolation: '''''${test}
-    '''
+    ''';
+    special escape: $${test}
   '';
 }

@@ -72,7 +72,8 @@ multiline = ''
   Two single quotes: ''',
   Interpolation: ${test},
   Escape interpolation: ''${test}
-''
+'';
+special escape: $${test}
 "#);
             })
         );
@@ -103,21 +104,27 @@ multiline = ''
                 let {
                     world = ("World");
                 } in {
-                    string = (raw (AST::Interpol(vec![
-                        Interpol::Literal("Hello ".into()),
-                        Interpol::AST(AST::Var("world".into())),
-                        Interpol::Literal("!".into()),
-                    ])));
-                    multiline = (raw (AST::Interpol(vec![
-                        Interpol::Literal("The set's x value is: ".into()),
-                        Interpol::AST(nix!(
-                            ({
-                                x = ("1");
-                                y = ("2");
-                            }).x
-                        )),
-                        Interpol::Literal("\n".into())
-                    ])));
+                    string = (raw (AST::Interpol {
+                        multiline: false,
+                        parts: vec![
+                            Interpol::Literal("Hello ".into()),
+                            Interpol::AST(AST::Var("world".into())),
+                            Interpol::Literal("!".into()),
+                        ]
+                    }));
+                    multiline = (raw (AST::Interpol {
+                        multiline: true,
+                        parts: vec![
+                            Interpol::Literal("The set's x value is: ".into()),
+                            Interpol::AST(nix!(
+                                ({
+                                    x = ("1");
+                                    y = ("2");
+                                }).x
+                            )),
+                            Interpol::Literal("\n".into())
+                        ]
+                    }));
                 }
             )
         );
@@ -189,7 +196,10 @@ multiline = ''
                 set = ({ a = (1); b = (2); });
                 dynamic_key = ("c");
             } in (((define) ("key")) ("value")) merge ({
-                    (raw AST::Interpol(vec![Interpol::AST(AST::Var("key".into()))])).(world) = (":D");
+                    (raw AST::Interpol {
+                        multiline: false,
+                        parts: vec![Interpol::AST(AST::Var("key".into()))]
+                    }).(world) = (":D");
                     dynamic_key_set = ((set) ? (dyn {dynamic_key}));
             }))
         );

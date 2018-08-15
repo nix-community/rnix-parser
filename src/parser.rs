@@ -27,7 +27,10 @@ pub struct AST(pub Meta, pub ASTType);
 #[derive(Clone, Debug, PartialEq)]
 pub enum ASTType {
     // Types
-    Interpol(Vec<Interpol>),
+    Interpol {
+        multiline: bool,
+        parts: Vec<Interpol>
+    },
     Lambda(FnArg, Box<AST>),
     List(Vec<AST>),
     Set {
@@ -124,7 +127,7 @@ macro_rules! math {
     }};
 }
 
-fn parse_interpol(values: Vec<TokenInterpol>) -> Result<ASTType> {
+fn parse_interpol(multiline: bool, values: Vec<TokenInterpol>) -> Result<ASTType> {
     let mut parsed = Vec::new();
     for value in values {
         parsed.push(match value {
@@ -132,7 +135,10 @@ fn parse_interpol(values: Vec<TokenInterpol>) -> Result<ASTType> {
             TokenInterpol::Tokens(tokens) => Interpol::AST(parse(tokens)?)
         });
     }
-    Ok(ASTType::Interpol(parsed))
+    Ok(ASTType::Interpol {
+        multiline,
+        parts: parsed
+    })
 }
 
 pub struct Parser<I>
@@ -183,7 +189,7 @@ impl<I> Parser<I>
             (meta, Token::Ident(ident)) => Ok(AST(meta, ASTType::Var(ident))),
             (meta, Token::Value(value)) => Ok(AST(meta, ASTType::Value(value))),
             (meta, Token::Dynamic(values)) => Ok(AST(meta, ASTType::Dynamic(Box::new(parse(values)?)))),
-            (meta, Token::Interpol(values)) => Ok(AST(meta, parse_interpol(values)?)),
+            (meta, Token::Interpol { multiline, parts }) => Ok(AST(meta, parse_interpol(multiline, parts)?)),
             (meta, token) => Err((Some(meta.span), ParseError::ExpectedType("attribute", token)))
         }
     }
@@ -348,7 +354,7 @@ impl<I> Parser<I>
             } else {
                 AST(start, ASTType::Var(name))
             },
-            (meta, Token::Interpol(values)) => AST(meta, parse_interpol(values)?),
+            (meta, Token::Interpol { multiline, parts }) => AST(meta, parse_interpol(multiline, parts)?),
             (meta, token) => return Err((Some(meta.span), ParseError::Unexpected(token)))
         };
 
@@ -595,7 +601,7 @@ mod tests {
                     Token::Dot, Token::Value("b".into()),
                 Token::Assign, Token::Value(1.into()), Token::Semicolon,
 
-                Token::Interpol(vec![TokenInterpol::Literal("c".into())]),
+                Token::Interpol { multiline: false, parts: vec![TokenInterpol::Literal("c".into())] },
                     Token::Dot, Token::Dynamic(vec![(Meta::default(), Token::Ident("d".into()))]),
                 Token::Assign, Token::Value(2.into()), Token::Semicolon,
 
@@ -609,7 +615,7 @@ mod tests {
                         AST::Value("b".into()),
                     ], AST::Value(1.into())),
                     SetEntry::Assign(vec![
-                        AST::Interpol(vec![Interpol::Literal("c".into())]),
+                        AST::Interpol { multiline: false, parts: vec![Interpol::Literal("c".into())] },
                         AST::Dynamic(Box::new(AST::Var("d".into())))
                     ], AST::Value(2.into()))
                 ]
@@ -794,7 +800,7 @@ mod tests {
             parse![
                 Token::Ident("test".into()),
                     Token::Dot, Token::Value("invalid ident".into()),
-                    Token::Dot, Token::Interpol(vec![TokenInterpol::Literal("hi".into())]),
+                    Token::Dot, Token::Interpol { multiline: false, parts: vec![TokenInterpol::Literal("hi".into())] },
                     Token::Dot, Token::Dynamic(vec![
                         (Meta::default(), Token::Ident("a".into()))
                     ])
@@ -805,7 +811,7 @@ mod tests {
                         AST::Var("test".into()),
                         AST::Value("invalid ident".into())
                     ))),
-                    AST::Interpol(vec![Interpol::Literal("hi".into())])
+                    AST::Interpol { multiline: false, parts: vec![Interpol::Literal("hi".into())] }
                 ))),
                 AST::Dynamic(Box::new(AST::Var("a".into())))
             ))))
@@ -815,32 +821,38 @@ mod tests {
     fn interpolation() {
         assert_eq!(
             parse![
-                Token::Interpol(vec![
-                    TokenInterpol::Literal("Hello, ".into()),
-                    TokenInterpol::Tokens(vec![
-                        (meta! { start: (0, 12), end: (0, 13) }, Token::CurlyBOpen),
-                        (meta! { start: (0, 14), end: (0, 19) }, Token::Ident("world".into())),
-                        (meta! { start: (0, 20), end: (0, 21) }, Token::Assign),
-                        (meta! { start: (0, 22), end: (0, 29) }, Token::Value("World".into())),
-                        (meta! { start: (0, 29), end: (0, 30) }, Token::Semicolon),
-                        (meta! { start: (0, 31), end: (0, 32) }, Token::CurlyBClose),
-                        (meta! { start: (0, 32), end: (0, 33) }, Token::Dot),
-                        (meta! { start: (0, 33), end: (0, 38) }, Token::Ident("world".into()))
-                    ]),
-                    TokenInterpol::Literal("!".into())
-                ])
+                Token::Interpol {
+                    multiline: false,
+                    parts: vec![
+                        TokenInterpol::Literal("Hello, ".into()),
+                        TokenInterpol::Tokens(vec![
+                            (meta! { start: (0, 12), end: (0, 13) }, Token::CurlyBOpen),
+                            (meta! { start: (0, 14), end: (0, 19) }, Token::Ident("world".into())),
+                            (meta! { start: (0, 20), end: (0, 21) }, Token::Assign),
+                            (meta! { start: (0, 22), end: (0, 29) }, Token::Value("World".into())),
+                            (meta! { start: (0, 29), end: (0, 30) }, Token::Semicolon),
+                            (meta! { start: (0, 31), end: (0, 32) }, Token::CurlyBClose),
+                            (meta! { start: (0, 32), end: (0, 33) }, Token::Dot),
+                            (meta! { start: (0, 33), end: (0, 38) }, Token::Ident("world".into()))
+                        ]),
+                        TokenInterpol::Literal("!".into())
+                    ]
+                }
             ],
-            Ok(AST::Interpol(vec![
-                Interpol::Literal("Hello, ".into()),
-                Interpol::AST(AST::IndexSet(Box::new((
-                    AST::Set {
-                        recursive: false,
-                        values: vec![SetEntry::Assign(vec![AST::Var("world".into())], AST::Value("World".into()))]
-                    },
-                    AST::Var("world".into())
-                )))),
-                Interpol::Literal("!".into())
-            ]))
+            Ok(AST::Interpol {
+                multiline: false,
+                parts: vec![
+                    Interpol::Literal("Hello, ".into()),
+                    Interpol::AST(AST::IndexSet(Box::new((
+                        AST::Set {
+                            recursive: false,
+                            values: vec![SetEntry::Assign(vec![AST::Var("world".into())], AST::Value("World".into()))]
+                        },
+                        AST::Var("world".into())
+                    )))),
+                    Interpol::Literal("!".into())
+                ]
+            })
         );
     }
     #[test]

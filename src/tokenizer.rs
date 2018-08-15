@@ -70,7 +70,10 @@ pub enum Token {
     // Identifiers and values
     Dynamic(Vec<(Meta, Token)>),
     Ident(String),
-    Interpol(Vec<Interpol>),
+    Interpol {
+        multiline: bool,
+        parts: Vec<Interpol>
+    },
     Value(Value),
 }
 impl Token {
@@ -85,7 +88,7 @@ impl Token {
     pub fn is_fn_arg(&self) -> bool {
         match self {
             Token::Rec | Token::CurlyBOpen | Token::SquareBOpen | Token::ParenOpen
-                | Token::Ident(_) | Token::Value(_) | Token::Interpol(_) => true,
+                | Token::Ident(_) | Token::Value(_) | Token::Interpol { .. } => true,
             _ => false
         }
     }
@@ -377,7 +380,10 @@ impl<'a> Tokenizer<'a> {
             if !literal.is_empty() {
                 interpol.push(Interpol::Literal(literal));
             }
-            self.span_end(meta, Token::Interpol(interpol))
+            self.span_end(meta, Token::Interpol {
+                multiline,
+                parts: interpol
+            })
         }
     }
 }
@@ -744,44 +750,53 @@ mod tests {
             tokenize_span(r#" "Hello, ${ { world = "World"; }.world }!" "#),
             Ok(vec![(
                 meta! { start: (0, 1), end: (0, 42) },
-                Token::Interpol(vec![
-                    Interpol::Literal("Hello, ".into()),
-                    Interpol::Tokens(vec![
-                        (meta! { start: (0, 12), end: (0, 13) }, Token::CurlyBOpen),
-                        (meta! { start: (0, 14), end: (0, 19) }, Token::Ident("world".into())),
-                        (meta! { start: (0, 20), end: (0, 21) }, Token::Assign),
-                        (meta! { start: (0, 22), end: (0, 29) }, Token::Value("World".into())),
-                        (meta! { start: (0, 29), end: (0, 30) }, Token::Semicolon),
-                        (meta! { start: (0, 31), end: (0, 32) }, Token::CurlyBClose),
-                        (meta! { start: (0, 32), end: (0, 33) }, Token::Dot),
-                        (meta! { start: (0, 33), end: (0, 38) }, Token::Ident("world".into()))
-                    ]),
-                    Interpol::Literal("!".into())
-                ])
+                Token::Interpol {
+                    multiline: false,
+                    parts: vec![
+                        Interpol::Literal("Hello, ".into()),
+                        Interpol::Tokens(vec![
+                            (meta! { start: (0, 12), end: (0, 13) }, Token::CurlyBOpen),
+                            (meta! { start: (0, 14), end: (0, 19) }, Token::Ident("world".into())),
+                            (meta! { start: (0, 20), end: (0, 21) }, Token::Assign),
+                            (meta! { start: (0, 22), end: (0, 29) }, Token::Value("World".into())),
+                            (meta! { start: (0, 29), end: (0, 30) }, Token::Semicolon),
+                            (meta! { start: (0, 31), end: (0, 32) }, Token::CurlyBClose),
+                            (meta! { start: (0, 32), end: (0, 33) }, Token::Dot),
+                            (meta! { start: (0, 33), end: (0, 38) }, Token::Ident("world".into()))
+                        ]),
+                        Interpol::Literal("!".into())
+                    ]
+                }
             )])
         );
         assert_eq!(
             tokenize_span(r#" "\$${test}" "#),
             Ok(vec![(
                 meta! { start: (0, 1), end: (0, 12) },
-                Token::Interpol(vec![
-                    Interpol::Literal("$".into()),
-                    Interpol::Tokens(vec![
-                        (meta! { start: (0, 6), end: (0, 10) }, Token::Ident("test".into()))
-                    ])
-                ])
+                Token::Interpol {
+                    multiline: false,
+                    parts: vec![
+                        Interpol::Literal("$".into()),
+                        Interpol::Tokens(vec![
+                            (meta! { start: (0, 6), end: (0, 10) }, Token::Ident("test".into()))
+                        ])
+                    ]
+                }
             )])
         );
         assert_eq!(
             tokenize_span(r#" ''''$${test}'' "#),
             Ok(vec![(
                 meta! { start: (0, 1), end: (0, 15) },
-                Token::Interpol(vec![
-                    Interpol::Literal("$".into()),
-                    Interpol::Tokens(vec![
-                        (meta! { start: (0, 8), end: (0, 12) }, Token::Ident("test".into()))
-                    ])
-                ])
+                Token::Interpol {
+                    multiline: true,
+                    parts: vec![
+                        Interpol::Literal("$".into()),
+                        Interpol::Tokens(vec![
+                            (meta! { start: (0, 8), end: (0, 12) }, Token::Ident("test".into()))
+                        ])
+                    ]
+                }
             )])
         );
     }

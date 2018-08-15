@@ -33,6 +33,32 @@ fn pad<W: Write>(w: &mut W, indent: usize) -> io::Result<()> {
     Ok(())
 }
 
+fn escape(input: &str, multiline: bool) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '$' => match chars.peek() {
+                Some('$') => { chars.next(); output.push_str("$$") },
+                _ if multiline => output.push_str("''$"),
+                _ => output.push_str("\\$")
+            },
+            '\'' if multiline => match chars.peek() {
+                Some('\'') => { chars.next(); output.push_str("\'\'\'"); },
+                _ => output.push('\''),
+            },
+            '"' if !multiline => output.push_str("\\\""),
+            '\r' if multiline => output.push_str("''r"),
+            '\t' if multiline => output.push_str("''t"),
+            '\n' => output.push_str("\\n"),
+            '\r' => output.push_str("\\r"),
+            '\t' => output.push_str("\\t"),
+            c => output.push(c)
+        }
+    }
+    output
+}
+
 fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
     //if !ast.0.comments.is_empty() {
     //    writeln!(w)?;
@@ -50,9 +76,9 @@ fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
         ($($op:path => $str:expr),*) => {
             match &ast.1 {
                 $($op(box (one, two)) => {
-                    print(w, indent + 2, one)?;
+                    print(w, indent+2, one)?;
                     write!(w, concat!(' ', $str, ' '))?;
-                    print(w, indent + 2, two)?;
+                    print(w, indent+2, two)?;
                     return Ok(());
                 }),*
                 _ => ()
@@ -69,31 +95,54 @@ fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
         ASTType::Value(Value::Bool(val)) => write!(w, "{}", val)?,
         ASTType::Value(Value::Integer(val)) => write!(w, "{}", val)?,
         ASTType::Value(Value::Float(val)) => write!(w, "{}", val)?,
-        ASTType::Value(Value::Path(_anchor, val)) => write!(w, "{}", val)?,
-        ASTType::Value(Value::Str { content, .. }) => write!(w, "{:?}", content)?,
+        ASTType::Value(Value::Path(Anchor::Home, val)) => write!(w, "~/{}", val)?,
+        ASTType::Value(Value::Path(Anchor::Store, val)) => write!(w, "<{}>", val)?,
+        ASTType::Value(Value::Path(_, val)) => write!(w, "{}", val)?,
+        ASTType::Value(Value::Str { multiline, content }) => {
+            if !multiline {
+                write!(w, "\"{}\"", escape(content, false))?
+            } else {
+                writeln!(w, "''");
+                for line in content.lines() {
+                    pad(w, indent+2)?;
+                    writeln!(w, "{}", escape(line, true))?;
+                }
+                pad(w, indent)?;
+                writeln!(w, "'';");
+            }
+        },
         ASTType::Var(name) => write!(w, "{}", name)?,
-        ASTType::Interpol(parts) => {
-            writeln!(w, "''")?;
-            pad(w, indent + 2)?;
+        ASTType::Interpol { multiline, parts } => {
+            if *multiline {
+                writeln!(w, "''")?;
+                pad(w, indent+2)?;
+            } else {
+                write!(w, "\"")?;
+            }
             for part in parts {
                 match part {
-                    Interpol::Literal(literal) => for (i, line) in literal.lines().enumerate() {
+                    Interpol::Literal(literal) if *multiline => for (i, line) in literal.lines().enumerate() {
                         if i > 0 {
                             writeln!(w)?;
-                            pad(w, indent + 2)?;
+                            pad(w, indent+2)?;
                         }
-                        write!(w, "{}", line)?;
+                        write!(w, "{}", escape(line, true))?;
                     },
+                    Interpol::Literal(literal) => write!(w, "{}", escape(literal, false))?,
                     Interpol::AST(ast) => {
                         write!(w, "${{")?;
-                        print(w, indent + 2, ast)?;
+                        print(w, indent+2, &ast)?;
                         write!(w, "}}")?;
                     }
                 }
             }
-            writeln!(w)?;
-            pad(w, indent)?;
-            write!(w, "''")?;
+            if *multiline {
+                writeln!(w)?;
+                pad(w, indent)?;
+                write!(w, "''")?;
+            } else {
+                write!(w, "\"")?;
+            }
         },
         ASTType::Set { recursive, values } => {
             if *recursive {
@@ -185,6 +234,16 @@ fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
             write!(w, " ")?;
             print(w, indent+2, arg)?;
             write!(w, ")")?;
+        },
+        ASTType::With(box (namespace, body)) => {
+            write!(w, "with ")?;
+            print(w, indent+2, namespace)?;
+            write!(w, "; ")?;
+            print(w, indent+2, body)?;
+        },
+        ASTType::Import(path) => {
+            write!(w, "import ")?;
+            print(w, indent+2, path)?;
         },
         ast => write!(w, "TODO: {:?}", ast)?,
     }

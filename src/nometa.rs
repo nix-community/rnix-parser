@@ -13,7 +13,10 @@ use crate::{
 #[derive(Clone, Debug, PartialEq)]
 pub enum AST {
     // Types
-    Interpol(Vec<Interpol>),
+    Interpol {
+        multiline: bool,
+        parts: Vec<Interpol>
+    },
     Lambda(FnArg, Box<AST>),
     List(Vec<AST>),
     Set {
@@ -127,7 +130,7 @@ impl From<ASTMeta> for AST {
     fn from(ast: ASTMeta) -> Self {
         match ast.1 {
             // Types
-            ASTType::Interpol(inner) => AST::Interpol(vec_into(inner)),
+            ASTType::Interpol { multiline, parts } => AST::Interpol { multiline, parts: vec_into(parts) },
             ASTType::Lambda(args, body) => AST::Lambda(args.into(), box_into(body)),
             ASTType::List(inner) => AST::List(vec_into(inner)),
             ASTType::Set { recursive, values } => AST::Set { recursive, values: vec_into(values) },
