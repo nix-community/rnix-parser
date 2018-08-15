@@ -528,8 +528,13 @@ impl<'a> Iterator for Tokenizer<'a> {
                 Ok(tokens) => self.span_end(meta, Token::Dynamic(tokens)),
                 Err(err) => Some(Err(err))
             },
-            'a'..='z' | 'A'..='Z' | '_' if kind != Some(IdentType::Store) => {
-                let kind = kind.unwrap_or(IdentType::Ident);
+            'a'..='z' | 'A'..='Z' | '_' => {
+                let kind = match kind {
+                    // It's detected as store if it ends with >, but if it
+                    // didn't start with <, that's wrong
+                    Some(IdentType::Store) | None => IdentType::Ident,
+                    Some(kind) => kind,
+                };
                 assert_ne!(kind, IdentType::Path, "paths are checked earlier");
                 let ident = self.next_ident(Some(c), |c| match c {
                     'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '\'' => true,
@@ -975,6 +980,10 @@ mod tests {
                     Token::Else,
                         Token::Value(3.into())
             ])
+        );
+        assert_eq!(
+            tokenize("x>=y"), // <- could be confused with store path because of the '>'
+            Ok(vec![Token::Ident("x".into()), Token::MoreOrEq, Token::Ident("y".into())])
         );
     }
     #[test]

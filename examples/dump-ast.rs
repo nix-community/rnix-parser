@@ -20,6 +20,6 @@ fn main() {
     };
     match rnix::parse(&content) {
         Ok(ast) => println!("{:#?}", ASTNoMeta::from(ast)),
-        Err(err) => eprintln!("error: {}", err)
+        Err(err) => eprintln!("error: {:?}", err)
     }
 }
