@@ -1,6 +1,7 @@
 //! The parser: turns a series of tokens into an AST
 
 pub mod nometa;
+pub mod recurse;
 
 use crate::{
     tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
