@@ -40,8 +40,9 @@ fn escape(input: &str, multiline: bool) -> String {
         match c {
             '$' => match chars.peek() {
                 Some('$') => { chars.next(); output.push_str("$$") },
-                _ if multiline => output.push_str("''$"),
-                _ => output.push_str("\\$")
+                Some('{') if multiline => { chars.next(); output.push_str("''${") },
+                Some('{') => { chars.next(); output.push_str("\\${") },
+                _ => output.push('$'),
             },
             '\'' if multiline => match chars.peek() {
                 Some('\'') => { chars.next(); output.push_str("\'\'\'"); },
@@ -108,7 +109,7 @@ fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
                     writeln!(w, "{}", escape(line, true))?;
                 }
                 pad(w, indent)?;
-                writeln!(w, "'';");
+                write!(w, "''");
             }
         },
         ASTType::Var(name) => write!(w, "{}", name)?,
@@ -147,6 +148,10 @@ fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
         ASTType::Set { recursive, values } => {
             if *recursive {
                 write!(w, "rec ")?;
+            }
+            if values.is_empty() {
+                write!(w, "{{}}")?;
+                return Ok(());
             }
             writeln!(w, "{{")?;
             for entry in values {
@@ -230,16 +235,16 @@ fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
         },
         ASTType::Apply(box (f, arg)) => {
             write!(w, "(")?;
-            print(w, indent+2, f)?;
+            print(w, indent, f)?;
             write!(w, " ")?;
-            print(w, indent+2, arg)?;
+            print(w, indent, arg)?;
             write!(w, ")")?;
         },
         ASTType::With(box (namespace, body)) => {
             write!(w, "with ")?;
-            print(w, indent+2, namespace)?;
+            print(w, indent, namespace)?;
             write!(w, "; ")?;
-            print(w, indent+2, body)?;
+            print(w, indent, body)?;
         },
         ASTType::Import(path) => {
             write!(w, "import ")?;

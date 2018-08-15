@@ -301,6 +301,10 @@ impl<I> Parser<I>
                 self.expect(Token::ParenClose)?;
                 expr
             },
+            (start, Token::Import) => {
+                let value = self.parse_val()?;
+                AST(start.until(&value.0), ASTType::Import(Box::new(value)))
+            },
             (start, Token::Rec) => {
                 self.expect(Token::CurlyBOpen)?;
                 let (end, values) = self.parse_set(&Token::CurlyBClose)?;
@@ -495,11 +499,6 @@ impl<I> Parser<I>
                 self.expect(Token::Semicolon)?;
                 let rest = self.parse_expr()?;
                 AST(start.until(&rest.0), ASTType::With(Box::new((vars, rest))))
-            },
-            Some(Token::Import) => {
-                let (start, _) = self.next().unwrap();
-                let AST(end, expr) = self.parse_expr()?;
-                AST(start.until(&end), ASTType::Import(Box::new(AST(end, expr))))
             },
             Some(Token::If) => {
                 let (start, _) = self.next().unwrap();
@@ -753,11 +752,18 @@ mod tests {
         assert_eq!(
             parse![
                 Token::Import,
-                Token::Value(Value::Path(Anchor::Store, "nixpkgs".into()))
+                Token::Value(Value::Path(Anchor::Store, "nixpkgs".into())),
+                Token::CurlyBOpen, Token::CurlyBClose
             ],
-            Ok(AST::Import(Box::new(
-                AST::Value(Value::Path(Anchor::Store, "nixpkgs".into()))
-            )))
+            Ok(AST::Apply(Box::new((
+                AST::Import(Box::new(
+                    AST::Value(Value::Path(Anchor::Store, "nixpkgs".into()))
+                )),
+                AST::Set {
+                    recursive: false,
+                    values: Vec::new()
+                }
+            ))))
         );
     }
     #[test]
