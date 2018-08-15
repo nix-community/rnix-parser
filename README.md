@@ -1,4 +1,4 @@
-# rnix
+# rnix [![Crates.io](https://img.shields.io/crates/v/rnix.svg)](http://crates.io/crates/rnix)
 
 rnix is a Nix parser written in Rust.
 
