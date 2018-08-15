@@ -179,6 +179,7 @@ fn print<W: Write>(w: &mut W, indent: usize, ast: &AST) -> io::Result<()> {
                         for val in values {
                             write!(w, " {}", val)?;
                         }
+                        write!(w, ";")?;
                     }
                 }
                 writeln!(w)?;
