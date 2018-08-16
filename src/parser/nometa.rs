@@ -2,17 +2,17 @@
 //! Useful for unit testing, where entering span information can get very tedious.
 //! You can convert an AST with metadata to this type using `.into()`
 
-use crate::{
-    parser::{
-        AST as ASTMeta,
-        ASTType,
-        LambdaArg as LambdaArgMeta,
-        Interpol as InterpolMeta,
-        PatEntry as PatEntryMeta,
-        SetEntry as SetEntryMeta,
-    },
-    value::Value
+use super::{
+    AST as ASTMeta,
+    ASTType,
+    LambdaArg as LambdaArgMeta,
+    Interpol as InterpolMeta,
+    PatEntry as PatEntryMeta,
+    Parens as ParensMeta,
+    SetEntry as SetEntryMeta,
 };
+use crate::value::Value;
+pub use super::Operator;
 
 /// An AST node
 #[derive(Clone, Debug, PartialEq)]
@@ -42,28 +42,12 @@ pub enum AST {
 
     // Operators
     Apply(Box<(AST, AST)>),
-    Concat(Box<(AST, AST)>),
     IndexSet(Box<(AST, AST)>),
     Invert(Box<AST>),
-    IsSet(Box<(AST, AST)>),
-    Merge(Box<(AST, AST)>),
     Negate(Box<AST>),
     OrDefault(Box<(AST, AST, AST)>),
 
-    Add(Box<(AST, AST)>),
-    Sub(Box<(AST, AST)>),
-    Mul(Box<(AST, AST)>),
-    Div(Box<(AST, AST)>),
-
-    And(Box<(AST, AST)>),
-    Equal(Box<(AST, AST)>),
-    Implication(Box<(AST, AST)>),
-    Less(Box<(AST, AST)>),
-    LessOrEq(Box<(AST, AST)>),
-    More(Box<(AST, AST)>),
-    MoreOrEq(Box<(AST, AST)>),
-    NotEqual(Box<(AST, AST)>),
-    Or(Box<(AST, AST)>)
+    Operation(Box<(AST, Operator, AST)>)
 }
 /// A lambda argument type
 #[derive(Clone, Debug, PartialEq)]
@@ -111,6 +95,12 @@ impl From<PatEntryMeta> for PatEntry {
         PatEntry(entry.0, entry.1.map(AST::from))
     }
 }
+impl From<ParensMeta> for AST {
+    fn from(parens: ParensMeta) -> Self {
+        let ParensMeta(_open, inner, _close) = parens;
+        AST::from(inner)
+    }
+}
 impl From<SetEntryMeta> for SetEntry {
     fn from(entry: SetEntryMeta) -> Self {
         match entry {
@@ -130,7 +120,7 @@ impl From<InterpolMeta> for Interpol {
 impl From<LambdaArgMeta> for LambdaArg {
     fn from(arg: LambdaArgMeta) -> Self {
         match arg {
-            LambdaArgMeta::Ident(name) => LambdaArg::Ident(name),
+            LambdaArgMeta::Ident(_meta, name) => LambdaArg::Ident(name),
             LambdaArgMeta::Pattern { args, bind, exact } => LambdaArg::Pattern { args: vec_into(args), bind, exact },
         }
     }
@@ -139,12 +129,14 @@ impl From<ASTMeta> for AST {
     fn from(ast: ASTMeta) -> Self {
         match ast.1 {
             // Types
-            ASTType::Interpol { multiline, parts } => AST::Interpol { multiline, parts: vec_into(parts) },
+            ASTType::Interpol { meta: _, multiline, parts } => AST::Interpol { multiline, parts: vec_into(parts) },
             ASTType::Lambda(args, body) => AST::Lambda(args.into(), box_into(body)),
-            ASTType::List(inner) => AST::List(vec_into(inner)),
-            ASTType::Set { recursive, values } => AST::Set { recursive, values: vec_into(values) },
-            ASTType::Value(inner) => AST::Value(inner),
-            ASTType::Var(inner) => AST::Var(inner),
+            ASTType::List(_open, inner, _close) => AST::List(vec_into(inner)),
+            ASTType::Parens(inner) => AST::from(*inner),
+            ASTType::Set { recursive, open: _, close: _, values } =>
+                AST::Set { recursive: recursive.is_some(), values: vec_into(values) },
+            ASTType::Value(_, inner) => AST::Value(inner),
+            ASTType::Var(_, inner) => AST::Var(inner),
 
             // Expressions
             ASTType::Assert(inner) => AST::Assert(tuple_into(inner)),
@@ -157,28 +149,12 @@ impl From<ASTMeta> for AST {
             // Operators
             ASTType::Apply(inner) => AST::Apply(tuple_into(inner)),
             ASTType::Dynamic(inner) => AST::Dynamic(box_into(inner)),
-            ASTType::Concat(inner) => AST::Concat(tuple_into(inner)),
             ASTType::IndexSet(inner) => AST::IndexSet(tuple_into(inner)),
             ASTType::Invert(inner) => AST::Invert(box_into(inner)),
-            ASTType::IsSet(inner) => AST::IsSet(tuple_into(inner)),
-            ASTType::Merge(inner) => AST::Merge(tuple_into(inner)),
             ASTType::Negate(inner) => AST::Negate(box_into(inner)),
             ASTType::OrDefault(inner) => AST::OrDefault(triple_into(inner)),
 
-            ASTType::Add(inner) => AST::Add(tuple_into(inner)),
-            ASTType::Sub(inner) => AST::Sub(tuple_into(inner)),
-            ASTType::Mul(inner) => AST::Mul(tuple_into(inner)),
-            ASTType::Div(inner) => AST::Div(tuple_into(inner)),
-
-            ASTType::And(inner) => AST::And(tuple_into(inner)),
-            ASTType::Equal(inner) => AST::Equal(tuple_into(inner)),
-            ASTType::Implication(inner) => AST::Implication(tuple_into(inner)),
-            ASTType::Less(inner) => AST::Less(tuple_into(inner)),
-            ASTType::LessOrEq(inner) => AST::LessOrEq(tuple_into(inner)),
-            ASTType::More(inner) => AST::More(tuple_into(inner)),
-            ASTType::MoreOrEq(inner) => AST::MoreOrEq(tuple_into(inner)),
-            ASTType::NotEqual(inner) => AST::NotEqual(tuple_into(inner)),
-            ASTType::Or(inner) => AST::Or(tuple_into(inner))
+            ASTType::Operation(box (one, (_, op), two)) => AST::Operation(Box::new((AST::from(one), op, AST::from(two))))
         }
     }
 }

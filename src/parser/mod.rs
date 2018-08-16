@@ -2,7 +2,7 @@
 
 pub mod nometa;
 // only `impl`s a function, no need to expose the module
-mod recurse;
+// mod recurse;
 
 use crate::{
     tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
@@ -31,23 +31,27 @@ pub enum ParseError {
 
 /// An AST node, with metadata
 #[derive(Clone, Debug, PartialEq)]
-pub struct AST(pub Meta, pub ASTType);
+pub struct AST(pub Span, pub ASTType);
 /// An AST node type
 #[derive(Clone, Debug, PartialEq)]
 pub enum ASTType {
     // Types
     Interpol {
+        meta: Meta,
         multiline: bool,
         parts: Vec<Interpol>
     },
     Lambda(LambdaArg, Box<AST>),
-    List(Vec<AST>),
+    List(Meta, Vec<AST>, Meta),
+    Parens(Box<Parens>),
     Set {
-        recursive: bool,
+        recursive: Option<Meta>,
+        open: Meta,
+        close: Meta,
         values: Vec<SetEntry>
     },
-    Value(Value),
-    Var(String),
+    Value(Meta, Value),
+    Var(Meta, String),
 
     // Expressions
     Assert(Box<(AST, AST)>),
@@ -59,34 +63,18 @@ pub enum ASTType {
 
     // Operators
     Apply(Box<(AST, AST)>),
-    Concat(Box<(AST, AST)>),
     Dynamic(Box<AST>),
     IndexSet(Box<(AST, AST)>),
     Invert(Box<AST>),
-    IsSet(Box<(AST, AST)>),
-    Merge(Box<(AST, AST)>),
     Negate(Box<AST>),
     OrDefault(Box<(AST, AST, AST)>),
 
-    Add(Box<(AST, AST)>),
-    Sub(Box<(AST, AST)>),
-    Mul(Box<(AST, AST)>),
-    Div(Box<(AST, AST)>),
-
-    And(Box<(AST, AST)>),
-    Equal(Box<(AST, AST)>),
-    Implication(Box<(AST, AST)>),
-    Less(Box<(AST, AST)>),
-    LessOrEq(Box<(AST, AST)>),
-    More(Box<(AST, AST)>),
-    MoreOrEq(Box<(AST, AST)>),
-    NotEqual(Box<(AST, AST)>),
-    Or(Box<(AST, AST)>)
+    Operation(Box<(AST, (Meta, Operator), AST)>),
 }
 /// A lambda argument type
 #[derive(Clone, Debug, PartialEq)]
 pub enum LambdaArg {
-    Ident(String),
+    Ident(Meta, String),
     Pattern {
         args: Vec<PatEntry>,
         bind: Option<String>,
@@ -99,6 +87,29 @@ pub enum Interpol {
     Literal(String),
     AST(AST)
 }
+/// An operator, such as + - * /
+#[derive(Clone, Debug, PartialEq)]
+pub enum Operator {
+    Concat,
+    Merge,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    And,
+    Equal,
+    Implication,
+    IsSet,
+    Less,
+    LessOrEq,
+    More,
+    MoreOrEq,
+    NotEqual,
+    Or
+}
+/// Parenthesis around an AST node
+#[derive(Clone, Debug, PartialEq)]
+pub struct Parens(Meta, AST, Meta);
 /// An entry in a pattern
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatEntry(pub String, pub Option<AST>);
@@ -106,32 +117,38 @@ pub struct PatEntry(pub String, pub Option<AST>);
 #[derive(Clone, Debug, PartialEq)]
 pub enum SetEntry {
     Assign(Vec<AST>, AST),
-    Inherit(Option<AST>, Vec<String>)
+    Inherit(Option<Parens>, Vec<String>)
 }
 
 type Error = (Option<Span>, ParseError);
 type Result<T> = std::result::Result<T, Error>;
 
 macro_rules! math {
-    (only_once, $self:expr, $next:block, $($token:pat $(if $cond:expr)* => $ast:expr),*) => {{
+    (only_once, $self:expr, $next:block, $($token:pat $(if $cond:expr)* => $op:expr),*) => {{
         let val = { $next };
         Ok(match $self.peek() {
             $(Some(&$token) $(if $cond)* => {
-                $self.next()?;
+                let (meta, _) = $self.next().unwrap();
                 let expr = { $next };
-                AST(val.0.span.until(expr.0.span).into(), $ast(Box::new((val, expr))))
+                AST(
+                    val.0.until(expr.0),
+                    ASTType::Operation(Box::new((val, (meta, $op), expr)))
+                )
             },)*
             _ => val
         })
     }};
-    ($self:expr, $next:block, $($token:pat $(if $cond:expr)* => $ast:expr),*) => {{
+    ($self:expr, $next:block, $($token:pat $(if $cond:expr)* => $op:expr),*) => {{
         let mut val = { $next };
         loop {
             match $self.peek() {
                 $(Some(&$token) $(if $cond)* => {
-                    $self.next()?;
-                    let AST(end, expr) = { $next };
-                    val = AST(val.0.span.until(end.span).into(), $ast(Box::new((val, AST(end, expr)))));
+                    let (meta, _) = $self.next().unwrap();
+                    let expr = { $next };
+                    val = AST(
+                        val.0.until(expr.0).into(),
+                        ASTType::Operation(Box::new((val, (meta, $op), expr)))
+                    );
                 },)*
                 _ => break
             }
@@ -140,7 +157,7 @@ macro_rules! math {
     }};
 }
 
-fn parse_interpol(multiline: bool, values: Vec<TokenInterpol>) -> Result<ASTType> {
+fn parse_interpol(meta: Meta, multiline: bool, values: Vec<TokenInterpol>) -> Result<ASTType> {
     let mut parsed = Vec::new();
     for value in values {
         parsed.push(match value {
@@ -149,6 +166,7 @@ fn parse_interpol(multiline: bool, values: Vec<TokenInterpol>) -> Result<ASTType
         });
     }
     Ok(ASTType::Interpol {
+        meta,
         multiline,
         parts: parsed
     })
@@ -201,10 +219,10 @@ impl<I> Parser<I>
 
     fn next_attr(&mut self) -> Result<AST> {
         match self.next()? {
-            (meta, Token::Ident(ident)) => Ok(AST(meta, ASTType::Var(ident))),
-            (meta, Token::Value(value)) => Ok(AST(meta, ASTType::Value(value))),
-            (meta, Token::Dynamic(values)) => Ok(AST(meta, ASTType::Dynamic(Box::new(parse(values)?)))),
-            (meta, Token::Interpol { multiline, parts }) => Ok(AST(meta, parse_interpol(multiline, parts)?)),
+            (meta, Token::Ident(ident)) => Ok(AST(meta.span, ASTType::Var(meta, ident))),
+            (meta, Token::Value(value)) => Ok(AST(meta.span, ASTType::Value(meta, value))),
+            (meta, Token::Dynamic(values)) => Ok(AST(meta.span, ASTType::Dynamic(Box::new(parse(values)?)))),
+            (meta, Token::Interpol { multiline, parts }) => Ok(AST(meta.span, parse_interpol(meta, multiline, parts)?)),
             (meta, token) => Err((Some(meta.span), ParseError::ExpectedType("attribute", token)))
         }
     }
@@ -265,11 +283,11 @@ impl<I> Parser<I>
         }
 
         self.expect(Token::Colon)?;
-        let AST(end, expr) = self.parse_expr()?;
+        let expr = self.parse_expr()?;
 
-        Ok(AST(start.until(&end), ASTType::Lambda(
+        Ok(AST(start.span.until(expr.0), ASTType::Lambda(
             LambdaArg::Pattern { args, bind, exact },
-            Box::new(AST(end, expr))
+            Box::new(expr)
         )))
     }
     fn parse_set(&mut self, until: &Token) -> Result<(Meta, Vec<SetEntry>)> {
@@ -281,10 +299,10 @@ impl<I> Parser<I>
                     self.next().unwrap();
 
                     let from = if self.peek() == Some(&Token::ParenOpen) {
-                        self.next().unwrap();
+                        let (open, _) = self.next().unwrap();
                         let from = self.parse_expr()?;
-                        self.expect(Token::ParenClose)?;
-                        Some(from)
+                        let close = self.expect(Token::ParenClose)?;
+                        Some(Parens(open, from, close))
                     } else {
                         None
                     };
@@ -311,24 +329,29 @@ impl<I> Parser<I>
     }
     fn parse_val(&mut self) -> Result<AST> {
         let mut val = match self.next()? {
-            (_, Token::ParenOpen) => {
+            (open, Token::ParenOpen) => {
                 let expr = self.parse_expr()?;
-                self.expect(Token::ParenClose)?;
-                expr
+                let close = self.expect(Token::ParenClose)?;
+                AST(
+                    open.span.until(close.span),
+                    ASTType::Parens(Box::new(Parens(open, expr, close)))
+                )
             },
             (start, Token::Import) => {
                 let value = self.parse_val()?;
-                AST(start.until(&value.0), ASTType::Import(Box::new(value)))
+                AST(start.span.until(value.0), ASTType::Import(Box::new(value)))
             },
-            (start, Token::Rec) => {
-                self.expect(Token::CurlyBOpen)?;
-                let (end, values) = self.parse_set(&Token::CurlyBClose)?;
-                AST(start.until(&end), ASTType::Set {
-                    recursive: true,
+            (rec, Token::Rec) => {
+                let open = self.expect(Token::CurlyBOpen)?;
+                let (close, values) = self.parse_set(&Token::CurlyBClose)?;
+                AST(rec.span.until(close.span), ASTType::Set {
+                    recursive: Some(rec),
+                    open,
+                    close,
                     values
                 })
             },
-            (start, Token::CurlyBOpen) => {
+            (open, Token::CurlyBOpen) => {
                 let temporary = self.next()?;
                 match (&temporary.1, self.peek()) {
                     (Token::Ident(_), Some(Token::Comma))
@@ -339,21 +362,23 @@ impl<I> Parser<I>
                             | (Token::CurlyBClose, Some(Token::At)) => {
                         // We did a lookahead, put it back
                         self.buffer.push(temporary);
-                        self.parse_pattern(start, None)?
+                        self.parse_pattern(open, None)?
                     },
                     _ => {
                         // We did a lookahead, put it back
                         self.buffer.push(temporary);
 
-                        let (end, values) = self.parse_set(&Token::CurlyBClose)?;
-                        AST(start.until(&end), ASTType::Set {
-                            recursive: false,
+                        let (close, values) = self.parse_set(&Token::CurlyBClose)?;
+                        AST(open.span.until(close.span), ASTType::Set {
+                            recursive: None,
+                            open,
+                            close,
                             values
                         })
                     }
                 }
             },
-            (start, Token::SquareBOpen) => {
+            (open, Token::SquareBOpen) => {
                 let mut values = Vec::new();
                 loop {
                     let peek = self.peek();
@@ -362,19 +387,19 @@ impl<I> Parser<I>
                         _ => values.push(self.parse_val()?)
                     }
                 }
-                let end = self.expect(Token::SquareBClose)?;
-                AST(start.until(&end), ASTType::List(values))
+                let close = self.expect(Token::SquareBClose)?;
+                AST(open.span.until(close.span), ASTType::List(open, values, close))
             },
-            (meta, Token::Dynamic(values)) => AST(meta, ASTType::Dynamic(Box::new(parse(values)?))),
-            (meta, Token::Value(val)) => AST(meta, ASTType::Value(val)),
-            (start, Token::Ident(name)) => if self.peek() == Some(&Token::At) {
+            (meta, Token::Dynamic(values)) => AST(meta.span, ASTType::Dynamic(Box::new(parse(values)?))),
+            (meta, Token::Value(val)) => AST(meta.span, ASTType::Value(meta, val)),
+            (meta, Token::Ident(name)) => if self.peek() == Some(&Token::At) {
                 self.next().unwrap();
                 self.expect(Token::CurlyBOpen)?;
-                self.parse_pattern(start, Some(name))?
+                self.parse_pattern(meta, Some(name))?
             } else {
-                AST(start, ASTType::Var(name))
+                AST(meta.span, ASTType::Var(meta, name))
             },
-            (meta, Token::Interpol { multiline, parts }) => AST(meta, parse_interpol(multiline, parts)?),
+            (meta, Token::Interpol { multiline, parts }) => AST(meta.span, parse_interpol(meta, multiline, parts)?),
             (meta, token) => return Err((Some(meta.span), ParseError::Unexpected(token)))
         };
 
@@ -386,12 +411,12 @@ impl<I> Parser<I>
                     self.next().unwrap();
                     let default = self.parse_val()?;
                     val = AST(
-                        val.0.span.until(attr.0.span).into(),
+                        val.0.until(attr.0).into(),
                         ASTType::OrDefault(Box::new((val, attr, default)))
                     );
                 },
                 _ => val = AST(
-                    val.0.span.until(attr.0.span).into(),
+                    val.0.until(attr.0).into(),
                     ASTType::IndexSet(Box::new((val, attr)))
                 )
             }
@@ -405,7 +430,7 @@ impl<I> Parser<I>
         while self.peek().map(|t| t.is_fn_arg()).unwrap_or(false) {
             let arg = self.parse_val()?;
             val = AST(
-                val.0.span.until(arg.0.span).into(),
+                val.0.until(arg.0).into(),
                 ASTType::Apply(Box::new((val, arg)))
             );
         }
@@ -416,78 +441,69 @@ impl<I> Parser<I>
         if self.peek() == Some(&Token::Sub) {
             let (start, _) = self.next().unwrap();
             let expr = self.parse_negate()?;
-            Ok(AST(start.until(&expr.0), ASTType::Negate(Box::new(expr))))
+            Ok(AST(start.span.until(expr.0), ASTType::Negate(Box::new(expr))))
         } else {
             self.parse_fn()
         }
     }
     fn parse_isset(&mut self) -> Result<AST> {
-        math!(
-            self, { self.parse_negate()? },
-            Token::Question => ASTType::IsSet
-        )
+        math!(self, { self.parse_negate()? }, Token::Question => Operator::IsSet)
     }
     fn parse_concat(&mut self) -> Result<AST> {
-        math!(self, { self.parse_isset()? }, Token::Concat => ASTType::Concat)
+        math!(self, { self.parse_isset()? }, Token::Concat => Operator::Concat)
     }
     fn parse_mul(&mut self) -> Result<AST> {
         math!(
             self, { self.parse_concat()? },
-            Token::Mul => ASTType::Mul,
-            Token::Div => ASTType::Div
+            Token::Mul => Operator::Mul,
+            Token::Div => Operator::Div
         )
     }
     fn parse_add(&mut self) -> Result<AST> {
         math!(
             self, { self.parse_mul()? },
-            Token::Add => ASTType::Add,
-            Token::Sub => ASTType::Sub
+            Token::Add => Operator::Add,
+            Token::Sub => Operator::Sub
         )
     }
     fn parse_invert(&mut self) -> Result<AST> {
         if self.peek() == Some(&Token::Invert) {
             let (start, _) = self.next().unwrap();
             let expr = self.parse_invert()?;
-            Ok(AST(start.until(&expr.0), ASTType::Invert(Box::new(expr))))
+            Ok(AST(start.span.until(expr.0), ASTType::Invert(Box::new(expr))))
         } else {
             self.parse_add()
         }
     }
     fn parse_merge(&mut self) -> Result<AST> {
-        math!(self, { self.parse_invert()? }, Token::Merge => ASTType::Merge)
+        math!(self, { self.parse_invert()? }, Token::Merge => Operator::Merge)
     }
     fn parse_compare(&mut self) -> Result<AST> {
         math!(
             only_once, self, { self.parse_merge()? },
-            Token::Less => ASTType::Less,
-            Token::LessOrEq => ASTType::LessOrEq,
-            Token::More => ASTType::More,
-            Token::MoreOrEq => ASTType::MoreOrEq
+            Token::Less => Operator::Less,
+            Token::LessOrEq => Operator::LessOrEq,
+            Token::More => Operator::More,
+            Token::MoreOrEq => Operator::MoreOrEq
         )
     }
     fn parse_equal(&mut self) -> Result<AST> {
         math!(
             only_once, self, { self.parse_compare()? },
-            Token::Equal => ASTType::Equal,
-            Token::NotEqual => ASTType::NotEqual
+            Token::Equal => Operator::Equal,
+            Token::NotEqual => Operator::NotEqual
         )
     }
     fn parse_and(&mut self) -> Result<AST> {
-        math!(
-            self, { self.parse_equal()? },
-            Token::And => ASTType::And
-        )
+        math!(self, { self.parse_equal()? }, Token::And => Operator::And)
     }
     fn parse_or(&mut self) -> Result<AST> {
-        math!(
-            self, { self.parse_and()? },
-            Token::Or => ASTType::Or
-        )
+        math!(self, { self.parse_and()? }, Token::Or => Operator::Or)
     }
     fn parse_implication(&mut self) -> Result<AST> {
         math!(
             self, { self.parse_or()? },
-            Token::Implication => ASTType::Implication
+            Token::Implication => Operator::Implication
         )
     }
     #[inline(always)]
@@ -503,11 +519,11 @@ impl<I> Parser<I>
                 if self.peek() == Some(&Token::CurlyBOpen) {
                     self.next().unwrap();
                     let (end, vars) = self.parse_set(&Token::CurlyBClose)?;
-                    AST(start.until(&end), ASTType::Let(vars))
+                    AST(start.span.until(end.span), ASTType::Let(vars))
                 } else {
                     let (_, vars) = self.parse_set(&Token::In)?;
-                    let AST(end, expr) = self.parse_expr()?;
-                    AST(start.until(&end), ASTType::LetIn(vars, Box::new(AST(end, expr))))
+                    let expr = self.parse_expr()?;
+                    AST(start.span.until(expr.0), ASTType::LetIn(vars, Box::new(expr)))
                 }
             },
             Some(Token::With) => {
@@ -515,7 +531,7 @@ impl<I> Parser<I>
                 let vars = self.parse_expr()?;
                 self.expect(Token::Semicolon)?;
                 let rest = self.parse_expr()?;
-                AST(start.until(&rest.0), ASTType::With(Box::new((vars, rest))))
+                AST(start.span.until(rest.0), ASTType::With(Box::new((vars, rest))))
             },
             Some(Token::If) => {
                 let (start, _) = self.next().unwrap();
@@ -525,7 +541,7 @@ impl<I> Parser<I>
                 self.expect(Token::Else)?;
                 let otherwise = self.parse_expr()?;
                 AST(
-                    start.span.until(otherwise.0.span).into(),
+                    start.span.until(otherwise.0).into(),
                     ASTType::IfElse(Box::new((condition, body, otherwise)))
                 )
             },
@@ -534,15 +550,15 @@ impl<I> Parser<I>
                 let condition = self.parse_expr()?;
                 self.expect(Token::Semicolon)?;
                 let rest = self.parse_expr()?;
-                AST(start.until(&rest.0), ASTType::Assert(Box::new((condition, rest))))
+                AST(start.span.until(rest.0), ASTType::Assert(Box::new((condition, rest))))
             },
             _ => match self.parse_math()? {
-                AST(start, ASTType::Var(name)) => if self.peek() == Some(&Token::Colon) {
+                AST(start, ASTType::Var(meta, name)) => if self.peek() == Some(&Token::Colon) {
                     self.next()?;
-                    let AST(end, expr) = self.parse_expr()?;
-                    AST(start.until(&end), ASTType::Lambda(LambdaArg::Ident(name), Box::new(AST(end, expr))))
+                    let expr = self.parse_expr()?;
+                    AST(start.until(expr.0), ASTType::Lambda(LambdaArg::Ident(meta, name), Box::new(expr)))
                 } else {
-                    AST(start, ASTType::Var(name))
+                    AST(start, ASTType::Var(meta, name))
                 },
                 ast => ast
             }
@@ -673,32 +689,43 @@ mod tests {
                 (meta! { start: 24, end: 25 }, Token::Value(3.into())),
             ].into_iter()),
             Ok(ASTSpan(
-                meta! { start: 0, end: 25 },
-                ASTType::Add(Box::new((
+                Span { start: 0, end: Some(25) },
+                ASTType::Operation(Box::new((
                     ASTSpan(
-                        meta! { start: 0, end: 1, trailing: 1 },
-                        ASTType::Value(1.into())
+                        Span { start: 0, end: Some(1) },
+                        ASTType::Value(
+                            meta! { start: 0, end: 1, trailing: 1 },
+                            1.into()
+                        )
                     ),
+                    (meta! { start: 2, end: 3, trailing: 1 }, Operator::Add),
                     ASTSpan(
-                        meta! { start: 20, end: 25 },
-                        ASTType::Mul(Box::new((
+                        Span { start: 20, end: Some(25) },
+                        ASTType::Operation(Box::new((
                             ASTSpan(
-                                Meta {
-                                    span: Span { start: 20, end: Some(21) },
-                                    leading: vec![
-                                        Trivia::Comment {
-                                            span: Span { start: 4, end: Some(19) },
-                                            multiline: false,
-                                            content: "Hello World".into()
-                                        }
-                                    ],
-                                    trailing: vec![Trivia::Spaces(1)]
-                                },
-                                ASTType::Value(2.into())
+                                Span { start: 20, end: Some(21) },
+                                ASTType::Value(
+                                    Meta {
+                                        span: Span { start: 20, end: Some(21) },
+                                        leading: vec![
+                                            Trivia::Comment {
+                                                span: Span { start: 4, end: Some(19) },
+                                                multiline: false,
+                                                content: "Hello World".into()
+                                            }
+                                        ],
+                                        trailing: vec![Trivia::Spaces(1)]
+                                    },
+                                    2.into()
+                                )
                             ),
+                            (meta! { start: 22, end: 23, trailing: 1 }, Operator::Mul),
                             ASTSpan(
-                                meta! { start: 24, end: 25 },
-                                ASTType::Value(3.into())
+                                Span { start: 24, end: Some(25) },
+                                ASTType::Value(
+                                    meta! { start: 24, end: 25 },
+                                    3.into()
+                                )
                             )
                         )))
                     )
@@ -712,10 +739,12 @@ mod tests {
             parse![
                 Token::Value(1.into()), Token::Add, Token::Value(2.into()), Token::Mul, Token::Value(3.into())
             ],
-            Ok(AST::Add(Box::new((
+            Ok(AST::Operation(Box::new((
                 AST::Value(1.into()),
-                AST::Mul(Box::new((
+                Operator::Add,
+                AST::Operation(Box::new((
                     AST::Value(2.into()),
+                    Operator::Mul,
                     AST::Value(3.into()),
                 )))
             ))))
@@ -727,10 +756,12 @@ mod tests {
                     Token::Value(3.into()), Token::Sub, Token::Value(2.into()),
                 Token::ParenClose
             ],
-            Ok(AST::Mul(Box::new((
+            Ok(AST::Operation(Box::new((
                 AST::Value(5.into()),
-                AST::Negate(Box::new(AST::Sub(Box::new((
+                Operator::Mul,
+                AST::Negate(Box::new(AST::Operation(Box::new((
                     AST::Value(3.into()),
+                    Operator::Sub,
                     AST::Value(2.into()),
                 )))))
             ))))
@@ -913,11 +944,13 @@ mod tests {
                Token::SquareBOpen, Token::Value(2.into()), Token::SquareBClose, Token::Concat,
                Token::SquareBOpen, Token::Value(3.into()), Token::SquareBClose
             ],
-            Ok(AST::Concat(Box::new((
-                AST::Concat(Box::new((
+            Ok(AST::Operation(Box::new((
+                AST::Operation(Box::new((
                     AST::List(vec![AST::Value(1.into())]),
+                    Operator::Concat,
                     AST::List(vec![AST::Value(2.into())]),
                 ))),
+                Operator::Concat,
                 AST::List(vec![AST::Value(3.into())])
             ))))
         );
@@ -933,8 +966,9 @@ mod tests {
                 LambdaArg::Ident("a".into()),
                 Box::new(AST::Lambda(
                     LambdaArg::Ident("b".into()),
-                    Box::new(AST::Add(Box::new((
+                    Box::new(AST::Operation(Box::new((
                         AST::Var("a".into()),
+                        Operator::Add,
                         AST::Var("b".into())
                     ))))
                 ))
@@ -982,7 +1016,7 @@ mod tests {
                 Token::Add,
                 Token::Value(3.into())
             ],
-            Ok(AST::Add(Box::new((
+            Ok(AST::Operation(Box::new((
                 AST::Apply(Box::new((
                     AST::Apply(Box::new((
                         AST::Var("a".into()),
@@ -990,6 +1024,7 @@ mod tests {
                     ))),
                     AST::Value(2.into()),
                 ))),
+                Operator::Add,
                 AST::Value(3.into())
             ))))
         );
@@ -1085,11 +1120,12 @@ mod tests {
                     Token::Ident("b".into()), Token::Assign, Token::Value(2.into()), Token::Semicolon,
                 Token::CurlyBClose
             ],
-            Ok(AST::Merge(Box::new((
+            Ok(AST::Operation(Box::new((
                 AST::Set {
                     recursive: false,
                     values: vec![SetEntry::Assign(vec![AST::Var("a".into())], AST::Value(1.into()))]
                 },
+                Operator::Merge,
                 AST::Set {
                     recursive: false,
                     values: vec![SetEntry::Assign(vec![AST::Var("b".into())], AST::Value(2.into()))]
@@ -1108,13 +1144,20 @@ mod tests {
                 Token::Or,
                 Token::Value(true.into())
             ],
-            Ok(AST::Implication(Box::new((
+            Ok(AST::Operation(Box::new((
                 AST::Value(false.into()),
-                AST::Or(Box::new((
-                    AST::And(Box::new((
+                Operator::Implication,
+                AST::Operation(Box::new((
+                    AST::Operation(Box::new((
                         AST::Invert(Box::new(AST::Value(false.into()))),
-                        AST::Equal(Box::new((AST::Value(false.into()), AST::Value(true.into()))))
+                        Operator::And,
+                        AST::Operation(Box::new((
+                            AST::Value(false.into()),
+                            Operator::Equal,
+                            AST::Value(true.into())
+                        )))
                     ))),
+                    Operator::Or,
                     AST::Value(true.into())
                 )))
             ))))
@@ -1129,14 +1172,33 @@ mod tests {
                 Token::And,
                 Token::Value(2.into()), Token::MoreOrEq, Token::Value(2.into())
             ],
-            Ok(AST::Or(Box::new((
-                AST::Less(Box::new((AST::Value(1.into()), AST::Value(2.into())))),
-                AST::And(Box::new((
-                    AST::And(Box::new((
-                        AST::LessOrEq(Box::new((AST::Value(2.into()), AST::Value(2.into())))),
-                        AST::More(Box::new((AST::Value(2.into()), AST::Value(1.into())))),
+            Ok(AST::Operation(Box::new((
+                AST::Operation(Box::new((
+                    AST::Value(1.into()),
+                    Operator::Less,
+                    AST::Value(2.into())
+                ))),
+                Operator::Or,
+                AST::Operation(Box::new((
+                    AST::Operation(Box::new((
+                        AST::Operation(Box::new((
+                            AST::Value(2.into()),
+                            Operator::LessOrEq,
+                            AST::Value(2.into())
+                        ))),
+                        Operator::And,
+                        AST::Operation(Box::new((
+                            AST::Value(2.into()),
+                            Operator::More,
+                            AST::Value(1.into())
+                        ))),
                     ))),
-                    AST::MoreOrEq(Box::new((AST::Value(2.into()), AST::Value(2.into()))))
+                    Operator::And,
+                    AST::Operation(Box::new((
+                        AST::Value(2.into()),
+                        Operator::MoreOrEq,
+                        AST::Value(2.into())
+                    )))
                 )))
             ))))
         );
@@ -1146,9 +1208,18 @@ mod tests {
                 Token::And,
                 Token::Value(2.into()), Token::NotEqual, Token::Value(3.into())
             ],
-            Ok(AST::And(Box::new((
-                AST::Equal(Box::new((AST::Value(1.into()), AST::Value(1.into())))),
-                AST::NotEqual(Box::new((AST::Value(2.into()), AST::Value(3.into()))))
+            Ok(AST::Operation(Box::new((
+                AST::Operation(Box::new((
+                    AST::Value(1.into()),
+                    Operator::Equal,
+                    AST::Value(1.into())
+                ))),
+                Operator::And,
+                AST::Operation(Box::new((
+                    AST::Value(2.into()),
+                    Operator::NotEqual,
+                    AST::Value(3.into())
+                )))
             ))))
         );
         assert_eq!(
@@ -1180,7 +1251,11 @@ mod tests {
                 Token::Value("a == b".into())
             ],
             Ok(AST::Assert(Box::new((
-                AST::Equal(Box::new((AST::Var("a".into()), AST::Var("b".into())))),
+                AST::Operation(Box::new((
+                    AST::Var("a".into()),
+                    Operator::Equal,
+                    AST::Var("b".into())
+                ))),
                 AST::Value("a == b".into())
             ))))
         );
@@ -1214,11 +1289,13 @@ mod tests {
                 Token::Ident("a".into()), Token::Question, Token::Value("b".into()),
                 Token::And, Token::Value(true.into())
             ],
-            Ok(AST::And(Box::new((
-                AST::IsSet(Box::new((
+            Ok(AST::Operation(Box::new((
+                AST::Operation(Box::new((
                     AST::Var("a".into()),
+                    Operator::IsSet,
                     AST::Value("b".into())
                 ))),
+                Operator::And,
                 AST::Value(true.into())
             ))))
         );
@@ -1230,7 +1307,7 @@ mod tests {
                 Token::Ident(OR.into()), Token::Value(1.into()),
                 Token::Add, Token::Value(1.into())
             ],
-            Ok(AST::Add(Box::new((
+            Ok(AST::Operation(Box::new((
                 AST::OrDefault(Box::new((
                     AST::IndexSet(Box::new((
                         AST::Var("a".into()),
@@ -1239,6 +1316,7 @@ mod tests {
                     AST::Var("c".into()),
                     AST::Value(1.into())
                 ))),
+                Operator::Add,
                 AST::Value(1.into())
             ))))
         );

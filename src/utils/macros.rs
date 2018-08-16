@@ -3,6 +3,13 @@
 /// Technical detail, don't mind this macro
 // #[macro_export]
 macro_rules! nix_inner {
+    (op ($($val1:tt)*) ($op:expr) ($($val2:tt)*)) => {{
+        AST::Operation(Box::new((
+            nix_inner!(parse $($val1)*),
+            $op,
+            nix_inner!(parse $($val2)*)
+        )))
+    }};
     (entry($vec:expr)) => {};
     (entry($vec:expr) $ident:ident = ($($val:tt)*); $($remaining:tt)*) => {
         $vec.push(SetEntry::Assign(vec![AST::Var(String::from(stringify!($ident)))], nix_inner!(parse $($val)*)));
@@ -98,46 +105,46 @@ macro_rules! nix_inner {
         )
     }};
     (parse ($($val1:tt)*) + ($($val2:tt)*)) => {{
-        AST::Add(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Add) ($($val2)*))
     }};
     (parse ($($val1:tt)*) - ($($val2:tt)*)) => {{
-        AST::Sub(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Sub) ($($val2)*))
     }};
     (parse ($($val1:tt)*) * ($($val2:tt)*)) => {{
-        AST::Mul(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Mul) ($($val2)*))
     }};
     (parse ($($val1:tt)*) / ($($val2:tt)*)) => {{
-        AST::Div(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Div) ($($val2)*))
     }};
     (parse ($($val1:tt)*) ++ ($($val2:tt)*)) => {{
-        AST::Concat(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Concat) ($($val2)*))
     }};
     (parse ($($val1:tt)*) == ($($val2:tt)*)) => {{
-        AST::Equal(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Equal) ($($val2)*))
     }};
     (parse ($($val1:tt)*) -> ($($val2:tt)*)) => {{
-        AST::Implication(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Implication) ($($val2)*))
     }};
     (parse ($($val1:tt)*) != ($($val2:tt)*)) => {{
-        AST::NotEqual(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::NotEqual) ($($val2)*))
     }};
     (parse ($($val1:tt)*) <= ($($val2:tt)*)) => {{
-        AST::LessOrEq(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::LessOrEq) ($($val2)*))
     }};
     (parse ($($val1:tt)*) < ($($val2:tt)*)) => {{
-        AST::Less(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Less) ($($val2)*))
     }};
     (parse ($($val1:tt)*) >= ($($val2:tt)*)) => {{
-        AST::MoreOrEq(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::MoreOrEq) ($($val2)*))
     }};
     (parse ($($val1:tt)*) > ($($val2:tt)*)) => {{
-        AST::More(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::More) ($($val2)*))
     }};
     (parse ($($val1:tt)*) merge ($($val2:tt)*)) => {{
-        AST::Merge(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Merge) ($($val2)*))
     }};
     (parse ($($val1:tt)*) ? ($($val2:tt)*)) => {{
-        AST::IsSet(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::IsSet) ($($val2)*))
     }};
     (parse ($($set:tt)*).($($index:tt)*) or ($($default:tt)*)) => {{
         AST::OrDefault(Box::new((
@@ -209,10 +216,12 @@ fn test_macro() {
             recursive: false,
             values: vec![
                 SetEntry::Assign(vec![AST::Var("string".into())], AST::Value("Hello World".into())),
-                SetEntry::Assign(vec![AST::Var("number".into())], AST::Mul(Box::new((
+                SetEntry::Assign(vec![AST::Var("number".into())], AST::Operation(Box::new((
                     AST::Value(3.into()),
-                    AST::Add(Box::new((
+                    Operator::Mul,
+                    AST::Operation(Box::new((
                         AST::Value(4.into()),
+                        Operator::Add,
                         AST::Value(2.into()),
                     )))
                 )))),

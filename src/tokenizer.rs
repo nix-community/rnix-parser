@@ -41,18 +41,6 @@ pub struct Meta {
     pub leading: Vec<Trivia>,
     pub trailing: Vec<Trivia>
 }
-impl Meta {
-    /// Join the inner spans
-    pub fn until(mut self, other: &Meta) -> Meta {
-        self.span = self.span.until(other.span);
-        self
-    }
-}
-impl From<Span> for Meta {
-    fn from(span: Span) -> Meta {
-        Meta { span, ..Default::default() }
-    }
-}
 
 #[derive(Debug, PartialEq, Eq)]
 enum IdentType {
