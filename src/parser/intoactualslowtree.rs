@@ -104,7 +104,7 @@ impl IntoTree<SetEntryMeta> for SetEntry {
                 key.into_iter().map(|(id, _dot)| AST::into_tree(arena.take(id), arena)).collect(),
                 AST::into_tree(arena.take(value), arena)
             ),
-            SetEntryMeta::Inherit(from, values, _semi) => SetEntry::Inherit(
+            SetEntryMeta::Inherit(_meta, from, values, _semi) => SetEntry::Inherit(
                 from.map(|attr| AST::into_tree(attr, arena)),
                 values.into_iter().map(|(_meta, value)| value).collect()
             )

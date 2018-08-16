@@ -2,7 +2,7 @@
 
 pub mod intoactualslowtree;
 // only `impl`s a function, no need to expose the module
-// mod recurse;
+mod display;
 
 use crate::{
     tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
@@ -138,8 +138,8 @@ pub enum Operator {
 /// An unary operator, such as - and !
 #[derive(Clone, Debug, PartialEq)]
 pub enum Unary {
-    Negate,
-    Invert
+    Invert,
+    Negate
 }
 /// Parenthesis around an AST node
 #[derive(Clone, Debug, PartialEq)]
@@ -165,7 +165,7 @@ pub struct PatternBind {
 #[derive(Clone, Debug, PartialEq)]
 pub enum SetEntry {
     Assign(Attribute, Meta, NodeId, Meta),
-    Inherit(Option<Parens>, Vec<(Meta, String)>, Meta)
+    Inherit(Meta, Option<Parens>, Vec<(Meta, String)>, Meta)
 }
 
 type Error = (Option<Span>, ParseError);
@@ -409,7 +409,7 @@ impl<'a, I> Parser<'a, I>
             match self.peek() {
                 token if token == Some(until) => break,
                 Some(Token::Inherit) => {
-                    self.next().unwrap();
+                    let (meta, _) = self.next().unwrap();
 
                     let from = if self.peek() == Some(&Token::ParenOpen) {
                         let (open, _) = self.next().unwrap();
@@ -426,7 +426,7 @@ impl<'a, I> Parser<'a, I>
                     }
                     let semi = self.expect(Token::Semicolon)?;
 
-                    values.push(SetEntry::Inherit(from, vars, semi));
+                    values.push(SetEntry::Inherit(meta, from, vars, semi));
                 },
                 _ => {
                     let key = self.parse_attr()?;

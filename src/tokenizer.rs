@@ -1,7 +1,7 @@
 //! The tokenizer: turns a string into tokens, such as numbers, strings, and keywords
 
 use crate::value::{Anchor, Value};
-use std::mem;
+use std::{fmt::{self, Write}, mem};
 
 /// A span, information about where in the original string a token started and ended
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -39,6 +39,33 @@ impl Trivia {
             Trivia::Newline(_) => true,
             _ => false
         }
+    }
+}
+impl fmt::Display for Trivia {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Trivia::Newline(amount) => for _ in 0..amount {
+                f.write_char('\n')?;
+            },
+            Trivia::Spaces(amount) => for _ in 0..amount {
+                f.write_char(' ')?;
+            },
+            Trivia::Tabs(amount) => for _ in 0..amount {
+                f.write_char('\t')?;
+            },
+            Trivia::Comment { span: _, multiline, ref content } => {
+                if multiline {
+                    f.write_str("/*")?;
+                } else {
+                    f.write_char('#')?;
+                }
+                f.write_str(content)?;
+                if multiline {
+                    f.write_str("*/")?;
+                }
+            },
+        }
+        Ok(())
     }
 }
 

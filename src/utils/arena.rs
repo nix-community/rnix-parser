@@ -1,7 +1,7 @@
 use std::ops::{Index, IndexMut};
 
 /// An AST node ID for lookups in the arena
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NodeId(pub usize);
 
 /// Arenas are efficient ways of storing trees: All nodes are actually on a
