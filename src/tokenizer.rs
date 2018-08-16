@@ -33,6 +33,14 @@ pub enum Trivia {
         content: String
     }
 }
+impl Trivia {
+    fn is_newline(&self) -> bool {
+        match self {
+            Trivia::Newline(_) => true,
+            _ => false
+        }
+    }
+}
 
 /// Metadata for a token, such as span information and trivia
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -167,6 +175,7 @@ type Result<T> = std::result::Result<T, (Span, TokenizeError)>;
 type Item = Result<(Meta, Token)>;
 
 /// The tokenizer. You may want to use the `tokenize` convenience function from this module instead.
+#[derive(Clone, Copy)]
 pub struct Tokenizer<'a> {
     input: &'a str,
     cursor: usize
@@ -192,11 +201,32 @@ impl<'a> Tokenizer<'a> {
     fn span_end(&mut self, mut meta: Meta, token: Token) -> Option<Item> {
         meta.span.end = Some(self.cursor);
 
-        while let Some(trivia) = self.next_trivia(false) {
-            meta.trailing.push(match trivia {
+        let mut trailing = Vec::new();
+
+        let mut before = *self;
+        while let Some(trivia) = self.next_trivia() {
+            trailing.push((before, match trivia {
                 Ok(inner) => inner,
                 Err(err) => return Some(Err(err))
-            });
+            }));
+            before = *self;
+        }
+
+        if self.input.is_empty() {
+            meta.trailing.extend(trailing.into_iter().map(|(_, trivia)| trivia));
+        } else {
+            // We read ALL the trivia, but it's not the end of the file so we
+            // should stop at newline, as that is the next token's property.
+
+            if let Some((state, _)) = trailing.iter()
+                    .find(|(_, trivia)| trivia.is_newline()) {
+                *self = *state;
+            }
+            meta.trailing.extend(
+                trailing.into_iter()
+                    .map(|(_, t)| t)
+                    .take_while(|trivia| !trivia.is_newline())
+            );
         }
 
         Some(Ok((meta, token)))
@@ -215,7 +245,7 @@ impl<'a> Tokenizer<'a> {
         self.input.chars().next()
     }
 
-    fn next_trivia(&mut self, multiline: bool) -> Option<Result<Trivia>> {
+    fn next_trivia(&mut self) -> Option<Result<Trivia>> {
         let mut span = self.span_start();
 
         match self.peek() {
@@ -235,7 +265,7 @@ impl<'a> Tokenizer<'a> {
                 }
                 Some(Ok(Trivia::Tabs(amount)))
             },
-            Some('\n') if multiline => {
+            Some('\n') => {
                 let mut amount = 0;
                 while self.peek() == Some('\n') {
                     self.next().unwrap();
@@ -479,7 +509,7 @@ impl<'a> Iterator for Tokenizer<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut meta = Meta::default();
 
-        while let Some(trivia) = self.next_trivia(true) {
+        while let Some(trivia) = self.next_trivia() {
             meta.leading.push(match trivia {
                 Ok(inner) => inner,
                 Err(err) => return Some(Err(err))
@@ -711,7 +741,7 @@ mod tests {
     #[test]
     fn meta() {
         assert_eq!(
-            tokenize_span("{\n    int /* hi */ = 1; # testing comments!\n}"),
+            tokenize_span("{\n    int /* hi */ = 1; # testing comments!\n}\n# trailing"),
             Ok(vec![
                 (
                     Meta {
@@ -772,7 +802,14 @@ mod tests {
                     Meta {
                         span: Span { start: 44, end: Some(45) },
                         leading: vec![Trivia::Newline(1)],
-                        trailing: Vec::new()
+                        trailing: vec![
+                            Trivia::Newline(1),
+                            Trivia::Comment {
+                                span: Span { start: 46, end: Some(56) },
+                                multiline: false,
+                                content: " trailing".into()
+                            }
+                        ]
                     },
                     Token::CurlyBClose
                 )
