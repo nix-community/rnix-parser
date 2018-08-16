@@ -6,10 +6,13 @@ extern crate failure;
 #[cfg(test)]
 macro_rules! meta {
     (start: $start:expr, end: None) => {{
-        Meta { span: Span { start: $start, end: None }, comments: Vec::new() }
+        Meta { span: Span { start: $start, end: None }, ..Default::default() }
     }};
     (start: $start:expr, end: $end:expr) => {{
-        Meta { span: Span { start: $start, end: Some($end) }, comments: Vec::new() }
+        Meta { span: Span { start: $start, end: Some($end) }, ..Default::default() }
+    }};
+    (start: $start:expr, end: $end:expr, trailing: $amount:expr) => {{
+        Meta { span: Span { start: $start, end: Some($end) }, trailing: vec![Trivia::Spaces($amount)], ..Default::default() }
     }};
 }
 

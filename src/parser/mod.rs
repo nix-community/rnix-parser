@@ -560,7 +560,7 @@ pub fn parse<I>(iter: I) -> Result<AST>
 #[cfg(test)]
 mod tests {
     use crate::{
-        tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
+        tokenizer::{Interpol as TokenInterpol, Meta, Span, Token, Trivia},
         value::{Anchor, Value}
     };
     use super::{nometa::*, AST as ASTSpan, ASTType, OR, ParseError};
@@ -652,37 +652,52 @@ mod tests {
         );
         assert_eq!(
             super::parse(vec![
-                (meta! { start: 0, end: 1 }, Token::Value(1.into())),
-                (meta! { start: 2, end: 3 }, Token::Add),
+                // 1 + /*Hello World*/ 2 * 3
+                (meta! { start: 0, end: 1, trailing: 1 }, Token::Value(1.into())),
+                (meta! { start: 2, end: 3, trailing: 1 }, Token::Add),
                 (
                     Meta {
-                        comments: vec!["Hello World!".into()],
-                        span: Span { start: 4, end: Some(5) }
+                        span: Span { start: 20, end: Some(21) },
+                        leading: vec![
+                            Trivia::Comment {
+                                span: Span { start: 4, end: Some(19) },
+                                multiline: false,
+                                content: "Hello World".into()
+                            }
+                        ],
+                        trailing: vec![Trivia::Spaces(1)]
                     },
                     Token::Value(2.into())
                 ),
-                (meta! { start: 6, end: 7 }, Token::Mul),
-                (meta! { start: 8, end: 9 }, Token::Value(3.into())),
+                (meta! { start: 22, end: 23, trailing: 1 }, Token::Mul),
+                (meta! { start: 24, end: 25 }, Token::Value(3.into())),
             ].into_iter()),
             Ok(ASTSpan(
-                meta! { start: 0, end: 9 },
+                meta! { start: 0, end: 25 },
                 ASTType::Add(Box::new((
                     ASTSpan(
-                        meta! { start: 0, end: 1 },
+                        meta! { start: 0, end: 1, trailing: 1 },
                         ASTType::Value(1.into())
                     ),
                     ASTSpan(
-                        meta! { start: 4, end: 9 },
+                        meta! { start: 20, end: 25 },
                         ASTType::Mul(Box::new((
                             ASTSpan(
                                 Meta {
-                                    comments: vec!["Hello World!".into()],
-                                    span: Span { start: 4, end: Some(5) }
+                                    span: Span { start: 20, end: Some(21) },
+                                    leading: vec![
+                                        Trivia::Comment {
+                                            span: Span { start: 4, end: Some(19) },
+                                            multiline: false,
+                                            content: "Hello World".into()
+                                        }
+                                    ],
+                                    trailing: vec![Trivia::Spaces(1)]
                                 },
                                 ASTType::Value(2.into())
                             ),
                             ASTSpan(
-                                meta! { start: 8, end: 9 },
+                                meta! { start: 24, end: 25 },
                                 ASTType::Value(3.into())
                             )
                         )))

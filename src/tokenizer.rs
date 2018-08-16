@@ -3,6 +3,57 @@
 use crate::value::{Anchor, Value};
 use std::mem;
 
+/// A span, information about where in the original string a token started and ended
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Span {
+    /// Offset (in bytes) in the original string where the token started
+    pub start: usize,
+    /// Offset (in bytes) in the original string where the token ended, including the next char
+    pub end: Option<usize>
+}
+impl Span {
+    /// Set the end of `self` to `other`
+    pub fn until(self, other: Span) -> Span {
+        Span {
+            start: self.start,
+            end: other.end
+        }
+    }
+}
+
+/// Information about token spacing
+#[derive(Clone, Debug, PartialEq)]
+pub enum Trivia {
+    Newline(usize),
+    Spaces(usize),
+    Tabs(usize),
+    Comment {
+        span: Span,
+        multiline: bool,
+        content: String
+    }
+}
+
+/// Metadata for a token, such as span information and trivia
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Meta {
+    pub span: Span,
+    pub leading: Vec<Trivia>,
+    pub trailing: Vec<Trivia>
+}
+impl Meta {
+    /// Join the inner spans
+    pub fn until(mut self, other: &Meta) -> Meta {
+        self.span = self.span.until(other.span);
+        self
+    }
+}
+impl From<Span> for Meta {
+    fn from(span: Span) -> Meta {
+        Meta { span, ..Default::default() }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum IdentType {
     Ident,
@@ -100,43 +151,6 @@ impl Token {
     }
 }
 
-/// Metadata for a token, such as span information and leading comments
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Meta {
-    pub span: Span,
-    pub comments: Vec<String>
-}
-impl Meta {
-    /// Join the inner spans
-    pub fn until(mut self, other: &Meta) -> Meta {
-        self.span = self.span.until(other.span);
-        self
-    }
-}
-impl From<Span> for Meta {
-    fn from(span: Span) -> Meta {
-        Meta { span, ..Default::default() }
-    }
-}
-
-/// A span, information about where in the original string a token started and ended
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Span {
-    /// Offset (in bytes) in the original string where the token started
-    pub start: usize,
-    /// Offset (in bytes) in the original string where the token ended, including the next char
-    pub end: Option<usize>
-}
-impl Span {
-    /// Set the end of `self` to `other`
-    pub fn until(self, other: Span) -> Span {
-        Span {
-            start: self.start,
-            end: other.end
-        }
-    }
-}
-
 /// An error that occured during tokenizing
 #[derive(Clone, Copy, Debug, Fail, PartialEq)]
 pub enum TokenizeError {
@@ -187,8 +201,16 @@ impl<'a> Tokenizer<'a> {
     fn span_err(&self, meta: Meta, error: TokenizeError) -> Option<Item> {
         Some(Err((meta.span, error)))
     }
-    fn span_end(&self, mut meta: Meta, token: Token) -> Option<Item> {
+    fn span_end(&mut self, mut meta: Meta, token: Token) -> Option<Item> {
         meta.span.end = Some(self.cursor);
+
+        while let Some(trivia) = self.next_trivia(false) {
+            meta.trailing.push(match trivia {
+                Ok(inner) => inner,
+                Err(err) => return Some(Err(err))
+            });
+        }
+
         Some(Ok((meta, token)))
     }
 
@@ -205,6 +227,73 @@ impl<'a> Tokenizer<'a> {
         self.input.chars().next()
     }
 
+    fn next_trivia(&mut self, multiline: bool) -> Option<Result<Trivia>> {
+        let mut span = self.span_start();
+
+        match self.peek() {
+            Some(' ') => {
+                let mut amount = 0;
+                while self.peek() == Some(' ') {
+                    self.next().unwrap();
+                    amount += 1;
+                }
+                Some(Ok(Trivia::Spaces(amount)))
+            },
+            Some('\t') => {
+                let mut amount = 0;
+                while self.peek() == Some('\t') {
+                    self.next().unwrap();
+                    amount += 1;
+                }
+                Some(Ok(Trivia::Tabs(amount)))
+            },
+            Some('\n') if multiline => {
+                let mut amount = 0;
+                while self.peek() == Some('\n') {
+                    self.next().unwrap();
+                    amount += 1;
+                }
+                Some(Ok(Trivia::Newline(amount)))
+            },
+            Some('#') => {
+                let end = self.input.find('\n').unwrap_or(self.input.len());
+
+                let content = self.input[1..end].to_string();
+                self.input = &self.input[end..];
+                self.cursor += end;
+
+                span.end = Some(self.cursor);
+                Some(Ok(Trivia::Comment {
+                    span,
+                    multiline: false,
+                    content
+                }))
+            },
+            Some('/') => {
+                if self.input[1..].chars().next() != Some('*') {
+                    return None;
+                }
+
+                let end = match self.input.find("*/") {
+                    Some(end) => end,
+                    None => return Some(Err((span, TokenizeError::UnclosedComment)))
+                };
+
+                let content = self.input[2..end].to_string();
+
+                self.input = &self.input[end+2..];
+                self.cursor += end + 2;
+
+                span.end = Some(self.cursor);
+                Some(Ok(Trivia::Comment {
+                    span,
+                    multiline: true,
+                    content
+                }))
+            },
+            _ => None
+        }
+    }
     fn next_ident<P, F>(&mut self, prefix: P, include: F) -> String
         where
             P: IntoIterator<Item = char>,
@@ -402,45 +491,11 @@ impl<'a> Iterator for Tokenizer<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut meta = Meta::default();
 
-        // This temporary span is only used if there's an error reading the comment
-        meta.span = self.span_start();
-
-        loop {
-            while self.peek().map(char::is_whitespace).unwrap_or(false) {
-                self.next()?;
-            }
-
-            match self.peek() {
-                Some('#') => {
-                    let end = self.input.find('\n')
-                        .map(|i| i + 1)
-                        .unwrap_or(self.input.len());
-
-                    meta.comments.push(self.input[1..end].to_string());
-                    self.input = &self.input[end..];
-                    self.cursor += end;
-                },
-                Some('/') => {
-                    if self.input[1..].chars().next() != Some('*') {
-                        break;
-                    }
-
-                    let end = match self.input.find("*/") {
-                        Some(end) => end,
-                        None => return self.span_err(meta, TokenizeError::UnclosedComment)
-                    };
-
-                    let comment = self.input[2..end].to_string();
-
-                    let target = &self.input[end+2..];
-                    while self.input.as_ptr() < target.as_ptr() {
-                        self.next()?;
-                    }
-
-                    meta.comments.push(comment);
-                },
-                _ => break
-            }
+        while let Some(trivia) = self.next_trivia(true) {
+            meta.leading.push(match trivia {
+                Ok(inner) => inner,
+                Err(err) => return Some(Err(err))
+            });
         }
 
         meta.span = self.span_start();
@@ -628,7 +683,7 @@ pub fn tokenize<'a>(input: &'a str) -> impl Iterator<Item = Item> + 'a {
 #[cfg(test)]
 mod tests {
     use crate::value::{Anchor, Value};
-    use super::{Interpol, Meta, Span, Token, TokenizeError};
+    use super::{Interpol, Meta, Span, Token, TokenizeError, Trivia};
 
     fn tokenize(input: &str) -> Result<Vec<Token>, TokenizeError> {
         super::tokenize(input)
@@ -670,21 +725,66 @@ mod tests {
         assert_eq!(
             tokenize_span("{\n    int /* hi */ = 1; # testing comments!\n}"),
             Ok(vec![
-                (meta! { start: 0, end: 1 }, Token::CurlyBOpen),
-                (meta! { start: 6, end: 9 }, Token::Ident("int".to_string())),
                 (
                     Meta {
-                        comments: vec![" hi ".into()],
+                        span: Span { start: 0, end: Some(1) },
+                        leading: Vec::new(),
+                        trailing: Vec::new()
+                    },
+                    Token::CurlyBOpen
+                ),
+                (
+                    Meta {
+                        span: Span { start: 6, end: Some(9) },
+                        leading: vec![Trivia::Newline(1), Trivia::Spaces(4)],
+                        trailing: vec![
+                            Trivia::Spaces(1),
+                            Trivia::Comment {
+                                span: Span { start: 10, end: Some(18) },
+                                multiline: true,
+                                content: " hi ".into()
+                            },
+                            Trivia::Spaces(1)
+                        ]
+                    },
+                    Token::Ident("int".to_string())
+                ),
+                (
+                    Meta {
                         span: Span { start: 19, end: Some(20) },
+                        leading: Vec::new(),
+                        trailing: vec![Trivia::Spaces(1)]
                     },
                     Token::Assign
                 ),
-                (meta! { start: 21, end: 22 }, Token::Value(1.into())),
-                (meta! { start: 22, end: 23 }, Token::Semicolon),
                 (
                     Meta {
-                        comments: vec![" testing comments!\n".into()],
-                        span: Span { start: 44, end: Some(45) }
+                        span: Span { start: 21, end: Some(22) },
+                        leading: Vec::new(),
+                        trailing: Vec::new()
+                    },
+                    Token::Value(1.into())
+                ),
+                (
+                    Meta {
+                        span: Span { start: 22, end: Some(23) },
+                        leading: Vec::new(),
+                        trailing: vec![
+                            Trivia::Spaces(1),
+                            Trivia::Comment {
+                                span: Span { start: 24, end: Some(43) },
+                                multiline: false,
+                                content: " testing comments!".into()
+                            }
+                        ]
+                    },
+                    Token::Semicolon
+                ),
+                (
+                    Meta {
+                        span: Span { start: 44, end: Some(45) },
+                        leading: vec![Trivia::Newline(1)],
+                        trailing: Vec::new()
                     },
                     Token::CurlyBClose
                 )
@@ -764,20 +864,31 @@ mod tests {
         assert_eq!(
             tokenize_span(r#" "Hello, ${ { world = "World"; }.world }!" "#),
             Ok(vec![(
-                meta! { start: 1, end: 42 },
+                Meta {
+                    span: Span { start: 1, end: Some(42) },
+                    leading: vec![Trivia::Spaces(1)],
+                    trailing: vec![Trivia::Spaces(1)]
+                },
                 Token::Interpol {
                     multiline: false,
                     parts: vec![
                         Interpol::Literal("Hello, ".into()),
                         Interpol::Tokens(vec![
-                            (meta! { start: 12, end: 13 }, Token::CurlyBOpen),
-                            (meta! { start: 14, end: 19 }, Token::Ident("world".into())),
-                            (meta! { start: 20, end: 21 }, Token::Assign),
-                            (meta! { start: 22, end: 29 }, Token::Value("World".into())),
-                            (meta! { start: 29, end: 30 }, Token::Semicolon),
-                            (meta! { start: 31, end: 32 }, Token::CurlyBClose),
-                            (meta! { start: 32, end: 33 }, Token::Dot),
-                            (meta! { start: 33, end: 38 }, Token::Ident("world".into()))
+                            (
+                                Meta {
+                                    span: Span { start: 12, end: Some(13) },
+                                    leading: vec![Trivia::Spaces(1)],
+                                    trailing: vec![Trivia::Spaces(1)]
+                                },
+                                Token::CurlyBOpen
+                            ),
+                            (meta! { start: 14, end: 19, trailing: 1 }, Token::Ident("world".into())),
+                            (meta! { start: 20, end: 21, trailing: 1 }, Token::Assign),
+                            (meta! { start: 22, end: 29              }, Token::Value("World".into())),
+                            (meta! { start: 29, end: 30, trailing: 1 }, Token::Semicolon),
+                            (meta! { start: 31, end: 32              }, Token::CurlyBClose),
+                            (meta! { start: 32, end: 33              }, Token::Dot),
+                            (meta! { start: 33, end: 38, trailing: 1 }, Token::Ident("world".into()))
                         ]),
                         Interpol::Literal("!".into())
                     ]
@@ -787,7 +898,11 @@ mod tests {
         assert_eq!(
             tokenize_span(r#" "\$${test}" "#),
             Ok(vec![(
-                meta! { start: 1, end: 12 },
+                Meta {
+                    span: Span { start: 1, end: Some(12) },
+                    leading: vec![Trivia::Spaces(1)],
+                    trailing: vec![Trivia::Spaces(1)]
+                },
                 Token::Interpol {
                     multiline: false,
                     parts: vec![
@@ -802,7 +917,11 @@ mod tests {
         assert_eq!(
             tokenize_span(r#" ''''$${test}'' "#),
             Ok(vec![(
-                meta! { start: 1, end: 15 },
+                Meta {
+                    span: Span { start: 1, end: Some(15) },
+                    leading: vec![Trivia::Spaces(1)],
+                    trailing: vec![Trivia::Spaces(1)]
+                },
                 Token::Interpol {
                     multiline: true,
                     parts: vec![
