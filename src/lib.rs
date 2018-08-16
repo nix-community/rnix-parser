@@ -167,7 +167,7 @@ special escape: $${test}
             parse(include_str!("../tests/pattern.nix")),
             nix!(
                 { a ? ({ b ? ("test") }: b) }:
-                bind @ { (exact = false) value }:
+                bind @ { (ellipsis = true) value }:
                 1
             )
         );

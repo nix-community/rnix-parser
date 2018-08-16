@@ -47,8 +47,8 @@ macro_rules! nix_inner {
     (pat_default $($stuff:tt)+) => {{ Some(nix_inner!(parse $($stuff)+)) }};
     (pat_bind) => {{ None }};
     (pat_bind $name:ident) => {{ Some(String::from(stringify!($name))) }};
-    (pat_exact) => {{ true }};
-    (pat_exact $value:expr) => {{ $value }};
+    (pat_ellipsis) => {{ false }};
+    (pat_ellipsis $value:expr) => {{ $value }};
     (parse { $($token:tt)* }) => {{ nix_inner!(set (rec: false) { $($token)* }) }};
     (parse rec { $($token:tt)* }) => {{ nix_inner!(set (rec: true) { $($token)* }) }};
     (parse let {
@@ -90,7 +90,7 @@ macro_rules! nix_inner {
         AST::Lambda(LambdaArg::Ident(String::from(stringify!($fn))), Box::new(nix_inner!(parse $($body)*)))
     }};
     (parse $($bind:ident @)* {
-        $(( exact = $optional:expr ))*
+        $(( ellipsis = $optional:expr ))*
         $($arg:ident $(? ($($default:tt)*))*),*
     }: $($body:tt)*) => {{
         AST::Lambda(
@@ -99,7 +99,7 @@ macro_rules! nix_inner {
                     $(PatEntry(String::from(stringify!($arg)), nix_inner!(pat_default $($($default)*)*))),*
                 ],
                 bind: nix_inner!(pat_bind $($bind)*),
-                exact: nix_inner!(pat_exact $($optional)*)
+                ellipsis: nix_inner!(pat_ellipsis $($optional)*)
             },
             Box::new(nix_inner!(parse $($body)*))
         )
@@ -163,10 +163,10 @@ macro_rules! nix_inner {
         AST::List(vec![$(nix_inner!(parse $($item)*)),*])
     }};
     (parse -$($val:tt)*) => {{
-        AST::Negate(Box::new((nix_inner!(parse $($val)*))))
+        AST::Unary(Unary::Negate, Box::new((nix_inner!(parse $($val)*))))
     }};
     (parse !$($val:tt)*) => {{
-        AST::Invert(Box::new((nix_inner!(parse $($val)*))))
+        AST::Unary(Unary::Invert, Box::new((nix_inner!(parse $($val)*))))
     }};
     (parse dyn {$($val:tt)*}) => {{
         AST::Dynamic(Box::new((nix_inner!(parse $($val)*))))

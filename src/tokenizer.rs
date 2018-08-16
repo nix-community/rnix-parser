@@ -44,6 +44,7 @@ impl Trivia {
 
 /// Metadata for a token, such as span information and trivia
 #[derive(Clone, Debug, Default, PartialEq)]
+#[must_use = "all metadata must be preserved"]
 pub struct Meta {
     pub span: Span,
     pub leading: Vec<Trivia>,
@@ -62,7 +63,7 @@ enum IdentType {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Interpol {
     Literal(String),
-    Tokens(Vec<(Meta, Token)>)
+    Tokens(Vec<(Meta, Token)>, Meta)
 }
 
 /// A token, such as a string literal, a number, or a keyword
@@ -119,7 +120,7 @@ pub enum Token {
     Or,
 
     // Identifiers and values
-    Dynamic(Vec<(Meta, Token)>),
+    Dynamic(Vec<(Meta, Token)>, Meta),
     Ident(String),
     Interpol {
         multiline: bool,
@@ -331,7 +332,7 @@ impl<'a> Tokenizer<'a> {
         }
         ident
     }
-    fn next_interpol(&mut self, start: Span) -> Result<Vec<(Meta, Token)>> {
+    fn next_interpol(&mut self, start: Span) -> Result<(Vec<(Meta, Token)>, Meta)> {
         self.next().expect("next_interpol was called in an invalid context");
 
         let mut tokens = Vec::new();
@@ -346,7 +347,7 @@ impl<'a> Tokenizer<'a> {
                     };
                     match token.1 {
                         Token::CurlyBOpen => count += 1,
-                        Token::CurlyBClose if count == 0 => break,
+                        Token::CurlyBClose if count == 0 => return Ok((tokens, token.0)),
                         Token::CurlyBClose => count -= 1,
                         _ => ()
                     }
@@ -354,8 +355,6 @@ impl<'a> Tokenizer<'a> {
                 }
             }
         }
-
-        Ok(tokens)
     }
     fn next_string(&mut self, meta: Meta, multiline: bool) -> Option<Item> {
         fn remove_shared_indent(indent: usize, string: &mut String) {
@@ -436,10 +435,10 @@ impl<'a> Tokenizer<'a> {
                         if !literal.is_empty() {
                             interpol.push(Interpol::Literal(mem::replace(&mut literal, String::new())));
                         }
-                        interpol.push(Interpol::Tokens(match self.next_interpol(meta.span) {
-                            Ok(inner) => inner,
+                        match self.next_interpol(meta.span) {
+                            Ok((tokens, close)) => interpol.push(Interpol::Tokens(tokens, close)),
                             Err(err) => return Some(Err(err))
-                        }));
+                        }
                     },
                     Some('$') => { self.next().unwrap(); literal.push_str("$$"); }
                     _ => literal.push('$')
@@ -598,7 +597,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             '>' if self.peek() == Some('=') => { self.next()?; self.span_end(meta, Token::MoreOrEq) },
             '>' => self.span_end(meta, Token::More),
             '$' if self.peek() == Some('{') => match self.next_interpol(meta.span) {
-                Ok(tokens) => self.span_end(meta, Token::Dynamic(tokens)),
+                Ok((tokens, close)) => self.span_end(meta, Token::Dynamic(tokens, close)),
                 Err(err) => Some(Err(err))
             },
             'a'..='z' | 'A'..='Z' | '_' => {
@@ -898,23 +897,26 @@ mod tests {
                     multiline: false,
                     parts: vec![
                         Interpol::Literal("Hello, ".into()),
-                        Interpol::Tokens(vec![
-                            (
-                                Meta {
-                                    span: Span { start: 12, end: Some(13) },
-                                    leading: vec![Trivia::Spaces(1)],
-                                    trailing: vec![Trivia::Spaces(1)]
-                                },
-                                Token::CurlyBOpen
-                            ),
-                            (meta! { start: 14, end: 19, trailing: 1 }, Token::Ident("world".into())),
-                            (meta! { start: 20, end: 21, trailing: 1 }, Token::Assign),
-                            (meta! { start: 22, end: 29              }, Token::Value("World".into())),
-                            (meta! { start: 29, end: 30, trailing: 1 }, Token::Semicolon),
-                            (meta! { start: 31, end: 32              }, Token::CurlyBClose),
-                            (meta! { start: 32, end: 33              }, Token::Dot),
-                            (meta! { start: 33, end: 38, trailing: 1 }, Token::Ident("world".into()))
-                        ]),
+                        Interpol::Tokens(
+                            vec![
+                                (
+                                    Meta {
+                                        span: Span { start: 12, end: Some(13) },
+                                        leading: vec![Trivia::Spaces(1)],
+                                        trailing: vec![Trivia::Spaces(1)]
+                                    },
+                                    Token::CurlyBOpen
+                                ),
+                                (meta! { start: 14, end: 19, trailing: 1 }, Token::Ident("world".into())),
+                                (meta! { start: 20, end: 21, trailing: 1 }, Token::Assign),
+                                (meta! { start: 22, end: 29              }, Token::Value("World".into())),
+                                (meta! { start: 29, end: 30, trailing: 1 }, Token::Semicolon),
+                                (meta! { start: 31, end: 32              }, Token::CurlyBClose),
+                                (meta! { start: 32, end: 33              }, Token::Dot),
+                                (meta! { start: 33, end: 38, trailing: 1 }, Token::Ident("world".into()))
+                            ],
+                            meta! { start: 39, end: 40 }
+                        ),
                         Interpol::Literal("!".into())
                     ]
                 }
@@ -932,9 +934,10 @@ mod tests {
                     multiline: false,
                     parts: vec![
                         Interpol::Literal("$".into()),
-                        Interpol::Tokens(vec![
-                            (meta! { start: 6, end: 10 }, Token::Ident("test".into()))
-                        ])
+                        Interpol::Tokens(
+                            vec![(meta! { start: 6, end: 10 }, Token::Ident("test".into()))],
+                            meta! { start: 10, end: 11 }
+                        )
                     ]
                 }
             )])
@@ -951,9 +954,10 @@ mod tests {
                     multiline: true,
                     parts: vec![
                         Interpol::Literal("$".into()),
-                        Interpol::Tokens(vec![
-                            (meta! { start: 8, end: 12 }, Token::Ident("test".into()))
-                        ])
+                        Interpol::Tokens(
+                            vec![(meta! { start: 8, end: 12 }, Token::Ident("test".into()))],
+                            meta! { start: 12, end: 13 }
+                        )
                     ]
                 }
             )])
@@ -1135,13 +1139,14 @@ mod tests {
         assert_eq!(
             tokenize("a.${b}.c"),
             Ok(vec![
-               Token::Ident("a".into()),
-               Token::Dot,
-               Token::Dynamic(vec![
-                    (meta! { start: 4, end: 5 }, Token::Ident("b".into()))
-               ]),
-               Token::Dot,
-               Token::Ident("c".into())
+                Token::Ident("a".into()),
+                Token::Dot,
+                Token::Dynamic(
+                   vec![(meta! { start: 4, end: 5 }, Token::Ident("b".into()))],
+                   meta! { start: 5, end: 6 }
+                ),
+                Token::Dot,
+                Token::Ident("c".into())
             ])
         );
     }

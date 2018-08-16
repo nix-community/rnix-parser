@@ -1,10 +1,13 @@
-//! Alternative AST representation that discards all metadata, such as comments and span information.
-//! Useful for unit testing, where entering span information can get very tedious.
-//! You can convert an AST with metadata to this type using `.into()`
+//! Alternative AST representation that discards all metadata, such as comments
+//! and span information. You should probably not use this, as the cast may be
+//! somewhat expensive. It's mostly useful for unit testing, where entering
+//! span information can get very tedious. You can convert an AST with metadata
+//! to this type using `.into()`
 
 use super::{
     AST as ASTMeta,
     ASTType,
+    Attribute as AttributeMeta,
     LambdaArg as LambdaArgMeta,
     Interpol as InterpolMeta,
     PatEntry as PatEntryMeta,
@@ -12,7 +15,7 @@ use super::{
     SetEntry as SetEntryMeta,
 };
 use crate::value::Value;
-pub use super::Operator;
+pub use super::{Operator, Unary};
 
 /// An AST node
 #[derive(Clone, Debug, PartialEq)]
@@ -43,8 +46,7 @@ pub enum AST {
     // Operators
     Apply(Box<(AST, AST)>),
     IndexSet(Box<(AST, AST)>),
-    Invert(Box<AST>),
-    Negate(Box<AST>),
+    Unary(Unary, Box<AST>),
     OrDefault(Box<(AST, AST, AST)>),
 
     Operation(Box<(AST, Operator, AST)>)
@@ -56,7 +58,7 @@ pub enum LambdaArg {
     Pattern {
         args: Vec<PatEntry>,
         bind: Option<String>,
-        exact: bool
+        ellipsis: bool
     }
 }
 /// An interpolation part
@@ -92,7 +94,7 @@ fn triple_into<F, T: From<F>>(ast: Box<(F, F, F)>) -> Box<(T, T, T)> {
 
 impl From<PatEntryMeta> for PatEntry {
     fn from(entry: PatEntryMeta) -> Self {
-        PatEntry(entry.0, entry.1.map(AST::from))
+        PatEntry(entry.name, entry.default.map(|(_, ast)| AST::from(ast)))
     }
 }
 impl From<ParensMeta> for AST {
@@ -104,8 +106,14 @@ impl From<ParensMeta> for AST {
 impl From<SetEntryMeta> for SetEntry {
     fn from(entry: SetEntryMeta) -> Self {
         match entry {
-            SetEntryMeta::Assign(key, value) => SetEntry::Assign(vec_into(key), AST::from(value)),
-            SetEntryMeta::Inherit(from, values) => SetEntry::Inherit(from.map(AST::from), values),
+            SetEntryMeta::Assign(AttributeMeta(key), _assign, value, _semi) => SetEntry::Assign(
+                key.into_iter().map(|(ast, _dot)| AST::from(ast)).collect(),
+                AST::from(value)
+            ),
+            SetEntryMeta::Inherit(from, values, _semi) => SetEntry::Inherit(
+                from.map(AST::from),
+                values.into_iter().map(|(_meta, value)| value).collect()
+            )
         }
     }
 }
@@ -113,7 +121,7 @@ impl From<InterpolMeta> for Interpol {
     fn from(interpol: InterpolMeta) -> Self {
         match interpol {
             InterpolMeta::Literal(text) => Interpol::Literal(text),
-            InterpolMeta::AST(ast) => Interpol::AST(AST::from(ast))
+            InterpolMeta::AST(ast, _close) => Interpol::AST(AST::from(ast))
         }
     }
 }
@@ -121,7 +129,11 @@ impl From<LambdaArgMeta> for LambdaArg {
     fn from(arg: LambdaArgMeta) -> Self {
         match arg {
             LambdaArgMeta::Ident(_meta, name) => LambdaArg::Ident(name),
-            LambdaArgMeta::Pattern { args, bind, exact } => LambdaArg::Pattern { args: vec_into(args), bind, exact },
+            LambdaArgMeta::Pattern { args, bind, ellipsis } => LambdaArg::Pattern {
+                args: vec_into(args.1),
+                bind: bind.map(|bind| bind.name),
+                ellipsis: ellipsis.is_some()
+            },
         }
     }
 }
@@ -130,29 +142,28 @@ impl From<ASTMeta> for AST {
         match ast.1 {
             // Types
             ASTType::Interpol { meta: _, multiline, parts } => AST::Interpol { multiline, parts: vec_into(parts) },
-            ASTType::Lambda(args, body) => AST::Lambda(args.into(), box_into(body)),
+            ASTType::Lambda(args, _colon, body) => AST::Lambda(args.into(), box_into(body)),
             ASTType::List(_open, inner, _close) => AST::List(vec_into(inner)),
             ASTType::Parens(inner) => AST::from(*inner),
-            ASTType::Set { recursive, open: _, close: _, values } =>
-                AST::Set { recursive: recursive.is_some(), values: vec_into(values) },
+            ASTType::Set { recursive, values } =>
+                AST::Set { recursive: recursive.is_some(), values: vec_into(values.1) },
             ASTType::Value(_, inner) => AST::Value(inner),
             ASTType::Var(_, inner) => AST::Var(inner),
 
             // Expressions
-            ASTType::Assert(inner) => AST::Assert(tuple_into(inner)),
-            ASTType::IfElse(inner) => AST::IfElse(triple_into(inner)),
-            ASTType::Import(inner) => AST::Import(box_into(inner)),
-            ASTType::Let(set) => AST::Let(vec_into(set)),
-            ASTType::LetIn(set, ast) => AST::LetIn(vec_into(set), box_into(ast)),
-            ASTType::With(inner) => AST::With(tuple_into(inner)),
+            ASTType::Assert(_assert, _semi, inner) => AST::Assert(tuple_into(inner)),
+            ASTType::IfElse { if_meta: _, then_meta: _, else_meta: _, bodies } => AST::IfElse(triple_into(bodies)),
+            ASTType::Import(_import, inner) => AST::Import(box_into(inner)),
+            ASTType::Let(_let, set) => AST::Let(vec_into(set.1)),
+            ASTType::LetIn(_let, set, _in, ast) => AST::LetIn(vec_into(set), box_into(ast)),
+            ASTType::With(_with, _semi, inner) => AST::With(tuple_into(inner)),
 
             // Operators
             ASTType::Apply(inner) => AST::Apply(tuple_into(inner)),
-            ASTType::Dynamic(inner) => AST::Dynamic(box_into(inner)),
-            ASTType::IndexSet(inner) => AST::IndexSet(tuple_into(inner)),
-            ASTType::Invert(inner) => AST::Invert(box_into(inner)),
-            ASTType::Negate(inner) => AST::Negate(box_into(inner)),
-            ASTType::OrDefault(inner) => AST::OrDefault(triple_into(inner)),
+            ASTType::Dynamic { meta: _, ast, close: _ } => AST::Dynamic(box_into(ast)),
+            ASTType::IndexSet(_dot, inner) => AST::IndexSet(tuple_into(inner)),
+            ASTType::Unary(_meta, op, inner) => AST::Unary(op, box_into(inner)),
+            ASTType::OrDefault { dot: _, or: _, bodies } => AST::OrDefault(triple_into(bodies)),
 
             ASTType::Operation(box (one, (_, op), two)) => AST::Operation(Box::new((AST::from(one), op, AST::from(two))))
         }
