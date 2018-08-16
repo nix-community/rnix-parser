@@ -4,9 +4,8 @@
 // #[macro_export]
 macro_rules! nix_inner {
     (op ($($val1:tt)*) ($op:expr) ($($val2:tt)*)) => {{
-        AST::Operation(Box::new((
+        AST::Operation($op, Box::new((
             nix_inner!(parse $($val1)*),
-            $op,
             nix_inner!(parse $($val2)*)
         )))
     }};
@@ -196,7 +195,7 @@ macro_rules! nix {
     ($($tokens:tt)*) => {{
         #[allow(unused_imports)]
         use crate::{
-            parser::nometa::*,
+            parser::intoactualslowtree::*,
             value::{Anchor, Value}
         };
         nix_inner!(parse $($tokens)*)
@@ -206,7 +205,7 @@ macro_rules! nix {
 #[cfg(test)]
 #[test]
 fn test_macro() {
-    use crate::parser::nometa::*;
+    use crate::parser::intoactualslowtree::*;
     assert_eq!(
         nix!({
             string = ("Hello World");
@@ -216,12 +215,10 @@ fn test_macro() {
             recursive: false,
             values: vec![
                 SetEntry::Assign(vec![AST::Var("string".into())], AST::Value("Hello World".into())),
-                SetEntry::Assign(vec![AST::Var("number".into())], AST::Operation(Box::new((
+                SetEntry::Assign(vec![AST::Var("number".into())], AST::Operation(Operator::Mul, Box::new((
                     AST::Value(3.into()),
-                    Operator::Mul,
-                    AST::Operation(Box::new((
+                    AST::Operation(Operator::Add, Box::new((
                         AST::Value(4.into()),
-                        Operator::Add,
                         AST::Value(2.into()),
                     )))
                 )))),

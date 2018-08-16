@@ -65,10 +65,11 @@ pub fn parse(input: &str) -> Result<parser::AST, Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parser::nometa::*, parse as inner_parse};
+    use super::{parser::intoactualslowtree::*, parse as inner_parse};
 
     fn parse(input: &str) -> AST {
-        inner_parse(input).expect("error while parsing").into()
+        let mut ast = inner_parse(input).expect("error while parsing");
+        AST::into_tree(ast.root, &mut ast.arena)
     }
 
     #[test]
