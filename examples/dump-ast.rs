@@ -1,6 +1,6 @@
 extern crate rnix;
 
-use rnix::parser::nometa::AST as ASTNoMeta;
+use rnix::parser::intoactualslowtree::{AST as ASTActual, IntoTree};
 use std::{env, fs};
 
 fn main() {
@@ -18,7 +18,9 @@ fn main() {
             }
         };
         match rnix::parse(&content) {
-            Ok(ast) => println!("{:#?}", ASTNoMeta::from(ast)),
+            Ok(mut ast) => {
+                println!("{:#?}", ASTActual::into_tree(ast.root, &mut ast.arena))
+            },
             Err(err) => eprintln!("error: {:?}", err)
         }
     }

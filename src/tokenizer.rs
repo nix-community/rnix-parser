@@ -198,6 +198,15 @@ fn is_valid_path_char(c: char) -> bool {
 type Result<T> = std::result::Result<T, (Span, TokenizeError)>;
 type Item = Result<(Meta, Token)>;
 
+enum Context {
+    Default,
+    Interpol {
+        brackets: usize,
+        ended: bool,
+        string: bool
+    }
+}
+
 /// The tokenizer. You may want to use the `tokenize` convenience function from this module instead.
 #[derive(Clone, Copy)]
 pub struct Tokenizer<'a> {
@@ -222,11 +231,17 @@ impl<'a> Tokenizer<'a> {
     fn span_err(&self, meta: Meta, error: TokenizeError) -> Item {
         Err((meta.span, error))
     }
-    fn span_end(&mut self, mut meta: Meta, token: Token) -> Item {
+    fn span_end(&mut self, mut meta: Meta, ctx: &mut Context, token: Token) -> Item {
         meta.span.end = Some(self.cursor);
 
-        while let Some(trivia) = self.next_trivia(false) {
-            meta.trailing.push(trivia?);
+        let trivia = match *ctx {
+            Context::Interpol { ended, string, .. } => !string || !ended,
+            _ => true
+        };
+        if trivia {
+            while let Some(trivia) = self.next_trivia(false) {
+                meta.trailing.push(trivia?);
+            }
         }
 
         Ok((meta, token))
@@ -330,31 +345,31 @@ impl<'a> Tokenizer<'a> {
         self.cursor += len;
         ident
     }
-    fn next_interpol(&mut self, start: Span) -> Result<(Vec<(Meta, Token)>, Meta)> {
+    fn next_interpol(&mut self, start: Span, string: bool) -> Result<(Vec<(Meta, Token)>, Meta)> {
         self.next().expect("next_interpol was called in an invalid context");
 
         let mut tokens = Vec::new();
-        let mut count = 0;
+        let mut ctx = Context::Interpol {
+            brackets: 0,
+            ended: false,
+            string
+        };
         loop {
-            match Iterator::next(self) {
-                None => return Err((start, TokenizeError::UnexpectedEOF)),
-                Some(token) => {
-                    let token = match token {
-                        Ok(inner) => inner,
-                        Err(err) => return Err(err)
-                    };
-                    match token.1 {
-                        Token::CurlyBOpen => count += 1,
-                        Token::CurlyBClose if count == 0 => return Ok((tokens, token.0)),
-                        Token::CurlyBClose => count -= 1,
-                        _ => ()
-                    }
-                    tokens.push(token);
-                }
+            let token = self.next_token(&mut ctx)?;
+            if token.1 == Token::EOF {
+                return Err((start, TokenizeError::UnexpectedEOF));
             }
+            if let Context::Interpol { ended, .. } = ctx {
+                if ended {
+                    break Ok((tokens, token.0));
+                }
+            } else {
+                unreachable!("context should never switch, wtf");
+            }
+            tokens.push(token);
         }
     }
-    fn next_string(&mut self, meta: Meta, multiline: bool) -> Item {
+    fn next_string(&mut self, meta: Meta, ctx: &mut Context, multiline: bool) -> Item {
         fn remove_shared_indent(indent: usize, string: &mut String) {
             let mut pos = 0;
             while let Some(newline) = string[pos..].find('\n') {
@@ -441,7 +456,7 @@ impl<'a> Tokenizer<'a> {
                                 content: mem::replace(&mut literal, String::new())
                             });
                         }
-                        let (tokens, close) = self.next_interpol(meta.span)?;
+                        let (tokens, close) = self.next_interpol(meta.span, true)?;
                         original_start = *self;
                         interpol.push(Interpol::Tokens(tokens, close));
                     },
@@ -495,7 +510,7 @@ impl<'a> Tokenizer<'a> {
         }
 
         if interpol.is_empty() {
-            self.span_end(meta, Token::Value(Value::Str {
+            self.span_end(meta, ctx, Token::Value(Value::Str {
                 multiline,
                 original: original_start.input[..original_len].to_string(),
                 content: literal
@@ -507,13 +522,13 @@ impl<'a> Tokenizer<'a> {
                     content: literal
                 });
             }
-            self.span_end(meta, Token::Interpol {
+            self.span_end(meta, ctx, Token::Interpol {
                 multiline,
                 parts: interpol
             })
         }
     }
-    fn next_token(&mut self) -> Item {
+    fn next_token(&mut self, ctx: &mut Context) -> Item {
         let mut meta = Meta::default();
 
         while let Some(trivia) = self.next_trivia(true) {
@@ -525,7 +540,7 @@ impl<'a> Tokenizer<'a> {
         if self.input.starts_with("...") {
             self.cursor += 3;
             self.input = &self.input[3..];
-            return self.span_end(meta, Token::Ellipsis);
+            return self.span_end(meta, ctx, Token::Ellipsis);
         }
 
         // Check if it's a path
@@ -547,7 +562,7 @@ impl<'a> Tokenizer<'a> {
 
         let c = match self.next() {
             Some(c) => c,
-            None => return self.span_end(meta, Token::EOF)
+            None => return self.span_end(meta, ctx, Token::EOF)
         };
 
         if c == '~' || kind == Some(IdentType::Path) {
@@ -564,49 +579,62 @@ impl<'a> Tokenizer<'a> {
             if ident.ends_with('/') {
                 return self.span_err(meta, TokenizeError::TrailingSlash);
             }
-            return self.span_end(meta, Token::Value(Value::Path(anchor, ident)));
+            return self.span_end(meta, ctx, Token::Value(Value::Path(anchor, ident)));
         }
 
         match c {
-            '=' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, Token::Equal) },
-            '!' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, Token::NotEqual) },
-            '!' => self.span_end(meta, Token::Invert),
-            '{' => self.span_end(meta, Token::CurlyBOpen),
-            '}' => self.span_end(meta, Token::CurlyBClose),
-            '[' => self.span_end(meta, Token::SquareBOpen),
-            ']' => self.span_end(meta, Token::SquareBClose),
-            '@' => self.span_end(meta, Token::At),
-            ':' => self.span_end(meta, Token::Colon),
-            ',' => self.span_end(meta, Token::Comma),
-            '.' => self.span_end(meta, Token::Dot),
-            '=' => self.span_end(meta, Token::Assign),
-            '?' => self.span_end(meta, Token::Question),
-            ';' => self.span_end(meta, Token::Semicolon),
-            '(' => self.span_end(meta, Token::ParenOpen),
-            ')' => self.span_end(meta, Token::ParenClose),
-            '+' if self.peek() == Some('+') => { self.next().unwrap(); self.span_end(meta, Token::Concat) },
-            '-' if self.peek() == Some('>') => { self.next().unwrap(); self.span_end(meta, Token::Implication) },
-            '/' if self.peek() == Some('/') => { self.next().unwrap(); self.span_end(meta, Token::Merge) },
-            '+' => self.span_end(meta, Token::Add),
-            '-' => self.span_end(meta, Token::Sub),
-            '*' => self.span_end(meta, Token::Mul),
-            '/' => self.span_end(meta, Token::Div),
+            '=' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, Token::Equal) },
+            '!' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, Token::NotEqual) },
+            '!' => self.span_end(meta, ctx, Token::Invert),
+            '{' => {
+                if let Context::Interpol { brackets, .. } = ctx {
+                    *brackets += 1;
+                }
+                self.span_end(meta, ctx, Token::CurlyBOpen)
+            },
+            '}' => {
+                if let Context::Interpol { brackets, ended, .. } = ctx {
+                    match brackets.checked_sub(1) {
+                        Some(new) => *brackets = new,
+                        None => *ended = true
+                    }
+                }
+                self.span_end(meta, ctx, Token::CurlyBClose)
+            },
+            '[' => self.span_end(meta, ctx, Token::SquareBOpen),
+            ']' => self.span_end(meta, ctx, Token::SquareBClose),
+            '@' => self.span_end(meta, ctx, Token::At),
+            ':' => self.span_end(meta, ctx, Token::Colon),
+            ',' => self.span_end(meta, ctx, Token::Comma),
+            '.' => self.span_end(meta, ctx, Token::Dot),
+            '=' => self.span_end(meta, ctx, Token::Assign),
+            '?' => self.span_end(meta, ctx, Token::Question),
+            ';' => self.span_end(meta, ctx, Token::Semicolon),
+            '(' => self.span_end(meta, ctx, Token::ParenOpen),
+            ')' => self.span_end(meta, ctx, Token::ParenClose),
+            '+' if self.peek() == Some('+') => { self.next().unwrap(); self.span_end(meta, ctx, Token::Concat) },
+            '-' if self.peek() == Some('>') => { self.next().unwrap(); self.span_end(meta, ctx, Token::Implication) },
+            '/' if self.peek() == Some('/') => { self.next().unwrap(); self.span_end(meta, ctx, Token::Merge) },
+            '+' => self.span_end(meta, ctx, Token::Add),
+            '-' => self.span_end(meta, ctx, Token::Sub),
+            '*' => self.span_end(meta, ctx, Token::Mul),
+            '/' => self.span_end(meta, ctx, Token::Div),
             '<' if kind == Some(IdentType::Store) => {
                 let ident = self.next_ident(None, is_valid_path_char);
                 if self.next() != Some('>') {
                     return self.span_err(meta, TokenizeError::UndefinedToken);
                 }
-                self.span_end(meta, Token::Value(Value::Path(Anchor::Store, ident)))
+                self.span_end(meta, ctx, Token::Value(Value::Path(Anchor::Store, ident)))
             },
-            '&' if self.peek() == Some('&') => { self.next().unwrap(); self.span_end(meta, Token::And) },
-            '|' if self.peek() == Some('|') => { self.next().unwrap(); self.span_end(meta, Token::Or) },
-            '<' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, Token::LessOrEq) },
-            '<' => self.span_end(meta, Token::Less),
-            '>' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, Token::MoreOrEq) },
-            '>' => self.span_end(meta, Token::More),
+            '&' if self.peek() == Some('&') => { self.next().unwrap(); self.span_end(meta, ctx, Token::And) },
+            '|' if self.peek() == Some('|') => { self.next().unwrap(); self.span_end(meta, ctx, Token::Or) },
+            '<' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, Token::LessOrEq) },
+            '<' => self.span_end(meta, ctx, Token::Less),
+            '>' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, Token::MoreOrEq) },
+            '>' => self.span_end(meta, ctx, Token::More),
             '$' if self.peek() == Some('{') => {
-                let (tokens, close) = self.next_interpol(meta.span)?;
-                self.span_end(meta, Token::Dynamic(tokens, close))
+                let (tokens, close) = self.next_interpol(meta.span, false)?;
+                self.span_end(meta, ctx, Token::Dynamic(tokens, close))
             },
             'a'..='z' | 'A'..='Z' | '_' => {
                 let kind = match kind {
@@ -623,7 +651,7 @@ impl<'a> Tokenizer<'a> {
                     c => kind == IdentType::Uri && is_valid_path_char(c),
                 });
                 if kind == IdentType::Ident {
-                    self.span_end(meta, match &*ident {
+                    self.span_end(meta, ctx, match &*ident {
                         "assert" => Token::Assert,
                         "else" => Token::Else,
                         "if" => Token::If,
@@ -642,7 +670,7 @@ impl<'a> Tokenizer<'a> {
                         _ => Token::Ident(ident),
                     })
                 } else {
-                    self.span_end(meta, match kind {
+                    self.span_end(meta, ctx, match kind {
                         IdentType::Ident => Token::Ident(ident),
                         IdentType::Path => Token::Value(Value::Path(Anchor::Relative, ident)),
                         IdentType::Store => unreachable!(),
@@ -650,10 +678,10 @@ impl<'a> Tokenizer<'a> {
                     })
                 }
             },
-            '"' => self.next_string(meta, false),
+            '"' => self.next_string(meta, ctx, false),
             '\'' if self.peek() == Some('\'') => {
                 self.next().unwrap();
-                self.next_string(meta, true)
+                self.next_string(meta, ctx, true)
             },
             '0'..='9' => {
                 let mut len = self.input.chars()
@@ -680,7 +708,7 @@ impl<'a> Tokenizer<'a> {
                 self.input = &self.input[len..];
                 self.cursor += len;
 
-                self.span_end(meta, Token::Value(if float {
+                self.span_end(meta, ctx, Token::Value(if float {
                     Value::Float(num)
                 } else {
                     Value::Integer(num)
@@ -697,7 +725,7 @@ impl<'a> Iterator for Tokenizer<'a> {
         if self.input.is_empty() {
             None
         } else {
-            Some(self.next_token())
+            Some(self.next_token(&mut Context::Default))
         }
     }
 }
@@ -1004,6 +1032,26 @@ mod tests {
                             vec![(meta! { start: 8, end: 12 }, Token::Ident("test".into()))],
                             meta! { start: 12, end: 13 }
                         )
+                    ]
+                }
+            )])
+        );
+        assert_eq!(
+            tokenize_span(r#" "${test}#123" "#),
+            Ok(vec![(
+                Meta {
+                    span: Span { start: 1, end: Some(14) },
+                    leading: vec![Trivia::Spaces(1)],
+                    trailing: vec![Trivia::Spaces(1)]
+                },
+                Token::Interpol {
+                    multiline: false,
+                    parts: vec![
+                        Interpol::Tokens(
+                            vec![(meta! { start: 4, end: 8 }, Token::Ident("test".into()))],
+                            meta! { start: 8, end: 9 }
+                        ),
+                        interpol("#123".into()),
                     ]
                 }
             )])
