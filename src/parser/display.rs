@@ -92,8 +92,6 @@ fn fmt_node<'a>(f: &mut fmt::Formatter, arena: &Arena<'a, ASTNode>, root: &ASTNo
                     Interpol::Literal { original, content: _ } => write!(f, "{}", original)?,
                     Interpol::AST(ast, close) => {
                         write!(f, "${{")?;
-                        println!("{:?}", arena[*ast]);
-                        println!("{:?} {:?}", ast, close);
                         fmt!(node *ast);
                         fmt!(close, "}}");
                     }

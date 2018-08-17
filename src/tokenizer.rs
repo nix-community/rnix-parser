@@ -450,7 +450,7 @@ impl<'a> Tokenizer<'a> {
                 },
                 Some('$') => match { self.next().unwrap(); self.peek() } {
                     Some('{') => {
-                        if !literal.is_empty() {
+                        if original_len > 0 {
                             interpol.push(Interpol::Literal {
                                 original: original_start.input[..original_len].to_string(),
                                 content: mem::replace(&mut literal, String::new())
@@ -516,7 +516,7 @@ impl<'a> Tokenizer<'a> {
                 content: literal
             }))
         } else {
-            if !literal.is_empty() {
+            if original_len > 0 {
                 interpol.push(Interpol::Literal {
                     original: original_start.input[..original_len].to_string(),
                     content: literal
@@ -1052,6 +1052,26 @@ mod tests {
                             meta! { start: 8, end: 9 }
                         ),
                         interpol("#123".into()),
+                    ]
+                }
+            )])
+        );
+        assert_eq!(
+            tokenize_span(" ''\n${test}'' "),
+            Ok(vec![(
+                Meta {
+                    span: Span { start: 1, end: Some(13) },
+                    leading: vec![Trivia::Spaces(1)],
+                    trailing: vec![Trivia::Spaces(1)]
+                },
+                Token::Interpol {
+                    multiline: true,
+                    parts: vec![
+                        interpol_original("\n".into(), "".into()),
+                        Interpol::Tokens(
+                            vec![(meta! { start: 6, end: 10 }, Token::Ident("test".into()))],
+                            meta! { start: 10, end: 11 }
+                        ),
                     ]
                 }
             )])
