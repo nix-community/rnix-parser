@@ -1,7 +1,4 @@
-use crate::{
-    tokenizer::Trivia,
-    value::*
-};
+use crate::tokenizer::Trivia;
 use super::*;
 
 use std::fmt;
@@ -87,7 +84,22 @@ fn fmt_node<'a>(f: &mut fmt::Formatter, arena: &Arena<'a, ASTNode>, root: &ASTNo
         }};
     }
     match &root.1 {
-        ASTType::Interpol { .. } => write!(f, "\"TODO: INTERPOLATION\"")?,
+        ASTType::Interpol { meta, multiline, parts } => {
+            fmt_trivia(f, &meta.leading)?;
+            write!(f, "{}", if *multiline { "''" } else { "\"" })?;
+            for part in parts {
+                match part {
+                    Interpol::Literal { original, content: _ } => write!(f, "{}", original)?,
+                    Interpol::AST(ast, close) => {
+                        write!(f, "{{")?;
+                        fmt!(node *ast);
+                        fmt!(close, "}}");
+                    }
+                }
+            }
+            write!(f, "{}", if *multiline { "''" } else { "\"" })?;
+            fmt_trivia(f, &meta.trailing)?;
+        },
         ASTType::Lambda(arg, colon, body) => {
             match arg {
                 LambdaArg::Ident(meta, name) => fmt!(meta, "{}", name),
@@ -144,16 +156,7 @@ fn fmt_node<'a>(f: &mut fmt::Formatter, arena: &Arena<'a, ASTNode>, root: &ASTNo
             fmt!(set values);
             fmt!(close, "}}");
         },
-        ASTType::Value(meta, Value::Bool(val)) => fmt!(meta, "{}", val),
-        ASTType::Value(meta, Value::Float(val)) => fmt!(meta, "{}", val),
-        ASTType::Value(meta, Value::Integer(val)) => fmt!(meta, "{}", val),
-        ASTType::Value(meta, Value::Null) => fmt!(meta, "null"),
-        ASTType::Value(meta, Value::Path(Anchor::Absolute, path)) => fmt!(meta, "{}", path),
-        ASTType::Value(meta, Value::Path(Anchor::Relative, path)) => fmt!(meta, "{}", path),
-        ASTType::Value(meta, Value::Path(Anchor::Home, path)) => fmt!(meta, "~/{}", path),
-        ASTType::Value(meta, Value::Path(Anchor::Store, path)) => fmt!(meta, "<{}>", path),
-        ASTType::Value(meta, Value::Path(Anchor::Uri, path)) => fmt!(meta, "{}", path),
-        ASTType::Value(_meta, Value::Str { .. }) => write!(f, "\"TODO: STRING\"")?,
+        ASTType::Value(meta, val) => fmt!(meta, "{}", val),
         ASTType::Var(meta, name) => fmt!(meta, "{}", name),
         ASTType::Assert(assert, condition, semi, body) => {
             fmt!(assert, "assert");

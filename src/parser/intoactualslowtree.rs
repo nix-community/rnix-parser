@@ -114,7 +114,7 @@ impl IntoTree<SetEntryMeta> for SetEntry {
 impl IntoTree<InterpolMeta> for Interpol {
     fn into_tree<'a>(interpol: InterpolMeta, arena: &mut Arena<'a>) -> Self {
         match interpol {
-            InterpolMeta::Literal(text) => Interpol::Literal(text),
+            InterpolMeta::Literal { original: _, content } => Interpol::Literal(content),
             InterpolMeta::AST(id, _close) => Interpol::AST(AST::into_tree(arena.take(id), arena))
         }
     }

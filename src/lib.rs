@@ -73,6 +73,13 @@ mod tests {
     }
 
     #[test]
+    fn test_preserve() {
+        assert_eq!(
+            inner_parse(include_str!("../tests/meta.nix")).expect("error while parsing").to_string(),
+            include_str!("../tests/meta.nix")
+        );
+    }
+    #[test]
     fn test_all() {
         assert_eq!(
             parse(include_str!("../tests/simple-set.nix")),
@@ -80,7 +87,18 @@ mod tests {
                 int = (3);
                 float = (2.1);
                 string = ("Hello World");
-                multiline = (multiline r#"This is a multiline string :D
+                multiline = (multiline
+original = r#"
+    This is a multiline string :D
+    \'\'\'\'\
+    multiline = '''
+      Two single quotes: '''',
+      Interpolation: ''${test},
+      Escape interpolation: '''''${test}
+    ''';
+    special escape: $${test}
+  "#,
+r#"This is a multiline string :D
 \'\'\'\'\
 multiline = ''
   Two single quotes: ''',
@@ -143,9 +161,10 @@ special escape: $${test}
             )
         );
         assert_eq!(
-            parse(include_str!("../tests/comments.nix")),
+            parse(include_str!("../tests/meta.nix")),
             nix!({
                 string = ("42");
+                hi = (raw AST::Value(Value::Float("3.0000000".into())));
                 password = ("hunter2");
             })
         );

@@ -112,7 +112,10 @@ pub enum LambdaArg {
 /// An interpolation part
 #[derive(Clone, Debug, PartialEq)]
 pub enum Interpol {
-    Literal(String),
+    Literal {
+        original: String,
+        content: String
+    },
     AST(NodeId, Meta)
 }
 /// An operator, such as + - * /
@@ -257,10 +260,19 @@ impl<'a, I> Parser<'a, I>
     fn peek(&mut self) -> Option<&Token> {
         self.peek_meta().map(|(_, token)| token)
     }
-    fn next(&mut self) -> Result<I::Item> {
+    fn next_raw(&mut self) -> Result<I::Item> {
         self.buffer.pop()
             .or_else(|| self.iter.next())
             .ok_or((None, ParseError::UnexpectedEOF))
+    }
+    fn next(&mut self) -> Result<I::Item> {
+        let mut next = self.next_raw()?;
+
+        if let Some(Token::EOF) = self.peek() {
+            let (mut meta, _) = self.next_raw()?;
+            next.0.trailing.append(&mut meta.leading);
+        }
+        Ok(next)
     }
     fn expect(&mut self, expected: Token) -> Result<Meta> {
         if let Ok((meta, actual)) = self.next() {
@@ -279,7 +291,7 @@ impl<'a, I> Parser<'a, I>
         let mut parsed = Vec::new();
         for value in values {
             parsed.push(match value {
-                TokenInterpol::Literal(text) => Interpol::Literal(text),
+                TokenInterpol::Literal { original, content } => Interpol::Literal { original, content },
                 TokenInterpol::Tokens(tokens, close) => {
                     let parsed = self.parse_branch(tokens)?;
                     Interpol::AST(
@@ -800,8 +812,16 @@ mod tests {
                     Token::Dot, Token::Value("b".into()),
                 Token::Assign, Token::Value(1.into()), Token::Semicolon,
 
-                Token::Interpol { multiline: false, parts: vec![TokenInterpol::Literal("c".into())] },
-                    Token::Dot, Token::Dynamic(vec![(Meta::default(), Token::Ident("d".into()))], Meta::default()),
+                Token::Interpol {
+                    multiline: false,
+                    parts: vec![
+                        TokenInterpol::Literal {
+                            original: "c".into(),
+                            content: "c".into()
+                        }
+                    ]
+                },
+                Token::Dot, Token::Dynamic(vec![(Meta::default(), Token::Ident("d".into()))], Meta::default()),
                 Token::Assign, Token::Value(2.into()), Token::Semicolon,
 
                 Token::CurlyBClose
@@ -1043,7 +1063,15 @@ mod tests {
             parse![
                 Token::Ident("test".into()),
                     Token::Dot, Token::Value("invalid ident".into()),
-                    Token::Dot, Token::Interpol { multiline: false, parts: vec![TokenInterpol::Literal("hi".into())] },
+                    Token::Dot, Token::Interpol {
+                        multiline: false,
+                        parts: vec![
+                            TokenInterpol::Literal {
+                                original: "hi".into(),
+                                content: "hi".into()
+                            }
+                        ]
+                    },
                     Token::Dot, Token::Dynamic(
                         vec![(Meta::default(), Token::Ident("a".into()))],
                         Meta::default()
@@ -1068,7 +1096,10 @@ mod tests {
                 Token::Interpol {
                     multiline: false,
                     parts: vec![
-                        TokenInterpol::Literal("Hello, ".into()),
+                        TokenInterpol::Literal {
+                            original: "Hello, ".into(),
+                            content: "Hello, ".into()
+                        },
                         TokenInterpol::Tokens(
                             vec![
                                 (Meta::default(), Token::CurlyBOpen),
@@ -1082,7 +1113,10 @@ mod tests {
                             ],
                             Meta::default()
                         ),
-                        TokenInterpol::Literal("!".into())
+                        TokenInterpol::Literal {
+                            original: "!".into(),
+                            content: "!".into()
+                        }
                     ]
                 }
             ],

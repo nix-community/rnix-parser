@@ -33,14 +33,6 @@ pub enum Trivia {
         content: String
     }
 }
-impl Trivia {
-    fn is_newline(&self) -> bool {
-        match self {
-            Trivia::Newline(_) => true,
-            _ => false
-        }
-    }
-}
 impl fmt::Display for Trivia {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -89,13 +81,19 @@ enum IdentType {
 /// An interpolation part
 #[derive(Clone, Debug, PartialEq)]
 pub enum Interpol {
-    Literal(String),
+    Literal {
+        original: String,
+        content: String
+    },
     Tokens(Vec<(Meta, Token)>, Meta)
 }
 
 /// A token, such as a string literal, a number, or a keyword
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
+    // So we get trailing trivia
+    EOF,
+
     // Keywords
     Assert,
     Else,
@@ -178,8 +176,6 @@ impl Token {
 /// An error that occured during tokenizing
 #[derive(Clone, Copy, Debug, Fail, PartialEq)]
 pub enum TokenizeError {
-    #[fail(display = "error parsing integer: overflow")]
-    IntegerOverflow,
     #[fail(display = "dot after number, but no decimals")]
     TrailingDecimal,
     #[fail(display = "unexpected eof")]
@@ -223,41 +219,17 @@ impl<'a> Tokenizer<'a> {
             end: None
         }
     }
-    fn span_err(&self, meta: Meta, error: TokenizeError) -> Option<Item> {
-        Some(Err((meta.span, error)))
+    fn span_err(&self, meta: Meta, error: TokenizeError) -> Item {
+        Err((meta.span, error))
     }
-    fn span_end(&mut self, mut meta: Meta, token: Token) -> Option<Item> {
+    fn span_end(&mut self, mut meta: Meta, token: Token) -> Item {
         meta.span.end = Some(self.cursor);
 
-        let mut trailing = Vec::new();
-
-        let mut before = *self;
-        while let Some(trivia) = self.next_trivia() {
-            trailing.push((before, match trivia {
-                Ok(inner) => inner,
-                Err(err) => return Some(Err(err))
-            }));
-            before = *self;
+        while let Some(trivia) = self.next_trivia(false) {
+            meta.trailing.push(trivia?);
         }
 
-        if self.input.is_empty() {
-            meta.trailing.extend(trailing.into_iter().map(|(_, trivia)| trivia));
-        } else {
-            // We read ALL the trivia, but it's not the end of the file so we
-            // should stop at newline, as that is the next token's property.
-
-            if let Some((state, _)) = trailing.iter()
-                    .find(|(_, trivia)| trivia.is_newline()) {
-                *self = *state;
-            }
-            meta.trailing.extend(
-                trailing.into_iter()
-                    .map(|(_, t)| t)
-                    .take_while(|trivia| !trivia.is_newline())
-            );
-        }
-
-        Some(Ok((meta, token)))
+        Ok((meta, token))
     }
 
     fn next(&mut self) -> Option<char> {
@@ -273,7 +245,7 @@ impl<'a> Tokenizer<'a> {
         self.input.chars().next()
     }
 
-    fn next_trivia(&mut self) -> Option<Result<Trivia>> {
+    fn next_trivia(&mut self, multiline: bool) -> Option<Result<Trivia>> {
         let mut span = self.span_start();
 
         match self.peek() {
@@ -293,7 +265,7 @@ impl<'a> Tokenizer<'a> {
                 }
                 Some(Ok(Trivia::Tabs(amount)))
             },
-            Some('\n') => {
+            Some('\n') if multiline => {
                 let mut amount = 0;
                 while self.peek() == Some('\n') {
                     self.next().unwrap();
@@ -345,18 +317,17 @@ impl<'a> Tokenizer<'a> {
             P: IntoIterator<Item = char>,
             F: Fn(char) -> bool
     {
-        let mut ident = String::with_capacity(self.input.chars().take_while(|&c| include(c)).count());
-
-        for c in prefix.into_iter() {
+        let len = self.input.chars()
+            .take_while(|&c| include(c))
+            .map(|c| c.len_utf8())
+            .sum();
+        let mut ident = String::with_capacity(len);
+        for c in prefix {
             ident.push(c);
         }
-
-        loop {
-            match self.peek() {
-                Some(c) if include(c) => ident.push(self.next().unwrap()),
-                _ => break,
-            }
-        }
+        ident.push_str(&self.input[..len]);
+        self.input = &self.input[len..];
+        self.cursor += len;
         ident
     }
     fn next_interpol(&mut self, start: Span) -> Result<(Vec<(Meta, Token)>, Meta)> {
@@ -383,7 +354,7 @@ impl<'a> Tokenizer<'a> {
             }
         }
     }
-    fn next_string(&mut self, meta: Meta, multiline: bool) -> Option<Item> {
+    fn next_string(&mut self, meta: Meta, multiline: bool) -> Item {
         fn remove_shared_indent(indent: usize, string: &mut String) {
             let mut pos = 0;
             while let Some(newline) = string[pos..].find('\n') {
@@ -392,6 +363,8 @@ impl<'a> Tokenizer<'a> {
                 string.drain(pos..end);
             }
         }
+
+        let mut original_start = *self;
 
         let mut interpol = Vec::new();
         let mut literal = String::new();
@@ -417,6 +390,8 @@ impl<'a> Tokenizer<'a> {
             literal.push(self.next().unwrap());
         }
 
+        let mut original_len = self.cursor - original_start.cursor;
+
         loop {
             let whitespace = self.peek().map(char::is_whitespace).unwrap_or(false);
             match self.peek() {
@@ -430,52 +405,58 @@ impl<'a> Tokenizer<'a> {
                         Some('t') => { self.next().unwrap(); literal.push('\t'); },
                         Some('\'') => { self.next().unwrap(); literal.push_str("''"); },
                         Some('$') => { self.next().unwrap(); literal.push('$'); },
-                        Some('\\') => { self.next().unwrap(); literal.push(self.next()?); },
+                        Some('\\') => { self.next().unwrap(); literal.push(match self.next() {
+                            None => return self.span_err(meta, TokenizeError::UnexpectedEOF),
+                            Some(c) => c
+                        }); },
                         _ => break
                     }
                     Some(_) => literal.push('\''),
                 },
                 Some('\n') if multiline => {
-                    // Don't push initial newline
-                    self.next()?;
-
-                    literal.push('\n');
+                    literal.push(self.next().unwrap());
 
                     last_indent = 0;
-                    while self.peek().map(|c| c.is_whitespace() && c != '\n').unwrap_or(false) {
+                    while self.peek().map(|c| c == ' ' || c == '\n').unwrap_or(false) {
                         last_indent += 1;
                         // Will later remove common indention
                         literal.push(self.next().unwrap());
                     }
                 },
                 Some('\\') if !multiline => {
-                    self.next()?;
-                    literal.push(match self.next()? {
-                        'n' => '\n',
-                        'r' => '\r',
-                        't' => '\t',
-                        c => c
+                    self.next().unwrap();
+                    literal.push(match self.next() {
+                        None => return self.span_err(meta, TokenizeError::UnexpectedEOF),
+                        Some('n') => '\n',
+                        Some('r') => '\r',
+                        Some('t') => '\t',
+                        Some(c) => c
                     });
                 },
                 Some('$') => match { self.next().unwrap(); self.peek() } {
                     Some('{') => {
                         if !literal.is_empty() {
-                            interpol.push(Interpol::Literal(mem::replace(&mut literal, String::new())));
+                            interpol.push(Interpol::Literal {
+                                original: original_start.input[..original_len].to_string(),
+                                content: mem::replace(&mut literal, String::new())
+                            });
                         }
-                        match self.next_interpol(meta.span) {
-                            Ok((tokens, close)) => interpol.push(Interpol::Tokens(tokens, close)),
-                            Err(err) => return Some(Err(err))
-                        }
+                        let (tokens, close) = self.next_interpol(meta.span)?;
+                        original_start = *self;
+                        interpol.push(Interpol::Tokens(tokens, close));
                     },
                     Some('$') => { self.next().unwrap(); literal.push_str("$$"); }
                     _ => literal.push('$')
                 }
                 Some(_) => {
-                    literal.push(self.next()?);
+                    literal.push(self.next().unwrap());
                 }
             }
-            // Set indent after because then if it's the end of the string we
-            // won't get here
+
+            // When the string is closing we won't get to this point:
+
+            original_len = self.cursor - original_start.cursor;
+
             if multiline && !whitespace {
                 min_indent = Some(min_indent.unwrap_or(std::usize::MAX).min(last_indent));
             }
@@ -488,8 +469,8 @@ impl<'a> Tokenizer<'a> {
                     literal.drain(..indent);
                 } else {
                     for entry in &mut interpol {
-                        if let Interpol::Literal(ref mut inner) = entry {
-                            inner.drain(..indent);
+                        if let Interpol::Literal { ref mut content, .. } = entry {
+                            content.drain(..indent);
                             break;
                         }
                     }
@@ -498,8 +479,8 @@ impl<'a> Tokenizer<'a> {
                 // Trim rest of the lines
                 remove_shared_indent(indent, &mut literal);
                 for entry in &mut interpol {
-                    if let Interpol::Literal(ref mut inner) = entry {
-                        remove_shared_indent(indent, inner);
+                    if let Interpol::Literal { ref mut content, .. } = entry {
+                        remove_shared_indent(indent, content);
                     }
                 }
             }
@@ -507,8 +488,8 @@ impl<'a> Tokenizer<'a> {
             // Must be all whitespace
             literal.retain(|c| c == '\n');
             for entry in &mut interpol {
-                if let Interpol::Literal(ref mut inner) = entry {
-                    inner.retain(|c| c == '\n');
+                if let Interpol::Literal { ref mut content, .. } = entry {
+                    content.retain(|c| c == '\n');
                 }
             }
         }
@@ -516,11 +497,15 @@ impl<'a> Tokenizer<'a> {
         if interpol.is_empty() {
             self.span_end(meta, Token::Value(Value::Str {
                 multiline,
+                original: original_start.input[..original_len].to_string(),
                 content: literal
             }))
         } else {
             if !literal.is_empty() {
-                interpol.push(Interpol::Literal(literal));
+                interpol.push(Interpol::Literal {
+                    original: original_start.input[..original_len].to_string(),
+                    content: literal
+                });
             }
             self.span_end(meta, Token::Interpol {
                 multiline,
@@ -528,18 +513,11 @@ impl<'a> Tokenizer<'a> {
             })
         }
     }
-}
-impl<'a> Iterator for Tokenizer<'a> {
-    type Item = Item;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next_token(&mut self) -> Item {
         let mut meta = Meta::default();
 
-        while let Some(trivia) = self.next_trivia() {
-            meta.leading.push(match trivia {
-                Ok(inner) => inner,
-                Err(err) => return Some(Err(err))
-            });
+        while let Some(trivia) = self.next_trivia(true) {
+            meta.leading.push(trivia?);
         }
 
         meta.span = self.span_start();
@@ -567,7 +545,10 @@ impl<'a> Iterator for Tokenizer<'a> {
             _ => None
         };
 
-        let c = self.next()?;
+        let c = match self.next() {
+            Some(c) => c,
+            None => return self.span_end(meta, Token::EOF)
+        };
 
         if c == '~' || kind == Some(IdentType::Path) {
             let (anchor, prefix) = match c {
@@ -587,8 +568,8 @@ impl<'a> Iterator for Tokenizer<'a> {
         }
 
         match c {
-            '=' if self.peek() == Some('=') => { self.next()?; self.span_end(meta, Token::Equal) },
-            '!' if self.peek() == Some('=') => { self.next()?; self.span_end(meta, Token::NotEqual) },
+            '=' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, Token::Equal) },
+            '!' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, Token::NotEqual) },
             '!' => self.span_end(meta, Token::Invert),
             '{' => self.span_end(meta, Token::CurlyBOpen),
             '}' => self.span_end(meta, Token::CurlyBClose),
@@ -603,9 +584,9 @@ impl<'a> Iterator for Tokenizer<'a> {
             ';' => self.span_end(meta, Token::Semicolon),
             '(' => self.span_end(meta, Token::ParenOpen),
             ')' => self.span_end(meta, Token::ParenClose),
-            '+' if self.peek() == Some('+') => { self.next()?; self.span_end(meta, Token::Concat) },
-            '-' if self.peek() == Some('>') => { self.next()?; self.span_end(meta, Token::Implication) },
-            '/' if self.peek() == Some('/') => { self.next()?; self.span_end(meta, Token::Merge) },
+            '+' if self.peek() == Some('+') => { self.next().unwrap(); self.span_end(meta, Token::Concat) },
+            '-' if self.peek() == Some('>') => { self.next().unwrap(); self.span_end(meta, Token::Implication) },
+            '/' if self.peek() == Some('/') => { self.next().unwrap(); self.span_end(meta, Token::Merge) },
             '+' => self.span_end(meta, Token::Add),
             '-' => self.span_end(meta, Token::Sub),
             '*' => self.span_end(meta, Token::Mul),
@@ -617,15 +598,15 @@ impl<'a> Iterator for Tokenizer<'a> {
                 }
                 self.span_end(meta, Token::Value(Value::Path(Anchor::Store, ident)))
             },
-            '&' if self.peek() == Some('&') => { self.next()?; self.span_end(meta, Token::And) },
-            '|' if self.peek() == Some('|') => { self.next()?; self.span_end(meta, Token::Or) },
-            '<' if self.peek() == Some('=') => { self.next()?; self.span_end(meta, Token::LessOrEq) },
+            '&' if self.peek() == Some('&') => { self.next().unwrap(); self.span_end(meta, Token::And) },
+            '|' if self.peek() == Some('|') => { self.next().unwrap(); self.span_end(meta, Token::Or) },
+            '<' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, Token::LessOrEq) },
             '<' => self.span_end(meta, Token::Less),
-            '>' if self.peek() == Some('=') => { self.next()?; self.span_end(meta, Token::MoreOrEq) },
+            '>' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, Token::MoreOrEq) },
             '>' => self.span_end(meta, Token::More),
-            '$' if self.peek() == Some('{') => match self.next_interpol(meta.span) {
-                Ok((tokens, close)) => self.span_end(meta, Token::Dynamic(tokens, close)),
-                Err(err) => Some(Err(err))
+            '$' if self.peek() == Some('{') => {
+                let (tokens, close) = self.next_interpol(meta.span)?;
+                self.span_end(meta, Token::Dynamic(tokens, close))
             },
             'a'..='z' | 'A'..='Z' | '_' => {
                 let kind = match kind {
@@ -671,50 +652,52 @@ impl<'a> Iterator for Tokenizer<'a> {
             },
             '"' => self.next_string(meta, false),
             '\'' if self.peek() == Some('\'') => {
-                self.next()?;
+                self.next().unwrap();
                 self.next_string(meta, true)
             },
             '0'..='9' => {
-                // Could use built-in rust parse function here, however that
-                // requires collecting stuff to a string first, which is very
-                // expensive.
-
-                // TODO: Multiple radixes?
-                const RADIX: u32 = 10;
-
-                // We already know it's a digit
-                let mut num = c.to_digit(RADIX).unwrap() as i64;
-
-                while let Some(digit) = self.peek().and_then(|c| c.to_digit(RADIX)) {
-                    self.next();
-                    num = match num.checked_mul(RADIX as i64).and_then(|num| num.checked_add(digit as i64)) {
-                        Some(num) => num,
-                        None => return self.span_err(meta, TokenizeError::IntegerOverflow)
-                    };
-                }
-
-                if self.peek() == Some('.') {
-                    self.next();
-
-                    let mut i = 1;
-                    let mut num = num as f64;
-
-                    while let Some(digit) = self.peek().and_then(|c| c.to_digit(RADIX)) {
-                        self.next();
-                        i *= RADIX;
-                        num += digit as f64 / i as f64;
-                    }
-
-                    if i == 1 {
+                let mut len = self.input.chars()
+                    .take_while(|&c| c >= '0' && c <= '9')
+                    .map(|c| c.len_utf8())
+                    .sum();
+                let float = if self.input.bytes().nth(len) == Some(b'.') {
+                    let trailing: usize = self.input[len+1..].chars()
+                        .take_while(|&c| c >= '0' && c <= '9')
+                        .map(|c| c.len_utf8())
+                        .sum();
+                    if trailing == 0 {
                         return self.span_err(meta, TokenizeError::TrailingDecimal)
                     }
-
-                    self.span_end(meta, Token::Value(Value::Float(num)))
+                    len += 1 + trailing;
+                    true
                 } else {
-                    self.span_end(meta, Token::Value(Value::Integer(num)))
-                }
+                    false
+                };
+
+                let mut num = String::with_capacity(1 + len);
+                num.push(c);
+                num.push_str(&self.input[..len]);
+                self.input = &self.input[len..];
+                self.cursor += len;
+
+                self.span_end(meta, Token::Value(if float {
+                    Value::Float(num)
+                } else {
+                    Value::Integer(num)
+                }))
             },
             _ => self.span_err(meta, TokenizeError::UndefinedToken)
+        }
+    }
+}
+impl<'a> Iterator for Tokenizer<'a> {
+    type Item = Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.input.is_empty() {
+            None
+        } else {
+            Some(self.next_token())
         }
     }
 }
@@ -740,6 +723,16 @@ mod tests {
         super::tokenize(input).collect()
     }
 
+    fn interpol(content: &str) -> Interpol {
+        interpol_original(content, content)
+    }
+    fn interpol_original(original: &str, content: &str) -> Interpol {
+        Interpol::Literal {
+            original: original.to_string(),
+            content: content.to_string()
+        }
+    }
+
     #[test]
     fn basic_int_set() {
         assert_eq!(
@@ -761,7 +754,11 @@ mod tests {
         assert_eq!(
             tokenize(r#"{ string = "Hello \"World\""; }"#),
             Ok(vec![Token::CurlyBOpen, Token::Ident("string".into()), Token::Assign,
-            Token::Value("Hello \"World\"".into()), Token::Semicolon, Token::CurlyBClose])
+            Token::Value(Value::Str {
+                multiline: false,
+                original: r#"Hello \"World\""#.into(),
+                content: "Hello \"World\"".into(),
+            }), Token::Semicolon, Token::CurlyBClose])
         );
     }
     #[test]
@@ -828,22 +825,30 @@ mod tests {
                     Meta {
                         span: Span { start: 44, end: Some(45) },
                         leading: vec![Trivia::Newline(1)],
-                        trailing: vec![
+                        trailing: Vec::new(),
+                    },
+                    Token::CurlyBClose
+                ),
+                (
+                    Meta {
+                        span: Span { start: 56, end: Some(56) },
+                        leading: vec![
                             Trivia::Newline(1),
                             Trivia::Comment {
                                 span: Span { start: 46, end: Some(56) },
                                 multiline: false,
                                 content: " trailing".into()
                             }
-                        ]
+                        ],
+                        trailing: Vec::new()
                     },
-                    Token::CurlyBClose
+                    Token::EOF
                 )
             ])
         );
         assert_eq!(
-            tokenize_span("{\n    overflow = 9999999999999999999999999999"),
-            Err((Span { start: 17, end: None }, TokenizeError::IntegerOverflow))
+            tokenize_span("{\n    overflow = 1."),
+            Err((Span { start: 17, end: None }, TokenizeError::TrailingDecimal))
         );
     }
     #[test]
@@ -866,6 +871,16 @@ mod tests {
                     Token::Ident("multiline".into()), Token::Assign,
                     Token::Value(Value::Str {
                         multiline: true,
+                        original: r#"
+            
+                  
+        This is a multiline string :D
+          indented by two
+        \'\'\'\'\
+        ''${ interpolation was escaped }
+        two single quotes: '''
+        three single quotes: ''''
+    "#.into(),
                         // Generate the below with nix-shell
                         content: "    \n          \nThis is a multiline string :D\n  \
                             indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\n\
@@ -878,6 +893,7 @@ mod tests {
             tokenize("''\n  \n    \n \n ''"),
             Ok(vec![Token::Value(Value::Str {
                 multiline: true,
+                original: "\n  \n    \n \n ".into(),
                 content: "\n\n\n".into()
             })])
         );
@@ -885,6 +901,7 @@ mod tests {
             tokenize("''\n  \n    \n a\n''"),
             Ok(vec![Token::Value(Value::Str {
                 multiline: true,
+                original: "\n  \n    \n a\n".into(),
                 content: " \n   \na\n".into()
             })])
         );
@@ -892,6 +909,7 @@ mod tests {
             tokenize("''  \n    \n a\n''"),
             Ok(vec![Token::Value(Value::Str {
                 multiline: true,
+                original: "  \n    \n a\n".into(),
                 content: "   \na\n".into()
             })])
         );
@@ -906,6 +924,7 @@ mod tests {
             tokenize(r#" ''$${test}'' "#),
             Ok(vec![Token::Value(Value::Str {
                 multiline: true,
+                original: "$${test}".into(),
                 content: "$${test}".into()
             })])
         );
@@ -923,7 +942,7 @@ mod tests {
                 Token::Interpol {
                     multiline: false,
                     parts: vec![
-                        Interpol::Literal("Hello, ".into()),
+                        interpol("Hello, ".into()),
                         Interpol::Tokens(
                             vec![
                                 (
@@ -944,7 +963,7 @@ mod tests {
                             ],
                             meta! { start: 39, end: 40 }
                         ),
-                        Interpol::Literal("!".into())
+                        interpol("!".into())
                     ]
                 }
             )])
@@ -960,7 +979,7 @@ mod tests {
                 Token::Interpol {
                     multiline: false,
                     parts: vec![
-                        Interpol::Literal("$".into()),
+                        interpol_original("\\$".into(), "$".into()),
                         Interpol::Tokens(
                             vec![(meta! { start: 6, end: 10 }, Token::Ident("test".into()))],
                             meta! { start: 10, end: 11 }
@@ -980,7 +999,7 @@ mod tests {
                 Token::Interpol {
                     multiline: true,
                     parts: vec![
-                        Interpol::Literal("$".into()),
+                        interpol_original("''$".into(), "$".into()),
                         Interpol::Tokens(
                             vec![(meta! { start: 8, end: 12 }, Token::Ident("test".into()))],
                             meta! { start: 12, end: 13 }
