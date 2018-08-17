@@ -2,6 +2,11 @@
 
 use std::fmt;
 
+#[cfg(feature = "smol_str")]
+use smol_str::SmolStr;
+#[cfg(not(feature = "smol_str"))]
+type SmolStr = String;
+
 /// An anchor point for a path, such as if it's relative or absolute
 #[derive(Clone, Debug, PartialEq)]
 pub enum Anchor {
@@ -22,8 +27,8 @@ pub enum Value {
     Path(Anchor, String),
     Str {
         multiline: bool,
-        original: String,
-        content: String
+        original: SmolStr,
+        content: SmolStr
     }
 }
 
@@ -44,6 +49,7 @@ impl From<f64> for Value {
 }
 impl From<String> for Value {
     fn from(val: String) -> Value {
+        let val = SmolStr::from(val);
         Value::Str {
             multiline: false,
             original: val.clone(),

@@ -33,8 +33,8 @@ fn main() {
         }
     };
 
-    let start = span.start;
-    let end = span.end.unwrap_or(start+1);
+    let start = span.start as usize;
+    let end = span.end.map(|i| i as usize).unwrap_or(start+1);
 
     let prev_line_end = content[..start].rfind('\n');
     let prev_line = content[..prev_line_end.unwrap_or(0)].rfind('\n').map(|n| n+1).unwrap_or(0);

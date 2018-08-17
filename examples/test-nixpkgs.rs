@@ -39,7 +39,11 @@ fn recurse(path: &Path) -> Result<(), Error> {
         return Ok(());
     } else {
         for entry in path.read_dir()? {
-            recurse(&entry?.path())?;
+            let entry = entry?;
+            if entry.file_type()?.is_symlink() {
+                continue;
+            }
+            recurse(&entry.path())?;
         }
     }
     Ok(())

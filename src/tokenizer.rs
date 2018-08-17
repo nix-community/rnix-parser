@@ -3,13 +3,18 @@
 use crate::value::{Anchor, Value};
 use std::{fmt::{self, Write}, mem};
 
+#[cfg(feature = "smol_str")]
+use smol_str::SmolStr;
+#[cfg(not(feature = "smol_str"))]
+type SmolStr = String;
+
 /// A span, information about where in the original string a token started and ended
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Span {
     /// Offset (in bytes) in the original string where the token started
-    pub start: usize,
+    pub start: u32,
     /// Offset (in bytes) in the original string where the token ended, including the next char
-    pub end: Option<usize>
+    pub end: Option<u32>
 }
 impl Span {
     /// Set the end of `self` to `other`
@@ -24,13 +29,13 @@ impl Span {
 /// Information about token spacing
 #[derive(Clone, Debug, PartialEq)]
 pub enum Trivia {
-    Newline(usize),
-    Spaces(usize),
-    Tabs(usize),
+    Newline(u32),
+    Spaces(u32),
+    Tabs(u32),
     Comment {
         span: Span,
         multiline: bool,
-        content: String
+        content: SmolStr
     }
 }
 impl fmt::Display for Trivia {
@@ -201,7 +206,7 @@ type Item = Result<(Meta, Token)>;
 enum Context {
     Default,
     Interpol {
-        brackets: usize,
+        brackets: u32,
         ended: bool,
         string: bool
     }
@@ -211,7 +216,7 @@ enum Context {
 #[derive(Clone, Copy)]
 pub struct Tokenizer<'a> {
     input: &'a str,
-    cursor: usize
+    cursor: u32
 }
 impl<'a> Tokenizer<'a> {
     /// Create a new instance
@@ -252,7 +257,7 @@ impl<'a> Tokenizer<'a> {
         if let Some(c) = c {
             let len = c.len_utf8();
             self.input = &self.input[len..];
-            self.cursor += len;
+            self.cursor += len as u32;
         }
         c
     }
@@ -291,9 +296,9 @@ impl<'a> Tokenizer<'a> {
             Some('#') => {
                 let end = self.input.find('\n').unwrap_or(self.input.len());
 
-                let content = self.input[1..end].to_string();
+                let content = self.input[1..end].into();
                 self.input = &self.input[end..];
-                self.cursor += end;
+                self.cursor += end as u32;
 
                 span.end = Some(self.cursor);
                 Some(Ok(Trivia::Comment {
@@ -312,10 +317,10 @@ impl<'a> Tokenizer<'a> {
                     None => return Some(Err((span, TokenizeError::UnclosedComment)))
                 };
 
-                let content = self.input[2..end].to_string();
+                let content = self.input[2..end].into();
 
                 self.input = &self.input[end+2..];
-                self.cursor += end + 2;
+                self.cursor += end as u32 + 2;
 
                 span.end = Some(self.cursor);
                 Some(Ok(Trivia::Comment {
@@ -342,7 +347,7 @@ impl<'a> Tokenizer<'a> {
         }
         ident.push_str(&self.input[..len]);
         self.input = &self.input[len..];
-        self.cursor += len;
+        self.cursor += len as u32;
         ident
     }
     fn next_interpol(&mut self, start: Span, string: bool) -> Result<(Vec<(Meta, Token)>, Meta)> {
@@ -452,7 +457,7 @@ impl<'a> Tokenizer<'a> {
                     Some('{') => {
                         if original_len > 0 {
                             interpol.push(Interpol::Literal {
-                                original: original_start.input[..original_len].to_string(),
+                                original: original_start.input[..original_len as usize].into(),
                                 content: mem::replace(&mut literal, String::new())
                             });
                         }
@@ -512,13 +517,13 @@ impl<'a> Tokenizer<'a> {
         if interpol.is_empty() {
             self.span_end(meta, ctx, Token::Value(Value::Str {
                 multiline,
-                original: original_start.input[..original_len].to_string(),
-                content: literal
+                original: original_start.input[..original_len as usize].into(),
+                content: literal.into()
             }))
         } else {
             if original_len > 0 {
                 interpol.push(Interpol::Literal {
-                    original: original_start.input[..original_len].to_string(),
+                    original: original_start.input[..original_len as usize].into(),
                     content: literal
                 });
             }
@@ -706,7 +711,7 @@ impl<'a> Tokenizer<'a> {
                 num.push(c);
                 num.push_str(&self.input[..len]);
                 self.input = &self.input[len..];
-                self.cursor += len;
+                self.cursor += len as u32;
 
                 self.span_end(meta, ctx, Token::Value(if float {
                     Value::Float(num)
@@ -756,8 +761,8 @@ mod tests {
     }
     fn interpol_original(original: &str, content: &str) -> Interpol {
         Interpol::Literal {
-            original: original.to_string(),
-            content: content.to_string()
+            original: original.into(),
+            content: content.into()
         }
     }
 
@@ -816,7 +821,7 @@ mod tests {
                             Trivia::Spaces(1)
                         ]
                     },
-                    Token::Ident("int".to_string())
+                    Token::Ident("int".into())
                 ),
                 (
                     Meta {
