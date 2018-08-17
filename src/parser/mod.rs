@@ -95,10 +95,10 @@ pub enum ASTType {
 /// An attribute path, a series of ASTs (because dynamic attributes) for the
 /// identifiers and metadata for the separators.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Attribute(Vec<(NodeId, Option<Meta>)>);
+pub struct Attribute(pub Vec<(NodeId, Option<Meta>)>);
 /// Brackets around something
 #[derive(Clone, Debug, PartialEq)]
-pub struct Brackets<T>(Meta, T, Meta);
+pub struct Brackets<T>(pub Meta, pub T, pub Meta);
 /// A lambda argument type
 #[derive(Clone, Debug, PartialEq)]
 pub enum LambdaArg {
@@ -146,7 +146,7 @@ pub enum Unary {
 }
 /// Parenthesis around an AST node
 #[derive(Clone, Debug, PartialEq)]
-pub struct Parens(Meta, NodeId, Meta);
+pub struct Parens(pub Meta, pub NodeId, pub Meta);
 /// An entry in a pattern
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatEntry {

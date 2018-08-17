@@ -58,7 +58,7 @@ impl From<(Option<Span>, ParseError)> for Error {
 /// by how much is unclear. If you need every ounce of speed you can get, rnix'
 /// other functions allow you not only to tokenize/parse lazily, but also do it
 /// in paralell.
-pub fn parse(input: &str) -> Result<parser::AST, Error> {
+pub fn parse(input: &str) -> Result<parser::AST<'static>, Error> {
     let tokens: Result<Vec<(Meta, Token)>, (Span, TokenizeError)> = tokenizer::tokenize(input).collect();
     parser::parse(tokens?).map_err(Error::from)
 }
