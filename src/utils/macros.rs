@@ -3,6 +3,12 @@
 /// Technical detail, don't mind this macro
 // #[macro_export]
 macro_rules! nix_inner {
+    (op ($($val1:tt)*) ($op:expr) ($($val2:tt)*)) => {{
+        AST::Operation($op, Box::new((
+            nix_inner!(parse $($val1)*),
+            nix_inner!(parse $($val2)*)
+        )))
+    }};
     (entry($vec:expr)) => {};
     (entry($vec:expr) $ident:ident = ($($val:tt)*); $($remaining:tt)*) => {
         $vec.push(SetEntry::Assign(vec![AST::Var(String::from(stringify!($ident)))], nix_inner!(parse $($val)*)));
@@ -40,8 +46,8 @@ macro_rules! nix_inner {
     (pat_default $($stuff:tt)+) => {{ Some(nix_inner!(parse $($stuff)+)) }};
     (pat_bind) => {{ None }};
     (pat_bind $name:ident) => {{ Some(String::from(stringify!($name))) }};
-    (pat_exact) => {{ true }};
-    (pat_exact $value:expr) => {{ $value }};
+    (pat_ellipsis) => {{ false }};
+    (pat_ellipsis $value:expr) => {{ $value }};
     (parse { $($token:tt)* }) => {{ nix_inner!(set (rec: false) { $($token)* }) }};
     (parse rec { $($token:tt)* }) => {{ nix_inner!(set (rec: true) { $($token)* }) }};
     (parse let {
@@ -83,7 +89,7 @@ macro_rules! nix_inner {
         AST::Lambda(LambdaArg::Ident(String::from(stringify!($fn))), Box::new(nix_inner!(parse $($body)*)))
     }};
     (parse $($bind:ident @)* {
-        $(( exact = $optional:expr ))*
+        $(( ellipsis = $optional:expr ))*
         $($arg:ident $(? ($($default:tt)*))*),*
     }: $($body:tt)*) => {{
         AST::Lambda(
@@ -92,52 +98,52 @@ macro_rules! nix_inner {
                     $(PatEntry(String::from(stringify!($arg)), nix_inner!(pat_default $($($default)*)*))),*
                 ],
                 bind: nix_inner!(pat_bind $($bind)*),
-                exact: nix_inner!(pat_exact $($optional)*)
+                ellipsis: nix_inner!(pat_ellipsis $($optional)*)
             },
             Box::new(nix_inner!(parse $($body)*))
         )
     }};
     (parse ($($val1:tt)*) + ($($val2:tt)*)) => {{
-        AST::Add(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Add) ($($val2)*))
     }};
     (parse ($($val1:tt)*) - ($($val2:tt)*)) => {{
-        AST::Sub(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Sub) ($($val2)*))
     }};
     (parse ($($val1:tt)*) * ($($val2:tt)*)) => {{
-        AST::Mul(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Mul) ($($val2)*))
     }};
     (parse ($($val1:tt)*) / ($($val2:tt)*)) => {{
-        AST::Div(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Div) ($($val2)*))
     }};
     (parse ($($val1:tt)*) ++ ($($val2:tt)*)) => {{
-        AST::Concat(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Concat) ($($val2)*))
     }};
     (parse ($($val1:tt)*) == ($($val2:tt)*)) => {{
-        AST::Equal(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Equal) ($($val2)*))
     }};
     (parse ($($val1:tt)*) -> ($($val2:tt)*)) => {{
-        AST::Implication(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Implication) ($($val2)*))
     }};
     (parse ($($val1:tt)*) != ($($val2:tt)*)) => {{
-        AST::NotEqual(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::NotEqual) ($($val2)*))
     }};
     (parse ($($val1:tt)*) <= ($($val2:tt)*)) => {{
-        AST::LessOrEq(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::LessOrEq) ($($val2)*))
     }};
     (parse ($($val1:tt)*) < ($($val2:tt)*)) => {{
-        AST::Less(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Less) ($($val2)*))
     }};
     (parse ($($val1:tt)*) >= ($($val2:tt)*)) => {{
-        AST::MoreOrEq(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::MoreOrEq) ($($val2)*))
     }};
     (parse ($($val1:tt)*) > ($($val2:tt)*)) => {{
-        AST::More(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::More) ($($val2)*))
     }};
     (parse ($($val1:tt)*) merge ($($val2:tt)*)) => {{
-        AST::Merge(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::Merge) ($($val2)*))
     }};
     (parse ($($val1:tt)*) ? ($($val2:tt)*)) => {{
-        AST::IsSet(Box::new((nix_inner!(parse $($val1)*), nix_inner!(parse $($val2)*))))
+        nix_inner!(op ($($val1)*) (Operator::IsSet) ($($val2)*))
     }};
     (parse ($($set:tt)*).($($index:tt)*) or ($($default:tt)*)) => {{
         AST::OrDefault(Box::new((
@@ -156,10 +162,10 @@ macro_rules! nix_inner {
         AST::List(vec![$(nix_inner!(parse $($item)*)),*])
     }};
     (parse -$($val:tt)*) => {{
-        AST::Negate(Box::new((nix_inner!(parse $($val)*))))
+        AST::Unary(Unary::Negate, Box::new((nix_inner!(parse $($val)*))))
     }};
     (parse !$($val:tt)*) => {{
-        AST::Invert(Box::new((nix_inner!(parse $($val)*))))
+        AST::Unary(Unary::Invert, Box::new((nix_inner!(parse $($val)*))))
     }};
     (parse dyn {$($val:tt)*}) => {{
         AST::Dynamic(Box::new((nix_inner!(parse $($val)*))))
@@ -174,8 +180,9 @@ macro_rules! nix_inner {
         AST::Value(Value::Path(Anchor::Relative, String::from(concat!("./", $val))))
     }};
     (parse raw $ast:expr) => {{ $ast }};
-    (parse multiline $val:expr) => {{ AST::Value(Value::Str {
+    (parse multiline original = $original:expr, $val:expr) => {{ AST::Value(Value::Str {
         multiline: true,
+        original: $original.into(),
         content: $val.into()
     }) }};
     (parse $val:expr) => {{ AST::Value(Value::from($val)) }};
@@ -189,7 +196,7 @@ macro_rules! nix {
     ($($tokens:tt)*) => {{
         #[allow(unused_imports)]
         use crate::{
-            parser::nometa::*,
+            parser::intoactualslowtree::*,
             value::{Anchor, Value}
         };
         nix_inner!(parse $($tokens)*)
@@ -199,7 +206,7 @@ macro_rules! nix {
 #[cfg(test)]
 #[test]
 fn test_macro() {
-    use crate::parser::nometa::*;
+    use crate::parser::intoactualslowtree::*;
     assert_eq!(
         nix!({
             string = ("Hello World");
@@ -209,9 +216,9 @@ fn test_macro() {
             recursive: false,
             values: vec![
                 SetEntry::Assign(vec![AST::Var("string".into())], AST::Value("Hello World".into())),
-                SetEntry::Assign(vec![AST::Var("number".into())], AST::Mul(Box::new((
+                SetEntry::Assign(vec![AST::Var("number".into())], AST::Operation(Operator::Mul, Box::new((
                     AST::Value(3.into()),
-                    AST::Add(Box::new((
+                    AST::Operation(Operator::Add, Box::new((
                         AST::Value(4.into()),
                         AST::Value(2.into()),
                     )))

@@ -12,9 +12,12 @@ and a lot more!
 
 rnix ...
 
- - will always maintain span information (line number and column) so the error
-   messages can be as useful as possible and any syntax highlighting plugin
-   could use the tokenizer to highlight.
+ - will always maintain span information (byte offset in the string) so the
+   error messages can be as useful as possible and any syntax highlighting
+   plugin could use the tokenizer to highlight.
+ - will preserve ALL syntax. Printing out the AST **must** print out the
+   original file - and if it doesn't that's a bug. (Thank
+   [@matklad](https://github.com/matklad) for the design ideas and motivation!)
  - works on top of Rust iterators, which are lazy by design. You get cool
    functions like `map` and `filter` at your fingertips!
 

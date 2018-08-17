@@ -1,12 +1,11 @@
 extern crate rnix;
 
-use rnix::parser::intoactualslowtree::{AST as ASTActual, IntoTree};
 use std::{env, fs};
 
 fn main() {
     let mut iter = env::args().skip(1).peekable();
     if iter.peek().is_none() {
-        eprintln!("Usage: dump-ast <file>");
+        eprintln!("Usage: preserve <file>");
         return;
     }
     for file in iter {
@@ -18,9 +17,7 @@ fn main() {
             }
         };
         match rnix::parse(&content) {
-            Ok(mut ast) => {
-                println!("{:#?}", ASTActual::into_tree(ast.root, &mut ast.arena))
-            },
+            Ok(ast) => print!("{}", ast),
             Err(err) => eprintln!("error: {:?}", err)
         }
     }

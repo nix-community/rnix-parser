@@ -1,93 +1,46 @@
-#![feature(rust_2018_preview, box_patterns)]
+#![feature(rust_2018_preview)]
 
 #[macro_use]
 extern crate failure;
-extern crate rnix;
 
 use failure::Error;
-use rnix::{parser::nometa::*, value::*};
-use std::{
-    collections::HashSet,
-    env,
-    fs,
-    path::{PathBuf, Path}
-};
+use std::{env, fs, path::Path};
 
 fn main() -> Result<(), Error> {
-    let nixpkgs = PathBuf::from(
-        &env::var("NIX_PATH")?.split(':')
-            .find(|s| s.starts_with("nixpkgs="))
-            .ok_or_else(|| format_err!("no store path found"))?
-            ["nixpkgs=".len()..]
-    );
+    let path = env::var("NIX_PATH")?;
+    let nixpkgs = path.split(':')
+        .find(|s| s.starts_with("nixpkgs="))
+        .ok_or_else(|| format_err!("no store path found"))?;
 
-    println!("Nix store path: {}", nixpkgs.display());
+    println!("Nix store path: {}", nixpkgs);
 
-    let mut app = App {
-        nixpkgs: nixpkgs.clone(),
-        checked: HashSet::new()
-    };
-
-    for path in &["lib/default.nix", "pkgs/top-level/all-packages.nix"] {
-        let default = nixpkgs.join(&path);
-        if let Err(err) = app.parse(&default) {
-            println!("error: {}", err);
-            break;
+    recurse(Path::new(&nixpkgs["nixpkgs=".len()..]))
+}
+fn recurse(path: &Path) -> Result<(), Error> {
+    if path.metadata()?.is_file() {
+        if path.extension().and_then(|s| s.to_str()) != Some("nix") {
+            return Ok(());
+        }
+        println!("Checking {}", path.display());
+        let original = fs::read_to_string(path)?;
+        let parsed = rnix::parse(&original)?.to_string();
+        if original != parsed {
+            eprintln!("Original input does not match parsed output!");
+            println!("Input:");
+            println!("----------");
+            println!("{}", original);
+            println!("----------");
+            println!("Output:");
+            println!("----------");
+            println!("{}", parsed);
+            println!("----------");
+            bail!("parsing error");
+        }
+        return Ok(());
+    } else {
+        for entry in path.read_dir()? {
+            recurse(&entry?.path())?;
         }
     }
     Ok(())
-}
-
-struct App {
-    nixpkgs: PathBuf,
-    checked: HashSet<PathBuf>
-}
-
-impl App {
-    fn parse(&mut self, file: &Path) -> Result<(), Error> {
-        if self.checked.contains(file) {
-            return Ok(());
-        }
-        self.checked.insert(file.to_path_buf());
-        print!("Trying {}... ", file.display());
-        let content = fs::read_to_string(file)?;
-        let ast = rnix::parse(&content)?.into(); // Drop all metadata
-        println!("success!");
-
-        self.resolve(file, &ast)
-    }
-    fn parse_file_from_ast(&mut self, file: &Path, ast: &AST) -> Result<(), Error> {
-        let mut file = match ast {
-            AST::Value(Value::Path(Anchor::Store, path)) => {
-                self.nixpkgs.join(&path)
-            },
-            AST::Value(Value::Path(Anchor::Relative, path)) => {
-                file.parent().unwrap().join(path)
-            },
-            //ast => bail!("importing on something that's not a good path: {:?}", ast)
-            _ => return Ok(())
-        };
-        if file.metadata()?.is_dir() {
-            file.push("default.nix");
-        }
-        self.parse(&file)
-    }
-    fn resolve(&mut self, file: &Path, ast: &AST) -> Result<(), Error> {
-        ast.recurse(&mut |ast| -> Result<(), Error> {
-            match ast {
-                AST::Apply(box (name, arg)) => {
-                    if let AST::Var(name) = name {
-                        if name == "callLibs" || name == "callPackage" {
-                            self.parse_file_from_ast(&file, arg)?;
-                        }
-                    }
-                },
-                AST::Import(path) => {
-                    self.parse_file_from_ast(&file, path)?;
-                },
-                _ => ()
-            }
-            Ok(())
-        })
-    }
 }

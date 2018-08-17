@@ -1,15 +1,21 @@
 #![feature(rust_2018_preview)]
 
+// TEMPORARY: Until I implement an arena-based tree
+#![feature(box_patterns)]
+
 #[macro_use]
 extern crate failure;
 
 #[cfg(test)]
 macro_rules! meta {
     (start: $start:expr, end: None) => {{
-        Meta { span: Span { start: $start, end: None }, comments: Vec::new() }
+        Meta { span: Span { start: $start, end: None }, ..Default::default() }
     }};
     (start: $start:expr, end: $end:expr) => {{
-        Meta { span: Span { start: $start, end: Some($end) }, comments: Vec::new() }
+        Meta { span: Span { start: $start, end: Some($end) }, ..Default::default() }
+    }};
+    (start: $start:expr, end: $end:expr, trailing: $amount:expr) => {{
+        Meta { span: Span { start: $start, end: Some($end) }, trailing: vec![Trivia::Spaces($amount)], ..Default::default() }
     }};
 }
 
@@ -52,19 +58,27 @@ impl From<(Option<Span>, ParseError)> for Error {
 /// by how much is unclear. If you need every ounce of speed you can get, rnix'
 /// other functions allow you not only to tokenize/parse lazily, but also do it
 /// in paralell.
-pub fn parse(input: &str) -> Result<parser::AST, Error> {
+pub fn parse(input: &str) -> Result<parser::AST<'static>, Error> {
     let tokens: Result<Vec<(Meta, Token)>, (Span, TokenizeError)> = tokenizer::tokenize(input).collect();
     parser::parse(tokens?).map_err(Error::from)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{parser::nometa::*, parse as inner_parse};
+    use super::{parser::intoactualslowtree::*, parse as inner_parse};
 
     fn parse(input: &str) -> AST {
-        inner_parse(input).expect("error while parsing").into()
+        let mut ast = inner_parse(input).expect("error while parsing");
+        AST::into_tree(ast.root, &mut ast.arena)
     }
 
+    #[test]
+    fn test_preserve() {
+        assert_eq!(
+            inner_parse(include_str!("../tests/meta.nix")).expect("error while parsing").to_string(),
+            include_str!("../tests/meta.nix")
+        );
+    }
     #[test]
     fn test_all() {
         assert_eq!(
@@ -73,7 +87,18 @@ mod tests {
                 int = (3);
                 float = (2.1);
                 string = ("Hello World");
-                multiline = (multiline r#"This is a multiline string :D
+                multiline = (multiline
+original = r#"
+    This is a multiline string :D
+    \'\'\'\'\
+    multiline = '''
+      Two single quotes: '''',
+      Interpolation: ''${test},
+      Escape interpolation: '''''${test}
+    ''';
+    special escape: $${test}
+  "#,
+r#"This is a multiline string :D
 \'\'\'\'\
 multiline = ''
   Two single quotes: ''',
@@ -136,9 +161,10 @@ special escape: $${test}
             )
         );
         assert_eq!(
-            parse(include_str!("../tests/comments.nix")),
+            parse(include_str!("../tests/meta.nix")),
             nix!({
                 string = ("42");
+                hi = (raw AST::Value(Value::Float("3.0000000".into())));
                 password = ("hunter2");
             })
         );
@@ -161,7 +187,7 @@ special escape: $${test}
             parse(include_str!("../tests/pattern.nix")),
             nix!(
                 { a ? ({ b ? ("test") }: b) }:
-                bind @ { (exact = false) value }:
+                bind @ { (ellipsis = true) value }:
                 1
             )
         );
