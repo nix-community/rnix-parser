@@ -1,4 +1,4 @@
-#![feature(rust_2018_preview)]
+#![feature(rust_2018_preview, catch_expr)]
 
 #[macro_use]
 extern crate failure;
@@ -62,7 +62,12 @@ pub fn parse(input: &str) -> Result<parser::AST<'static>, Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parser::intoactualslowtree::*, parse as inner_parse};
+    use super::{
+        parse as inner_parse,
+        parser::ParseError,
+        parser::intoactualslowtree::*,
+        tokenizer::{Span, TokenKind}
+    };
 
     fn parse(input: &str) -> AST {
         let mut ast = inner_parse(input).expect("error while parsing");
@@ -238,6 +243,19 @@ special escape: $${test}
             nix!(rec {
                 x = (({ a = (1); }) ? (b));
                 y = (({ b = (2); }).(c) or (5));
+            })
+        );
+        assert_eq!(
+            parse(include_str!("../tests/error.nix")),
+            nix!({
+                test = ({
+                    valid = ("entry");
+                    error (
+                        Some(Span { start: 46, end: Some(53) }),
+                        ParseError::Expected(TokenKind::Assign, Some(TokenKind::Value))
+                    );
+                    another = ("valid entry");
+                });
             })
         );
     }

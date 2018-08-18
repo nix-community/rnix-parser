@@ -32,6 +32,11 @@ macro_rules! nix_inner {
         $vec.push(SetEntry::Inherit(None, vec![$(String::from(stringify!($var))),*]));
         nix_inner!(entry($vec) $($remaining)*);
     }};
+    (entry($vec:expr) error ($span:expr, $err:expr); $($remaining:tt)*) => {{
+        $vec.push(SetEntry::Error(($span, $err)));
+        nix_inner!(entry($vec) $($remaining)*);
+
+    }};
     (set (rec: $recursive:expr) { $($inner:tt)* }) => {{
         AST::Set {
             recursive: $recursive,

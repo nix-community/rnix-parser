@@ -56,6 +56,7 @@ fn fmt_node<'a>(f: &mut fmt::Formatter, arena: &Arena<'a, ASTNode>, root: &ASTNo
         (set $values:expr) => {
             for entry in $values {
                 match entry {
+                    SetEntry::Error((_span, error)) => panic!("AST syntax error: {}", error),
                     SetEntry::Assign(Attribute(attr), eq, value, semi) => {
                         fmt!(attr attr);
                         fmt!(eq, "=");

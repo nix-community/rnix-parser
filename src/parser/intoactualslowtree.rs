@@ -10,10 +10,11 @@ use super::{
     ASTNode as ASTMeta,
     ASTType,
     Attribute as AttributeMeta,
+    Error,
     LambdaArg as LambdaArgMeta,
     Interpol as InterpolMeta,
-    PatEntry as PatEntryMeta,
     Parens as ParensMeta,
+    PatEntry as PatEntryMeta,
     SetEntry as SetEntryMeta
 };
 use crate::value::Value;
@@ -75,6 +76,7 @@ pub struct PatEntry(pub String, pub Option<AST>);
 /// An entry in a set
 #[derive(Clone, Debug, PartialEq)]
 pub enum SetEntry {
+    Error(Error),
     Assign(Vec<AST>, AST),
     Inherit(Option<AST>, Vec<String>)
 }
@@ -100,6 +102,7 @@ impl IntoTree<ParensMeta> for AST {
 impl IntoTree<SetEntryMeta> for SetEntry {
     fn into_tree<'a>(entry: SetEntryMeta, arena: &mut Arena<'a>) -> Self {
         match entry {
+            SetEntryMeta::Error(error) => SetEntry::Error(error),
             SetEntryMeta::Assign(AttributeMeta(key), _assign, value, _semi) => SetEntry::Assign(
                 key.into_iter().map(|(id, _dot)| AST::into_tree(arena.take(id), arena)).collect(),
                 AST::into_tree(arena.take(value), arena)

@@ -165,12 +165,13 @@ pub struct PatternBind {
 /// An entry in a set
 #[derive(Clone, Debug, PartialEq)]
 pub enum SetEntry {
+    Error(Error),
     Assign(Attribute, Meta, NodeId, Meta),
     Inherit(Meta, Option<Parens>, Vec<(Meta, String)>, Meta)
 }
 
-type Error = (Option<Span>, ParseError);
-type Result<T> = std::result::Result<T, Error>;
+crate type Error = (Option<Span>, ParseError);
+crate type Result<T> = std::result::Result<T, Error>;
 
 macro_rules! math {
     (only_once, $self:expr, $next:block, $($token:pat => $op:expr),*) => {{
@@ -284,6 +285,15 @@ impl<'a, I> Parser<'a, I>
             }
         } else {
             Err((None, ParseError::Expected(expected, None)))
+        }
+    }
+    fn recover(&mut self, recover: &[TokenKind]) -> bool {
+        loop {
+            match self.peek_kind() {
+                Some(kind) if recover.contains(&kind) => return true,
+                None => return false,
+                _ => { self.next().unwrap(); }
+            }
         }
     }
 
@@ -416,37 +426,48 @@ impl<'a, I> Parser<'a, I>
         )))
     }
     fn parse_set(&mut self, until: TokenKind) -> Result<(Meta, Vec<SetEntry>)> {
+        const RECOVER_SET: &[TokenKind] = &[TokenKind::Ident, TokenKind::Inherit, TokenKind::CurlyBClose];
         let mut values = Vec::new();
         loop {
-            match self.peek_kind() {
-                token if token == Some(until) => break,
-                Some(TokenKind::Inherit) => {
-                    let (meta, _) = self.next().unwrap();
+            let result = do catch {
+                match self.peek_kind() {
+                    token if token == Some(until) => break,
+                    Some(TokenKind::Inherit) => {
+                        let (meta, _) = self.next().unwrap();
 
-                    let from = if self.peek_kind() == Some(TokenKind::ParenOpen) {
-                        let (open, _) = self.next().unwrap();
-                        let from = self.parse_expr()?;
-                        let close = self.expect(TokenKind::ParenClose)?;
-                        Some(Parens(open, self.insert(from), close))
-                    } else {
-                        None
-                    };
+                        let from = if self.peek_kind() == Some(TokenKind::ParenOpen) {
+                            let (open, _) = self.next().unwrap();
+                            let from = self.parse_expr()?;
+                            let close = self.expect(TokenKind::ParenClose)?;
+                            Some(Parens(open, self.insert(from), close))
+                        } else {
+                            None
+                        };
 
-                    let mut vars = Vec::new();
-                    while let Some(Token::Ident(_)) = self.peek() {
-                        vars.push(self.next_ident().unwrap());
+                        let mut vars = Vec::new();
+                        while let Some(Token::Ident(_)) = self.peek() {
+                            vars.push(self.next_ident().unwrap());
+                        }
+                        let semi = self.expect(TokenKind::Semicolon)?;
+
+                        values.push(SetEntry::Inherit(meta, from, vars, semi));
+                    },
+                    _ => {
+                        let key = self.parse_attr()?;
+                        let assign = self.expect(TokenKind::Assign)?;
+                        let value = self.parse_expr()?;
+                        let semi = self.expect(TokenKind::Semicolon)?;
+
+                        values.push(SetEntry::Assign(key, assign, self.insert(value), semi));
                     }
-                    let semi = self.expect(TokenKind::Semicolon)?;
-
-                    values.push(SetEntry::Inherit(meta, from, vars, semi));
-                },
-                _ => {
-                    let key = self.parse_attr()?;
-                    let assign = self.expect(TokenKind::Assign)?;
-                    let value = self.parse_expr()?;
-                    let semi = self.expect(TokenKind::Semicolon)?;
-
-                    values.push(SetEntry::Assign(key, assign, self.insert(value), semi));
+                }
+            };
+            if let Err(err) = result {
+                println!("{:?}", err);
+                if self.recover(RECOVER_SET) {
+                    values.push(SetEntry::Error(err));
+                } else {
+                    return Err(err);
                 }
             }
         }
