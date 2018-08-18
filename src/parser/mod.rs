@@ -5,7 +5,7 @@ pub mod intoactualslowtree;
 mod display;
 
 use crate::{
-    tokenizer::{Interpol as TokenInterpol, Meta, Span, Token},
+    tokenizer::{Interpol as TokenInterpol, Meta, Span, Token, TokenKind},
     utils::stack::Stack,
     value::Value
 };
@@ -19,15 +19,13 @@ pub enum ParseError {
     #[fail(display = "can't bind pattern here, already bound before")]
     AlreadyBound,
     #[fail(display = "expected {:?}, found {:?}", _0, _1)]
-    Expected(Token, Option<Token>),
-    #[fail(display = "expected {}, found {:?}", _0, _1)]
-    ExpectedType(&'static str, Token),
+    Expected(TokenKind, Option<TokenKind>),
     #[fail(display = "invalid type! expected {}", _0)]
     InvalidType(&'static str),
     #[fail(display = "unexpected eof")]
     UnexpectedEOF,
     #[fail(display = "unexpected token {:?} not applicable in this context", _0)]
-    Unexpected(Token)
+    Unexpected(TokenKind)
 }
 
 /// An AST with the arena and node
@@ -175,10 +173,10 @@ type Error = (Option<Span>, ParseError);
 type Result<T> = std::result::Result<T, Error>;
 
 macro_rules! math {
-    (only_once, $self:expr, $next:block, $($token:pat $(if $cond:expr)* => $op:expr),*) => {{
+    (only_once, $self:expr, $next:block, $($token:pat => $op:expr),*) => {{
         let val = { $next };
-        Ok(match $self.peek() {
-            $(Some(&$token) $(if $cond)* => {
+        Ok(match $self.peek_kind() {
+            $(Some($token) => {
                 let (meta, _) = $self.next().unwrap();
                 let expr = { $next };
                 ASTNode(
@@ -189,11 +187,11 @@ macro_rules! math {
             _ => val
         })
     }};
-    ($self:expr, $next:block, $($token:pat $(if $cond:expr)* => $op:expr),*) => {{
+    ($self:expr, $next:block, $($token:pat => $op:expr),*) => {{
         let mut val = { $next };
         loop {
-            match $self.peek() {
-                $(Some(&$token) $(if $cond)* => {
+            match $self.peek_kind() {
+                $(Some($token) => {
                     let (meta, _) = $self.next().unwrap();
                     let expr = { $next };
                     val = ASTNode(
@@ -260,6 +258,9 @@ impl<'a, I> Parser<'a, I>
     fn peek(&mut self) -> Option<&Token> {
         self.peek_meta().map(|(_, token)| token)
     }
+    fn peek_kind(&mut self) -> Option<TokenKind> {
+        self.peek().map(Token::kind)
+    }
     fn next_raw(&mut self) -> Result<I::Item> {
         self.buffer.pop()
             .or_else(|| self.iter.next())
@@ -268,24 +269,23 @@ impl<'a, I> Parser<'a, I>
     fn next(&mut self) -> Result<I::Item> {
         let mut next = self.next_raw()?;
 
-        if let Some(Token::EOF) = self.peek() {
+        if let Some(TokenKind::EOF) = self.peek_kind() {
             let (mut meta, _) = self.next_raw()?;
             next.0.trailing.append(&mut meta.leading);
         }
         Ok(next)
     }
-    fn expect(&mut self, expected: Token) -> Result<Meta> {
+    fn expect(&mut self, expected: TokenKind) -> Result<Meta> {
         if let Ok((meta, actual)) = self.next() {
-            if actual == expected {
+            if actual.kind() == expected {
                 Ok(meta)
             } else {
-                Err((Some(meta.span), ParseError::Expected(expected, Some(actual))))
+                Err((Some(meta.span), ParseError::Expected(expected, Some(actual.kind()))))
             }
         } else {
             Err((None, ParseError::Expected(expected, None)))
         }
     }
-
 
     fn parse_interpol(&mut self, meta: Meta, multiline: bool, values: Vec<TokenInterpol>) -> Result<ASTType> {
         let mut parsed = Vec::new();
@@ -323,7 +323,7 @@ impl<'a, I> Parser<'a, I>
                 meta.span,
                 self.parse_interpol(meta, multiline, parts)?
             )),
-            (meta, token) => Err((Some(meta.span), ParseError::ExpectedType("attribute", token)))
+            (meta, token) => Err((Some(meta.span), ParseError::Expected(TokenKind::Ident, Some(token.kind()))))
         }
     }
     fn parse_attr(&mut self) -> Result<Attribute> {
@@ -331,7 +331,7 @@ impl<'a, I> Parser<'a, I>
         loop {
             let attr = self.next_attr()?;
             let attr = self.insert(attr);
-            if self.peek() == Some(&Token::Dot) {
+            if self.peek_kind() == Some(TokenKind::Dot) {
                 let (dot, _) = self.next().unwrap();
                 path.push((attr, Some(dot)));
             } else {
@@ -344,7 +344,7 @@ impl<'a, I> Parser<'a, I>
     fn next_ident(&mut self) -> Result<(Meta, String)> {
         match self.next()? {
             (meta, Token::Ident(name)) => Ok((meta, name)),
-            (meta, token) => Err((Some(meta.span), ParseError::ExpectedType("ident", token)))
+            (meta, token) => Err((Some(meta.span), ParseError::Expected(TokenKind::Ident, Some(token.kind()))))
         }
     }
     fn parse_pattern(&mut self, open: Meta, mut bind: Option<PatternBind>) -> Result<ASTNode> {
@@ -353,24 +353,24 @@ impl<'a, I> Parser<'a, I>
         let mut args = Vec::with_capacity(1);
         let mut ellipsis = None;
         loop {
-            let (ident, name) = match self.peek_meta() {
-                Some((_, Token::Ellipsis)) => {
+            let (ident, name) = match self.peek_kind() {
+                Some(TokenKind::Ellipsis) => {
                     let (new, _) = self.next().unwrap();
                     ellipsis = Some(new);
                     break;
                 },
-                Some((_, Token::CurlyBClose)) => break,
+                Some(TokenKind::CurlyBClose) => break,
                 _ => self.next_ident()?,
             };
-            let default = if self.peek() == Some(&Token::Question) {
+            let default = if self.peek_kind() == Some(TokenKind::Question) {
                 let (question, _) = self.next().unwrap();
                 let expr = self.parse_expr()?;
                 Some((question, self.insert(expr)))
             } else {
                 None
             };
-            let comma = match self.peek() {
-                Some(Token::Comma) => Some(self.next().unwrap().0),
+            let comma = match self.peek_kind() {
+                Some(TokenKind::Comma) => Some(self.next().unwrap().0),
                 _ => None
             };
             let no_comma = comma.is_none();
@@ -385,9 +385,9 @@ impl<'a, I> Parser<'a, I>
             }
         }
 
-        let close = self.expect(Token::CurlyBClose)?;
+        let close = self.expect(TokenKind::CurlyBClose)?;
 
-        if let Some(Token::At) = self.peek() {
+        if let Some(TokenKind::At) = self.peek_kind() {
             let (at, _) = self.next().unwrap();
             if bind.is_some() {
                 return Err((Some(at.span), ParseError::AlreadyBound));
@@ -402,7 +402,7 @@ impl<'a, I> Parser<'a, I>
             });
         }
 
-        let colon = self.expect(Token::Colon)?;
+        let colon = self.expect(TokenKind::Colon)?;
         let expr = self.parse_expr()?;
 
         Ok(ASTNode(start.until(expr.0), ASTType::Lambda(
@@ -415,18 +415,18 @@ impl<'a, I> Parser<'a, I>
             self.insert(expr)
         )))
     }
-    fn parse_set(&mut self, until: &Token) -> Result<(Meta, Vec<SetEntry>)> {
+    fn parse_set(&mut self, until: TokenKind) -> Result<(Meta, Vec<SetEntry>)> {
         let mut values = Vec::new();
         loop {
-            match self.peek() {
+            match self.peek_kind() {
                 token if token == Some(until) => break,
-                Some(Token::Inherit) => {
+                Some(TokenKind::Inherit) => {
                     let (meta, _) = self.next().unwrap();
 
-                    let from = if self.peek() == Some(&Token::ParenOpen) {
+                    let from = if self.peek_kind() == Some(TokenKind::ParenOpen) {
                         let (open, _) = self.next().unwrap();
                         let from = self.parse_expr()?;
-                        let close = self.expect(Token::ParenClose)?;
+                        let close = self.expect(TokenKind::ParenClose)?;
                         Some(Parens(open, self.insert(from), close))
                     } else {
                         None
@@ -436,15 +436,15 @@ impl<'a, I> Parser<'a, I>
                     while let Some(Token::Ident(_)) = self.peek() {
                         vars.push(self.next_ident().unwrap());
                     }
-                    let semi = self.expect(Token::Semicolon)?;
+                    let semi = self.expect(TokenKind::Semicolon)?;
 
                     values.push(SetEntry::Inherit(meta, from, vars, semi));
                 },
                 _ => {
                     let key = self.parse_attr()?;
-                    let assign = self.expect(Token::Assign)?;
+                    let assign = self.expect(TokenKind::Assign)?;
                     let value = self.parse_expr()?;
-                    let semi = self.expect(Token::Semicolon)?;
+                    let semi = self.expect(TokenKind::Semicolon)?;
 
                     values.push(SetEntry::Assign(key, assign, self.insert(value), semi));
                 }
@@ -454,36 +454,37 @@ impl<'a, I> Parser<'a, I>
         Ok((end, values))
     }
     fn parse_val(&mut self) -> Result<ASTNode> {
-        let mut val = match self.next()? {
-            (open, Token::ParenOpen) => {
+        let (meta, token) = self.next()?;
+        let mut val = match (meta, token.kind(), token) {
+            (open, TokenKind::ParenOpen, _) => {
                 let expr = self.parse_expr()?;
-                let close = self.expect(Token::ParenClose)?;
+                let close = self.expect(TokenKind::ParenClose)?;
                 ASTNode(
                     open.span.until(close.span),
                     ASTType::Parens(Parens(open, self.insert(expr), close))
                 )
             },
-            (import, Token::Import) => {
+            (import, TokenKind::Import, _) => {
                 let value = self.parse_val()?;
                 ASTNode(import.span.until(value.0), ASTType::Import(import, self.insert(value)))
             },
-            (rec, Token::Rec) => {
-                let open = self.expect(Token::CurlyBOpen)?;
-                let (close, values) = self.parse_set(&Token::CurlyBClose)?;
+            (rec, TokenKind::Rec, _) => {
+                let open = self.expect(TokenKind::CurlyBOpen)?;
+                let (close, values) = self.parse_set(TokenKind::CurlyBClose)?;
                 ASTNode(rec.span.until(close.span), ASTType::Set {
                     recursive: Some(rec),
                     values: Brackets(open, values, close)
                 })
             },
-            (open, Token::CurlyBOpen) => {
+            (open, TokenKind::CurlyBOpen, _) => {
                 let temporary = self.next()?;
-                match (&temporary.1, self.peek()) {
-                    (Token::Ident(_), Some(Token::Comma))
-                            | (Token::Ident(_), Some(Token::Question))
-                            | (Token::Ellipsis, Some(Token::CurlyBClose))
-                            | (Token::Ident(_), Some(Token::CurlyBClose))
-                            | (Token::CurlyBClose, Some(Token::Colon))
-                            | (Token::CurlyBClose, Some(Token::At)) => {
+                match (temporary.1.kind(), self.peek_kind()) {
+                    (TokenKind::Ident, Some(TokenKind::Comma))
+                            | (TokenKind::Ident, Some(TokenKind::Question))
+                            | (TokenKind::Ellipsis, Some(TokenKind::CurlyBClose))
+                            | (TokenKind::Ident, Some(TokenKind::CurlyBClose))
+                            | (TokenKind::CurlyBClose, Some(TokenKind::Colon))
+                            | (TokenKind::CurlyBClose, Some(TokenKind::At)) => {
                         // We did a lookahead, put it back
                         self.buffer.push(temporary);
                         self.parse_pattern(open, None)?
@@ -492,7 +493,7 @@ impl<'a, I> Parser<'a, I>
                         // We did a lookahead, put it back
                         self.buffer.push(temporary);
 
-                        let (close, values) = self.parse_set(&Token::CurlyBClose)?;
+                        let (close, values) = self.parse_set(TokenKind::CurlyBClose)?;
                         ASTNode(open.span.until(close.span), ASTType::Set {
                             recursive: None,
                             values: Brackets(open, values, close)
@@ -500,22 +501,21 @@ impl<'a, I> Parser<'a, I>
                     }
                 }
             },
-            (open, Token::SquareBOpen) => {
+            (open, TokenKind::SquareBOpen, _) => {
                 let mut values = Vec::new();
                 loop {
-                    let peek = self.peek();
-                    match peek {
-                        None | Some(Token::SquareBClose) => break,
+                    match self.peek_kind() {
+                        None | Some(TokenKind::SquareBClose) => break,
                         _ => {
                             let val = self.parse_val()?;
                             values.push(self.insert(val));
                         }
                     }
                 }
-                let close = self.expect(Token::SquareBClose)?;
+                let close = self.expect(TokenKind::SquareBClose)?;
                 ASTNode(open.span.until(close.span), ASTType::List(open, values, close))
             },
-            (meta, Token::Dynamic(values, close)) => {
+            (meta, _, Token::Dynamic(values, close)) => {
                 let parsed = self.parse_branch(values)?;
                 ASTNode(meta.span, ASTType::Dynamic {
                     meta: meta,
@@ -523,10 +523,10 @@ impl<'a, I> Parser<'a, I>
                     close
                 })
             },
-            (meta, Token::Value(val)) => ASTNode(meta.span, ASTType::Value(meta, val)),
-            (meta, Token::Ident(name)) => if self.peek() == Some(&Token::At) {
+            (meta, _, Token::Value(val)) => ASTNode(meta.span, ASTType::Value(meta, val)),
+            (meta, _, Token::Ident(name)) => if self.peek_kind() == Some(TokenKind::At) {
                 let (at, _) = self.next().unwrap();
-                let open = self.expect(Token::CurlyBOpen)?;
+                let open = self.expect(TokenKind::CurlyBOpen)?;
                 self.parse_pattern(open, Some(PatternBind {
                     before: true,
                     span: meta.span.until(at.span),
@@ -537,14 +537,14 @@ impl<'a, I> Parser<'a, I>
             } else {
                 ASTNode(meta.span, ASTType::Var(meta, name))
             },
-            (meta, Token::Interpol { multiline, parts }) => ASTNode(
+            (meta, _, Token::Interpol { multiline, parts }) => ASTNode(
                 meta.span,
                 self.parse_interpol(meta, multiline, parts)?
             ),
-            (meta, token) => return Err((Some(meta.span), ParseError::Unexpected(token)))
+            (meta, kind, _) => return Err((Some(meta.span), ParseError::Unexpected(kind)))
         };
 
-        while self.peek() == Some(&Token::Dot) {
+        while self.peek_kind() == Some(TokenKind::Dot) {
             let (dot, _) = self.next().unwrap();
             let attr = self.next_attr()?;
             match self.peek() {
@@ -574,7 +574,7 @@ impl<'a, I> Parser<'a, I>
     fn parse_fn(&mut self) -> Result<ASTNode> {
         let mut val = self.parse_val()?;
 
-        while self.peek().map(|t| t.is_fn_arg()).unwrap_or(false) {
+        while self.peek_kind().map(|t| t.is_fn_arg()).unwrap_or(false) {
             let arg = self.parse_val()?;
             val = ASTNode(
                 val.0.until(arg.0).into(),
@@ -585,7 +585,7 @@ impl<'a, I> Parser<'a, I>
         Ok(val)
     }
     fn parse_negate(&mut self) -> Result<ASTNode> {
-        if self.peek() == Some(&Token::Sub) {
+        if self.peek_kind() == Some(TokenKind::Sub) {
             let (sub, _) = self.next().unwrap();
             let expr = self.parse_negate()?;
             Ok(ASTNode(sub.span.until(expr.0), ASTType::Unary(sub, Unary::Negate, self.insert(expr))))
@@ -594,27 +594,27 @@ impl<'a, I> Parser<'a, I>
         }
     }
     fn parse_isset(&mut self) -> Result<ASTNode> {
-        math!(self, { self.parse_negate()? }, Token::Question => Operator::IsSet)
+        math!(self, { self.parse_negate()? }, TokenKind::Question => Operator::IsSet)
     }
     fn parse_concat(&mut self) -> Result<ASTNode> {
-        math!(self, { self.parse_isset()? }, Token::Concat => Operator::Concat)
+        math!(self, { self.parse_isset()? }, TokenKind::Concat => Operator::Concat)
     }
     fn parse_mul(&mut self) -> Result<ASTNode> {
         math!(
             self, { self.parse_concat()? },
-            Token::Mul => Operator::Mul,
-            Token::Div => Operator::Div
+            TokenKind::Mul => Operator::Mul,
+            TokenKind::Div => Operator::Div
         )
     }
     fn parse_add(&mut self) -> Result<ASTNode> {
         math!(
             self, { self.parse_mul()? },
-            Token::Add => Operator::Add,
-            Token::Sub => Operator::Sub
+            TokenKind::Add => Operator::Add,
+            TokenKind::Sub => Operator::Sub
         )
     }
     fn parse_invert(&mut self) -> Result<ASTNode> {
-        if self.peek() == Some(&Token::Invert) {
+        if self.peek_kind() == Some(TokenKind::Invert) {
             let (excl, _) = self.next().unwrap();
             let expr = self.parse_invert()?;
             Ok(ASTNode(excl.span.until(expr.0), ASTType::Unary(excl, Unary::Invert, self.insert(expr))))
@@ -623,35 +623,32 @@ impl<'a, I> Parser<'a, I>
         }
     }
     fn parse_merge(&mut self) -> Result<ASTNode> {
-        math!(self, { self.parse_invert()? }, Token::Merge => Operator::Merge)
+        math!(self, { self.parse_invert()? }, TokenKind::Merge => Operator::Merge)
     }
     fn parse_compare(&mut self) -> Result<ASTNode> {
         math!(
             only_once, self, { self.parse_merge()? },
-            Token::Less => Operator::Less,
-            Token::LessOrEq => Operator::LessOrEq,
-            Token::More => Operator::More,
-            Token::MoreOrEq => Operator::MoreOrEq
+            TokenKind::Less => Operator::Less,
+            TokenKind::LessOrEq => Operator::LessOrEq,
+            TokenKind::More => Operator::More,
+            TokenKind::MoreOrEq => Operator::MoreOrEq
         )
     }
     fn parse_equal(&mut self) -> Result<ASTNode> {
         math!(
             only_once, self, { self.parse_compare()? },
-            Token::Equal => Operator::Equal,
-            Token::NotEqual => Operator::NotEqual
+            TokenKind::Equal => Operator::Equal,
+            TokenKind::NotEqual => Operator::NotEqual
         )
     }
     fn parse_and(&mut self) -> Result<ASTNode> {
-        math!(self, { self.parse_equal()? }, Token::And => Operator::And)
+        math!(self, { self.parse_equal()? }, TokenKind::And => Operator::And)
     }
     fn parse_or(&mut self) -> Result<ASTNode> {
-        math!(self, { self.parse_and()? }, Token::Or => Operator::Or)
+        math!(self, { self.parse_and()? }, TokenKind::Or => Operator::Or)
     }
     fn parse_implication(&mut self) -> Result<ASTNode> {
-        math!(
-            self, { self.parse_or()? },
-            Token::Implication => Operator::Implication
-        )
+        math!(self, { self.parse_or()? }, TokenKind::Implication => Operator::Implication)
     }
     #[inline(always)]
     fn parse_math(&mut self) -> Result<ASTNode> {
@@ -660,18 +657,18 @@ impl<'a, I> Parser<'a, I>
     }
     /// Parse Nix code into an AST
     pub fn parse_expr(&mut self) -> Result<ASTNode> {
-        Ok(match self.peek() {
-            Some(Token::Let) => {
+        Ok(match self.peek_kind() {
+            Some(TokenKind::Let) => {
                 let (let_, _) = self.next().unwrap();
-                if self.peek() == Some(&Token::CurlyBOpen) {
+                if self.peek_kind() == Some(TokenKind::CurlyBOpen) {
                     let (open, _) = self.next().unwrap();
-                    let (close, vars) = self.parse_set(&Token::CurlyBClose)?;
+                    let (close, vars) = self.parse_set(TokenKind::CurlyBClose)?;
                     ASTNode(
                         let_.span.until(close.span),
                         ASTType::Let(let_, Brackets(open, vars, close))
                     )
                 } else {
-                    let (in_, vars) = self.parse_set(&Token::In)?;
+                    let (in_, vars) = self.parse_set(TokenKind::In)?;
                     let expr = self.parse_expr()?;
                     ASTNode(
                         let_.span.until(expr.0),
@@ -679,22 +676,22 @@ impl<'a, I> Parser<'a, I>
                     )
                 }
             },
-            Some(Token::With) => {
+            Some(TokenKind::With) => {
                 let (with, _) = self.next().unwrap();
                 let vars = self.parse_expr()?;
-                let semi = self.expect(Token::Semicolon)?;
+                let semi = self.expect(TokenKind::Semicolon)?;
                 let rest = self.parse_expr()?;
                 ASTNode(
                     with.span.until(rest.0),
                     ASTType::With(with, self.insert(vars), semi, self.insert(rest))
                 )
             },
-            Some(Token::If) => {
+            Some(TokenKind::If) => {
                 let (if_meta, _) = self.next().unwrap();
                 let condition = self.parse_expr()?;
-                let then_meta = self.expect(Token::Then)?;
+                let then_meta = self.expect(TokenKind::Then)?;
                 let body = self.parse_expr()?;
-                let else_meta = self.expect(Token::Else)?;
+                let else_meta = self.expect(TokenKind::Else)?;
                 let otherwise = self.parse_expr()?;
                 ASTNode(
                     if_meta.span.until(otherwise.0).into(),
@@ -708,10 +705,10 @@ impl<'a, I> Parser<'a, I>
                     }
                 )
             },
-            Some(Token::Assert) => {
+            Some(TokenKind::Assert) => {
                 let (assert, _) = self.next().unwrap();
                 let condition = self.parse_expr()?;
-                let semi = self.expect(Token::Semicolon)?;
+                let semi = self.expect(TokenKind::Semicolon)?;
                 let rest = self.parse_expr()?;
                 ASTNode(
                     assert.span.until(rest.0),
@@ -719,7 +716,7 @@ impl<'a, I> Parser<'a, I>
                 )
             },
             _ => match self.parse_math()? {
-                ASTNode(start, ASTType::Var(meta, name)) => if self.peek() == Some(&Token::Colon) {
+                ASTNode(start, ASTType::Var(meta, name)) => if self.peek_kind() == Some(TokenKind::Colon) {
                     let (colon, _) = self.next().unwrap();
                     let expr = self.parse_expr()?;
                     ASTNode(
@@ -755,14 +752,14 @@ pub fn parse<I>(iter: I) -> Result<AST<'static>>
 #[cfg(test)]
 mod tests {
     use crate::{
-        tokenizer::{Interpol as TokenInterpol, Meta, Span, Token, Trivia},
+        tokenizer::{Interpol as TokenInterpol, Meta, Span, Token, TokenKind, Trivia},
         value::{Anchor, Value}
     };
     use super::{intoactualslowtree::*, ASTNode as ASTSpan, ASTType, NodeId, OR, ParseError};
 
     macro_rules! parse {
         ($($token:expr),*) => {
-            super::parse(vec![$((Meta::default(), $token)),*])
+            super::parse(vec![$((Meta::default(), $token.into())),*])
                 .map(|mut ast| AST::into_tree(ast.root, &mut ast.arena))
         };
     }
@@ -771,12 +768,12 @@ mod tests {
     fn set() {
         assert_eq!(
             parse![
-                Token::CurlyBOpen,
+                TokenKind::CurlyBOpen,
 
-                Token::Ident("meaning_of_life".into()), Token::Assign, Token::Value(42.into()), Token::Semicolon,
-                Token::Ident("H4X0RNUM83R".into()), Token::Assign, Token::Value(1.337.into()), Token::Semicolon,
+                Token::Ident("meaning_of_life".into()), TokenKind::Assign, Token::Value(42.into()), TokenKind::Semicolon,
+                Token::Ident("H4X0RNUM83R".into()), TokenKind::Assign, Token::Value(1.337.into()), TokenKind::Semicolon,
 
-                Token::CurlyBClose
+                TokenKind::CurlyBClose
             ],
             Ok(AST::Set {
                 recursive: false,
@@ -788,9 +785,9 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::Rec, Token::CurlyBOpen,
-                Token::Ident("test".into()), Token::Assign, Token::Value(1.into()), Token::Semicolon,
-                Token::CurlyBClose
+                TokenKind::Rec, TokenKind::CurlyBOpen,
+                Token::Ident("test".into()), TokenKind::Assign, Token::Value(1.into()), TokenKind::Semicolon,
+                TokenKind::CurlyBClose
             ],
             Ok(AST::Set {
                 recursive: true,
@@ -798,7 +795,7 @@ mod tests {
             })
         );
         assert_eq!(
-            parse![Token::CurlyBOpen, Token::CurlyBClose],
+            parse![TokenKind::CurlyBOpen, TokenKind::CurlyBClose],
             Ok(AST::Set {
                 recursive: false,
                 values: Vec::new()
@@ -806,11 +803,11 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::CurlyBOpen,
+                TokenKind::CurlyBOpen,
 
                 Token::Ident("a".into()),
-                    Token::Dot, Token::Value("b".into()),
-                Token::Assign, Token::Value(1.into()), Token::Semicolon,
+                    TokenKind::Dot, Token::Value("b".into()),
+                TokenKind::Assign, Token::Value(1.into()), TokenKind::Semicolon,
 
                 Token::Interpol {
                     multiline: false,
@@ -821,10 +818,10 @@ mod tests {
                         }
                     ]
                 },
-                Token::Dot, Token::Dynamic(vec![(Meta::default(), Token::Ident("d".into()))], Meta::default()),
-                Token::Assign, Token::Value(2.into()), Token::Semicolon,
+                TokenKind::Dot, Token::Dynamic(vec![(Meta::default(), Token::Ident("d".into()))], Meta::default()),
+                TokenKind::Assign, Token::Value(2.into()), TokenKind::Semicolon,
 
-                Token::CurlyBClose
+                TokenKind::CurlyBClose
             ],
             Ok(AST::Set {
                 recursive: false,
@@ -844,20 +841,20 @@ mod tests {
     #[test]
     fn meta() {
         let ast = super::parse(vec![
-            (Meta::default(), Token::CurlyBOpen),
-            (meta! { start: 1, end: 2 }, Token::Semicolon),
+            (Meta::default(), TokenKind::CurlyBOpen.into()),
+            (meta! { start: 1, end: 2 }, TokenKind::Semicolon.into()),
         ]);
         assert_eq!(
             ast.map(|_| ()),
             Err((
                 Some(Span { start: 1, end: Some(2) }),
-                ParseError::ExpectedType("attribute", Token::Semicolon)
+                ParseError::Expected(TokenKind::Ident, Some(TokenKind::Semicolon))
             ))
         );
         let ast = super::parse(vec![
             // 1 + /*Hello World*/ 2 * 3
             (meta! { start: 0, end: 1, trailing: 1 }, Token::Value(1.into())),
-            (meta! { start: 2, end: 3, trailing: 1 }, Token::Add),
+            (meta! { start: 2, end: 3, trailing: 1 }, TokenKind::Add.into()),
             (
                 Meta {
                     span: Span { start: 20, end: Some(21) },
@@ -872,7 +869,7 @@ mod tests {
                 },
                 Token::Value(2.into())
             ),
-            (meta! { start: 22, end: 23, trailing: 1 }, Token::Mul),
+            (meta! { start: 22, end: 23, trailing: 1 }, TokenKind::Mul.into()),
             (meta! { start: 24, end: 25 }, Token::Value(3.into())),
         ]).unwrap();
         assert_eq!(
@@ -935,7 +932,7 @@ mod tests {
     fn math() {
         assert_eq!(
             parse![
-                Token::Value(1.into()), Token::Add, Token::Value(2.into()), Token::Mul, Token::Value(3.into())
+                Token::Value(1.into()), TokenKind::Add, Token::Value(2.into()), TokenKind::Mul, Token::Value(3.into())
             ],
             Ok(AST::Operation(Operator::Add, Box::new((
                 AST::Value(1.into()),
@@ -947,10 +944,10 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::Value(5.into()), Token::Mul,
-                Token::Sub, Token::ParenOpen,
-                    Token::Value(3.into()), Token::Sub, Token::Value(2.into()),
-                Token::ParenClose
+                Token::Value(5.into()), TokenKind::Mul,
+                TokenKind::Sub, TokenKind::ParenOpen,
+                    Token::Value(3.into()), TokenKind::Sub, Token::Value(2.into()),
+                TokenKind::ParenClose
             ],
             Ok(AST::Operation(Operator::Mul, Box::new((
                 AST::Value(5.into()),
@@ -965,9 +962,9 @@ mod tests {
     fn let_in() {
         assert_eq!(
             parse![
-                Token::Let,
-                    Token::Ident("a".into()), Token::Assign, Token::Value(42.into()), Token::Semicolon,
-                Token::In,
+                TokenKind::Let,
+                    Token::Ident("a".into()), TokenKind::Assign, Token::Value(42.into()), TokenKind::Semicolon,
+                TokenKind::In,
                     Token::Ident("a".into())
             ],
             Ok(AST::LetIn(
@@ -980,10 +977,10 @@ mod tests {
     fn let_legacy_syntax() {
         assert_eq!(
             parse![
-                Token::Let, Token::CurlyBOpen,
-                    Token::Ident("a".into()), Token::Assign, Token::Value(42.into()), Token::Semicolon,
-                    Token::Ident("body".into()), Token::Assign, Token::Ident("a".into()), Token::Semicolon,
-                Token::CurlyBClose
+                TokenKind::Let, TokenKind::CurlyBOpen,
+                    Token::Ident("a".into()), TokenKind::Assign, Token::Value(42.into()), TokenKind::Semicolon,
+                    Token::Ident("body".into()), TokenKind::Assign, Token::Ident("a".into()), TokenKind::Semicolon,
+                TokenKind::CurlyBClose
             ],
             Ok(AST::Let(vec![
                 SetEntry::Assign(vec![AST::Var("a".into())], AST::Value(42.into())),
@@ -995,7 +992,7 @@ mod tests {
     fn with() {
         assert_eq!(
             parse![
-                Token::With, Token::Ident("namespace".into()), Token::Semicolon,
+                TokenKind::With, Token::Ident("namespace".into()), TokenKind::Semicolon,
                 Token::Ident("expr".into())
             ],
             Ok(AST::With(Box::new((
@@ -1008,9 +1005,9 @@ mod tests {
     fn import() {
         assert_eq!(
             parse![
-                Token::Import,
+                TokenKind::Import,
                 Token::Value(Value::Path(Anchor::Store, "nixpkgs".into())),
-                Token::CurlyBOpen, Token::CurlyBClose
+                TokenKind::CurlyBOpen, TokenKind::CurlyBClose
             ],
             Ok(AST::Apply(Box::new((
                 AST::Import(Box::new(
@@ -1028,8 +1025,8 @@ mod tests {
         assert_eq!(
             parse![
                 Token::Ident("a".into()),
-                Token::Dot, Token::Ident("b".into()),
-                Token::Dot, Token::Ident("c".into())
+                TokenKind::Dot, Token::Ident("b".into()),
+                TokenKind::Dot, Token::Ident("c".into())
             ],
             Ok(AST::IndexSet(Box::new((
                 AST::IndexSet(Box::new((
@@ -1041,12 +1038,12 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::CurlyBOpen,
+                TokenKind::CurlyBOpen,
                     Token::Ident("a".into()),
-                        Token::Dot, Token::Ident("b".into()),
-                        Token::Dot, Token::Ident("c".into()),
-                    Token::Assign, Token::Value(1.into()), Token::Semicolon,
-                Token::CurlyBClose
+                        TokenKind::Dot, Token::Ident("b".into()),
+                        TokenKind::Dot, Token::Ident("c".into()),
+                    TokenKind::Assign, Token::Value(1.into()), TokenKind::Semicolon,
+                TokenKind::CurlyBClose
             ],
             Ok(AST::Set {
                 recursive: false,
@@ -1062,8 +1059,8 @@ mod tests {
         assert_eq!(
             parse![
                 Token::Ident("test".into()),
-                    Token::Dot, Token::Value("invalid ident".into()),
-                    Token::Dot, Token::Interpol {
+                    TokenKind::Dot, Token::Value("invalid ident".into()),
+                    TokenKind::Dot, Token::Interpol {
                         multiline: false,
                         parts: vec![
                             TokenInterpol::Literal {
@@ -1072,7 +1069,7 @@ mod tests {
                             }
                         ]
                     },
-                    Token::Dot, Token::Dynamic(
+                    TokenKind::Dot, Token::Dynamic(
                         vec![(Meta::default(), Token::Ident("a".into()))],
                         Meta::default()
                     )
@@ -1102,13 +1099,13 @@ mod tests {
                         },
                         TokenInterpol::Tokens(
                             vec![
-                                (Meta::default(), Token::CurlyBOpen),
+                                (Meta::default(), TokenKind::CurlyBOpen.into()),
                                 (Meta::default(), Token::Ident("world".into())),
-                                (Meta::default(), Token::Assign),
+                                (Meta::default(), TokenKind::Assign.into()),
                                 (Meta::default(), Token::Value("World".into())),
-                                (Meta::default(), Token::Semicolon),
-                                (Meta::default(), Token::CurlyBClose),
-                                (Meta::default(), Token::Dot),
+                                (Meta::default(), TokenKind::Semicolon.into()),
+                                (Meta::default(), TokenKind::CurlyBClose.into()),
+                                (Meta::default(), TokenKind::Dot.into()),
                                 (Meta::default(), Token::Ident("world".into()))
                             ],
                             Meta::default()
@@ -1140,10 +1137,10 @@ mod tests {
     fn list() {
         assert_eq!(
             parse![
-               Token::SquareBOpen,
+               TokenKind::SquareBOpen,
                Token::Ident("a".into()), Token::Value(2.into()), Token::Value(3.into()),
                Token::Value("lol".into()),
-               Token::SquareBClose
+               TokenKind::SquareBClose
             ],
             Ok(AST::List(vec![
                 AST::Var("a".into()), AST::Value(2.into()), AST::Value(3.into()),
@@ -1152,9 +1149,9 @@ mod tests {
         );
         assert_eq!(
             parse![
-               Token::SquareBOpen, Token::Value(1.into()), Token::SquareBClose, Token::Concat,
-               Token::SquareBOpen, Token::Value(2.into()), Token::SquareBClose, Token::Concat,
-               Token::SquareBOpen, Token::Value(3.into()), Token::SquareBClose
+               TokenKind::SquareBOpen, Token::Value(1.into()), TokenKind::SquareBClose, TokenKind::Concat,
+               TokenKind::SquareBOpen, Token::Value(2.into()), TokenKind::SquareBClose, TokenKind::Concat,
+               TokenKind::SquareBOpen, Token::Value(3.into()), TokenKind::SquareBClose
             ],
             Ok(AST::Operation(Operator::Concat, Box::new((
                 AST::Operation(Operator::Concat, Box::new((
@@ -1169,8 +1166,8 @@ mod tests {
     fn functions() {
         assert_eq!(
             parse![
-               Token::Ident("a".into()), Token::Colon, Token::Ident("b".into()), Token::Colon,
-               Token::Ident("a".into()), Token::Add, Token::Ident("b".into())
+               Token::Ident("a".into()), TokenKind::Colon, Token::Ident("b".into()), TokenKind::Colon,
+               Token::Ident("a".into()), TokenKind::Add, Token::Ident("b".into())
             ],
             Ok(AST::Lambda(
                 LambdaArg::Ident("a".into()),
@@ -1184,7 +1181,7 @@ mod tests {
             ))
         );
         assert_eq!(
-            parse![Token::CurlyBOpen, Token::CurlyBClose, Token::Colon, Token::Value(1.into())],
+            parse![TokenKind::CurlyBOpen, TokenKind::CurlyBClose, TokenKind::Colon, Token::Value(1.into())],
             Ok(AST::Lambda(
                 LambdaArg::Pattern {
                     args: Vec::new(),
@@ -1196,8 +1193,8 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::CurlyBOpen, Token::CurlyBClose, Token::At, Token::Ident("outer".into()),
-                Token::Colon, Token::Value(1.into())
+                TokenKind::CurlyBOpen, TokenKind::CurlyBClose, TokenKind::At, Token::Ident("outer".into()),
+                TokenKind::Colon, Token::Value(1.into())
             ],
             Ok(AST::Lambda(
                 LambdaArg::Pattern {
@@ -1209,7 +1206,7 @@ mod tests {
             ))
         );
         assert_eq!(
-            parse![Token::CurlyBOpen, Token::Ellipsis, Token::CurlyBClose, Token::Colon, Token::Value(1.into())],
+            parse![TokenKind::CurlyBOpen, TokenKind::Ellipsis, TokenKind::CurlyBClose, TokenKind::Colon, Token::Value(1.into())],
             Ok(AST::Lambda(
                 LambdaArg::Pattern {
                     args: Vec::new(),
@@ -1222,7 +1219,7 @@ mod tests {
         assert_eq!(
             parse![
                 Token::Ident("a".into()), Token::Value(1.into()), Token::Value(2.into()),
-                Token::Add,
+                TokenKind::Add,
                 Token::Value(3.into())
             ],
             Ok(AST::Operation(Operator::Add, Box::new((
@@ -1241,11 +1238,11 @@ mod tests {
     fn patterns() {
         assert_eq!(
             parse![
-                Token::CurlyBOpen,
-                    Token::Ident("a".into()), Token::Comma,
-                    Token::Ident("b".into()), Token::Question, Token::Value("default".into()),
-                Token::CurlyBClose,
-                Token::Colon,
+                TokenKind::CurlyBOpen,
+                    Token::Ident("a".into()), TokenKind::Comma,
+                    Token::Ident("b".into()), TokenKind::Question, Token::Value("default".into()),
+                TokenKind::CurlyBClose,
+                TokenKind::Colon,
                 Token::Ident("a".into())
             ],
             Ok(AST::Lambda(
@@ -1262,14 +1259,14 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::CurlyBOpen,
-                    Token::Ident("a".into()), Token::Comma,
-                    Token::Ident("b".into()), Token::Question, Token::Value("default".into()), Token::Comma,
-                    Token::Ellipsis,
-                Token::CurlyBClose,
-                Token::At,
+                TokenKind::CurlyBOpen,
+                    Token::Ident("a".into()), TokenKind::Comma,
+                    Token::Ident("b".into()), TokenKind::Question, Token::Value("default".into()), TokenKind::Comma,
+                    TokenKind::Ellipsis,
+                TokenKind::CurlyBClose,
+                TokenKind::At,
                 Token::Ident("outer".into()),
-                Token::Colon,
+                TokenKind::Colon,
                 Token::Ident("outer".into())
             ],
             Ok(AST::Lambda(
@@ -1286,9 +1283,9 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::Ident("outer".into()), Token::At,
-                Token::CurlyBOpen, Token::Ident("a".into()), Token::CurlyBClose,
-                Token::Colon,
+                Token::Ident("outer".into()), TokenKind::At,
+                TokenKind::CurlyBOpen, Token::Ident("a".into()), TokenKind::CurlyBClose,
+                TokenKind::Colon,
                 Token::Ident("outer".into())
             ],
             Ok(AST::Lambda(
@@ -1302,9 +1299,9 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::CurlyBOpen,
-                    Token::Ident("a".into()), Token::Question, Token::CurlyBOpen, Token::CurlyBClose,
-                Token::CurlyBClose, Token::Colon, Token::Ident("a".into())
+                TokenKind::CurlyBOpen,
+                    Token::Ident("a".into()), TokenKind::Question, TokenKind::CurlyBOpen, TokenKind::CurlyBClose,
+                TokenKind::CurlyBClose, TokenKind::Colon, Token::Ident("a".into())
             ],
             Ok(AST::Lambda(
                 LambdaArg::Pattern {
@@ -1320,13 +1317,13 @@ mod tests {
     fn merge() {
         assert_eq!(
             parse![
-                Token::CurlyBOpen,
-                    Token::Ident("a".into()), Token::Assign, Token::Value(1.into()), Token::Semicolon,
-                Token::CurlyBClose,
-                Token::Merge,
-                Token::CurlyBOpen,
-                    Token::Ident("b".into()), Token::Assign, Token::Value(2.into()), Token::Semicolon,
-                Token::CurlyBClose
+                TokenKind::CurlyBOpen,
+                    Token::Ident("a".into()), TokenKind::Assign, Token::Value(1.into()), TokenKind::Semicolon,
+                TokenKind::CurlyBClose,
+                TokenKind::Merge,
+                TokenKind::CurlyBOpen,
+                    Token::Ident("b".into()), TokenKind::Assign, Token::Value(2.into()), TokenKind::Semicolon,
+                TokenKind::CurlyBClose
             ],
             Ok(AST::Operation(Operator::Merge, Box::new((
                 AST::Set {
@@ -1344,11 +1341,11 @@ mod tests {
     fn ifs() {
         assert_eq!(
             parse![
-                Token::Value(false.into()), Token::Implication,
-                Token::Invert, Token::Value(false.into()),
-                Token::And,
-                Token::Value(false.into()), Token::Equal, Token::Value(true.into()),
-                Token::Or,
+                Token::Value(false.into()), TokenKind::Implication,
+                TokenKind::Invert, Token::Value(false.into()),
+                TokenKind::And,
+                Token::Value(false.into()), TokenKind::Equal, Token::Value(true.into()),
+                TokenKind::Or,
                 Token::Value(true.into())
             ],
             Ok(AST::Operation(Operator::Implication, Box::new((
@@ -1367,13 +1364,13 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::Value(1.into()), Token::Less, Token::Value(2.into()),
-                Token::Or,
-                Token::Value(2.into()), Token::LessOrEq, Token::Value(2.into()),
-                Token::And,
-                Token::Value(2.into()), Token::More, Token::Value(1.into()),
-                Token::And,
-                Token::Value(2.into()), Token::MoreOrEq, Token::Value(2.into())
+                Token::Value(1.into()), TokenKind::Less, Token::Value(2.into()),
+                TokenKind::Or,
+                Token::Value(2.into()), TokenKind::LessOrEq, Token::Value(2.into()),
+                TokenKind::And,
+                Token::Value(2.into()), TokenKind::More, Token::Value(1.into()),
+                TokenKind::And,
+                Token::Value(2.into()), TokenKind::MoreOrEq, Token::Value(2.into())
             ],
             Ok(AST::Operation(Operator::Or, Box::new((
                 AST::Operation(Operator::Less, Box::new((
@@ -1400,9 +1397,9 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::Value(1.into()), Token::Equal, Token::Value(1.into()),
-                Token::And,
-                Token::Value(2.into()), Token::NotEqual, Token::Value(3.into())
+                Token::Value(1.into()), TokenKind::Equal, Token::Value(1.into()),
+                TokenKind::And,
+                Token::Value(2.into()), TokenKind::NotEqual, Token::Value(3.into())
             ],
             Ok(AST::Operation(Operator::And, Box::new((
                 AST::Operation(Operator::Equal, Box::new((
@@ -1417,12 +1414,12 @@ mod tests {
         );
         assert_eq!(
             parse![
-                Token::If, Token::Value(false.into()), Token::Then,
+                TokenKind::If, Token::Value(false.into()), TokenKind::Then,
                     Token::Value(1.into()),
-                Token::Else,
-                    Token::If, Token::Value(true.into()), Token::Then,
+                TokenKind::Else,
+                    TokenKind::If, Token::Value(true.into()), TokenKind::Then,
                         Token::Value(2.into()),
-                    Token::Else,
+                    TokenKind::Else,
                         Token::Value(3.into())
             ],
             Ok(AST::IfElse(Box::new((
@@ -1440,7 +1437,7 @@ mod tests {
     fn assert() {
         assert_eq!(
             parse![
-                Token::Assert, Token::Ident("a".into()), Token::Equal, Token::Ident("b".into()), Token::Semicolon,
+                TokenKind::Assert, Token::Ident("a".into()), TokenKind::Equal, Token::Ident("b".into()), TokenKind::Semicolon,
                 Token::Value("a == b".into())
             ],
             Ok(AST::Assert(Box::new((
@@ -1456,13 +1453,13 @@ mod tests {
     fn inherit() {
         assert_eq!(
             parse![
-                Token::CurlyBOpen,
-                    Token::Ident("a".into()), Token::Assign, Token::Value(1.into()), Token::Semicolon,
-                    Token::Inherit, Token::Ident("b".into()), Token::Semicolon,
+                TokenKind::CurlyBOpen,
+                    Token::Ident("a".into()), TokenKind::Assign, Token::Value(1.into()), TokenKind::Semicolon,
+                    TokenKind::Inherit, Token::Ident("b".into()), TokenKind::Semicolon,
 
-                    Token::Inherit, Token::ParenOpen, Token::Ident("set".into()), Token::ParenClose,
-                    Token::Ident("c".into()), Token::Semicolon,
-                Token::CurlyBClose
+                    TokenKind::Inherit, TokenKind::ParenOpen, Token::Ident("set".into()), TokenKind::ParenClose,
+                    Token::Ident("c".into()), TokenKind::Semicolon,
+                TokenKind::CurlyBClose
             ],
             Ok(AST::Set {
                 recursive: false,
@@ -1478,8 +1475,8 @@ mod tests {
     fn isset() {
         assert_eq!(
             parse![
-                Token::Ident("a".into()), Token::Question, Token::Value("b".into()),
-                Token::And, Token::Value(true.into())
+                Token::Ident("a".into()), TokenKind::Question, Token::Value("b".into()),
+                TokenKind::And, Token::Value(true.into())
             ],
             Ok(AST::Operation(Operator::And, Box::new((
                 AST::Operation(Operator::IsSet, Box::new((
@@ -1492,10 +1489,10 @@ mod tests {
         assert_eq!(
             parse![
                 Token::Ident("a".into()),
-                    Token::Dot, Token::Ident("b".into()),
-                    Token::Dot, Token::Ident("c".into()),
+                    TokenKind::Dot, Token::Ident("b".into()),
+                    TokenKind::Dot, Token::Ident("c".into()),
                 Token::Ident(OR.into()), Token::Value(1.into()),
-                Token::Add, Token::Value(1.into())
+                TokenKind::Add, Token::Value(1.into())
             ],
             Ok(AST::Operation(Operator::Add, Box::new((
                 AST::OrDefault(Box::new((

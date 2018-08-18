@@ -96,6 +96,38 @@ pub enum Interpol {
 /// A token, such as a string literal, a number, or a keyword
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
+    Simple(TokenKind),
+
+    // Identifiers and values
+    Dynamic(Vec<(Meta, Token)>, Meta),
+    Ident(String),
+    Interpol {
+        multiline: bool,
+        parts: Vec<Interpol>
+    },
+    Value(Value),
+}
+impl Token {
+    /// Returns the TokenKind for this token. TokenKinds are basically tokens
+    /// without any metadata, so you can easily check the types of them.
+    pub fn kind(&self) -> TokenKind {
+        match *self {
+            Token::Simple(kind) => kind,
+            Token::Dynamic(_, _) => TokenKind::Dynamic,
+            Token::Ident(_) => TokenKind::Ident,
+            Token::Interpol { .. } => TokenKind::Interpol,
+            Token::Value(_) => TokenKind::Value
+        }
+    }
+}
+impl From<TokenKind> for Token {
+    fn from(kind: TokenKind) -> Self {
+        Token::Simple(kind)
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(u8)]
+pub enum TokenKind {
     // So we get trailing trivia
     EOF,
 
@@ -150,15 +182,12 @@ pub enum Token {
     Or,
 
     // Identifiers and values
-    Dynamic(Vec<(Meta, Token)>, Meta),
-    Ident(String),
-    Interpol {
-        multiline: bool,
-        parts: Vec<Interpol>
-    },
-    Value(Value),
+    Dynamic,
+    Ident,
+    Interpol,
+    Value
 }
-impl Token {
+impl TokenKind {
     /// Returns true if this token should be used as a function argument.
     /// ```ignore
     /// Example:
@@ -169,10 +198,10 @@ impl Token {
     /// |   +- true
     /// +- true
     /// ```
-    pub fn is_fn_arg(&self) -> bool {
+    pub fn is_fn_arg(self) -> bool {
         match self {
-            Token::Rec | Token::CurlyBOpen | Token::SquareBOpen | Token::ParenOpen
-                | Token::Ident(_) | Token::Value(_) | Token::Interpol { .. } => true,
+            TokenKind::Rec | TokenKind::CurlyBOpen | TokenKind::SquareBOpen | TokenKind::ParenOpen
+                | TokenKind::Ident | TokenKind::Value | TokenKind::Interpol => true,
             _ => false
         }
     }
@@ -236,7 +265,7 @@ impl<'a> Tokenizer<'a> {
     fn span_err(&self, meta: Meta, error: TokenizeError) -> Item {
         Err((meta.span, error))
     }
-    fn span_end(&mut self, mut meta: Meta, ctx: &mut Context, token: Token) -> Item {
+    fn span_end<T: Into<Token>>(&mut self, mut meta: Meta, ctx: &mut Context, token: T) -> Item {
         meta.span.end = Some(self.cursor);
 
         let trivia = match *ctx {
@@ -249,7 +278,7 @@ impl<'a> Tokenizer<'a> {
             }
         }
 
-        Ok((meta, token))
+        Ok((meta, token.into()))
     }
 
     fn next(&mut self) -> Option<char> {
@@ -361,7 +390,7 @@ impl<'a> Tokenizer<'a> {
         };
         loop {
             let token = self.next_token(&mut ctx)?;
-            if token.1 == Token::EOF {
+            if token.1.kind() == TokenKind::EOF {
                 return Err((start, TokenizeError::UnexpectedEOF));
             }
             if let Context::Interpol { ended, .. } = ctx {
@@ -545,7 +574,7 @@ impl<'a> Tokenizer<'a> {
         if self.input.starts_with("...") {
             self.cursor += 3;
             self.input = &self.input[3..];
-            return self.span_end(meta, ctx, Token::Ellipsis);
+            return self.span_end(meta, ctx, TokenKind::Ellipsis);
         }
 
         // Check if it's a path
@@ -567,7 +596,7 @@ impl<'a> Tokenizer<'a> {
 
         let c = match self.next() {
             Some(c) => c,
-            None => return self.span_end(meta, ctx, Token::EOF)
+            None => return self.span_end(meta, ctx, TokenKind::EOF)
         };
 
         if c == '~' || kind == Some(IdentType::Path) {
@@ -588,14 +617,14 @@ impl<'a> Tokenizer<'a> {
         }
 
         match c {
-            '=' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, Token::Equal) },
-            '!' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, Token::NotEqual) },
-            '!' => self.span_end(meta, ctx, Token::Invert),
+            '=' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, TokenKind::Equal) },
+            '!' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, TokenKind::NotEqual) },
+            '!' => self.span_end(meta, ctx, TokenKind::Invert),
             '{' => {
                 if let Context::Interpol { brackets, .. } = ctx {
                     *brackets += 1;
                 }
-                self.span_end(meta, ctx, Token::CurlyBOpen)
+                self.span_end(meta, ctx, TokenKind::CurlyBOpen)
             },
             '}' => {
                 if let Context::Interpol { brackets, ended, .. } = ctx {
@@ -604,26 +633,26 @@ impl<'a> Tokenizer<'a> {
                         None => *ended = true
                     }
                 }
-                self.span_end(meta, ctx, Token::CurlyBClose)
+                self.span_end(meta, ctx, TokenKind::CurlyBClose)
             },
-            '[' => self.span_end(meta, ctx, Token::SquareBOpen),
-            ']' => self.span_end(meta, ctx, Token::SquareBClose),
-            '@' => self.span_end(meta, ctx, Token::At),
-            ':' => self.span_end(meta, ctx, Token::Colon),
-            ',' => self.span_end(meta, ctx, Token::Comma),
-            '.' => self.span_end(meta, ctx, Token::Dot),
-            '=' => self.span_end(meta, ctx, Token::Assign),
-            '?' => self.span_end(meta, ctx, Token::Question),
-            ';' => self.span_end(meta, ctx, Token::Semicolon),
-            '(' => self.span_end(meta, ctx, Token::ParenOpen),
-            ')' => self.span_end(meta, ctx, Token::ParenClose),
-            '+' if self.peek() == Some('+') => { self.next().unwrap(); self.span_end(meta, ctx, Token::Concat) },
-            '-' if self.peek() == Some('>') => { self.next().unwrap(); self.span_end(meta, ctx, Token::Implication) },
-            '/' if self.peek() == Some('/') => { self.next().unwrap(); self.span_end(meta, ctx, Token::Merge) },
-            '+' => self.span_end(meta, ctx, Token::Add),
-            '-' => self.span_end(meta, ctx, Token::Sub),
-            '*' => self.span_end(meta, ctx, Token::Mul),
-            '/' => self.span_end(meta, ctx, Token::Div),
+            '[' => self.span_end(meta, ctx, TokenKind::SquareBOpen),
+            ']' => self.span_end(meta, ctx, TokenKind::SquareBClose),
+            '@' => self.span_end(meta, ctx, TokenKind::At),
+            ':' => self.span_end(meta, ctx, TokenKind::Colon),
+            ',' => self.span_end(meta, ctx, TokenKind::Comma),
+            '.' => self.span_end(meta, ctx, TokenKind::Dot),
+            '=' => self.span_end(meta, ctx, TokenKind::Assign),
+            '?' => self.span_end(meta, ctx, TokenKind::Question),
+            ';' => self.span_end(meta, ctx, TokenKind::Semicolon),
+            '(' => self.span_end(meta, ctx, TokenKind::ParenOpen),
+            ')' => self.span_end(meta, ctx, TokenKind::ParenClose),
+            '+' if self.peek() == Some('+') => { self.next().unwrap(); self.span_end(meta, ctx, TokenKind::Concat) },
+            '-' if self.peek() == Some('>') => { self.next().unwrap(); self.span_end(meta, ctx, TokenKind::Implication) },
+            '/' if self.peek() == Some('/') => { self.next().unwrap(); self.span_end(meta, ctx, TokenKind::Merge) },
+            '+' => self.span_end(meta, ctx, TokenKind::Add),
+            '-' => self.span_end(meta, ctx, TokenKind::Sub),
+            '*' => self.span_end(meta, ctx, TokenKind::Mul),
+            '/' => self.span_end(meta, ctx, TokenKind::Div),
             '<' if kind == Some(IdentType::Store) => {
                 let ident = self.next_ident(None, is_valid_path_char);
                 if self.next() != Some('>') {
@@ -631,12 +660,12 @@ impl<'a> Tokenizer<'a> {
                 }
                 self.span_end(meta, ctx, Token::Value(Value::Path(Anchor::Store, ident)))
             },
-            '&' if self.peek() == Some('&') => { self.next().unwrap(); self.span_end(meta, ctx, Token::And) },
-            '|' if self.peek() == Some('|') => { self.next().unwrap(); self.span_end(meta, ctx, Token::Or) },
-            '<' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, Token::LessOrEq) },
-            '<' => self.span_end(meta, ctx, Token::Less),
-            '>' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, Token::MoreOrEq) },
-            '>' => self.span_end(meta, ctx, Token::More),
+            '&' if self.peek() == Some('&') => { self.next().unwrap(); self.span_end(meta, ctx, TokenKind::And) },
+            '|' if self.peek() == Some('|') => { self.next().unwrap(); self.span_end(meta, ctx, TokenKind::Or) },
+            '<' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, TokenKind::LessOrEq) },
+            '<' => self.span_end(meta, ctx, TokenKind::Less),
+            '>' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, TokenKind::MoreOrEq) },
+            '>' => self.span_end(meta, ctx, TokenKind::More),
             '$' if self.peek() == Some('{') => {
                 let (tokens, close) = self.next_interpol(meta.span, false)?;
                 self.span_end(meta, ctx, Token::Dynamic(tokens, close))
@@ -657,17 +686,17 @@ impl<'a> Tokenizer<'a> {
                 });
                 if kind == IdentType::Ident {
                     self.span_end(meta, ctx, match &*ident {
-                        "assert" => Token::Assert,
-                        "else" => Token::Else,
-                        "if" => Token::If,
-                        "import" => Token::Import,
-                        "in" => Token::In,
-                        "inherit" => Token::Inherit,
-                        "let" => Token::Let,
-                        // "or" => Token::OrDefault,
-                        "rec" => Token::Rec,
-                        "then" => Token::Then,
-                        "with" => Token::With,
+                        "assert" => TokenKind::Assert.into(),
+                        "else" => TokenKind::Else.into(),
+                        "if" => TokenKind::If.into(),
+                        "import" => TokenKind::Import.into(),
+                        "in" => TokenKind::In.into(),
+                        "inherit" => TokenKind::Inherit.into(),
+                        "let" => TokenKind::Let.into(),
+                        // "or" => TokenKind::OrDefault,
+                        "rec" => TokenKind::Rec.into(),
+                        "then" => TokenKind::Then.into(),
+                        "with" => TokenKind::With.into(),
 
                         "true" => Token::Value(Value::Bool(true)),
                         "false" => Token::Value(Value::Bool(false)),
@@ -743,7 +772,7 @@ pub fn tokenize<'a>(input: &'a str) -> impl Iterator<Item = Item> + 'a {
 #[cfg(test)]
 mod tests {
     use crate::value::{Anchor, Value};
-    use super::{Interpol, Meta, Span, Token, TokenizeError, Trivia};
+    use super::{Interpol, Meta, Span, Token, TokenKind, TokenizeError, Trivia};
 
     fn tokenize(input: &str) -> Result<Vec<Token>, TokenizeError> {
         super::tokenize(input)
@@ -766,32 +795,38 @@ mod tests {
         }
     }
 
+    macro_rules! tokens {
+        ($($token:expr),*) => {
+            vec![$($token.into()),*]
+        }
+    }
+
     #[test]
     fn basic_int_set() {
         assert_eq!(
             tokenize("{ int = 42; }"),
-            Ok(vec![Token::CurlyBOpen, Token::Ident("int".into()), Token::Assign,
-            Token::Value(42.into()), Token::Semicolon, Token::CurlyBClose])
+            Ok(tokens![TokenKind::CurlyBOpen, Token::Ident("int".into()), TokenKind::Assign,
+            Token::Value(42.into()), TokenKind::Semicolon, TokenKind::CurlyBClose])
         );
     }
     #[test]
     fn basic_float_set() {
         assert_eq!(
             tokenize("{ float = 1.234; }"),
-            Ok(vec![Token::CurlyBOpen, Token::Ident("float".into()), Token::Assign,
-            Token::Value(1.234.into()), Token::Semicolon, Token::CurlyBClose])
+            Ok(tokens![TokenKind::CurlyBOpen, Token::Ident("float".into()), TokenKind::Assign,
+            Token::Value(1.234.into()), TokenKind::Semicolon, TokenKind::CurlyBClose])
         );
     }
     #[test]
     fn basic_string_set() {
         assert_eq!(
             tokenize(r#"{ string = "Hello \"World\""; }"#),
-            Ok(vec![Token::CurlyBOpen, Token::Ident("string".into()), Token::Assign,
+            Ok(tokens![TokenKind::CurlyBOpen, Token::Ident("string".into()), TokenKind::Assign,
             Token::Value(Value::Str {
                 multiline: false,
                 original: r#"Hello \"World\""#.into(),
                 content: "Hello \"World\"".into(),
-            }), Token::Semicolon, Token::CurlyBClose])
+            }), TokenKind::Semicolon, TokenKind::CurlyBClose])
         );
     }
     #[test]
@@ -805,7 +840,7 @@ mod tests {
                         leading: Vec::new(),
                         trailing: Vec::new()
                     },
-                    Token::CurlyBOpen
+                    TokenKind::CurlyBOpen.into()
                 ),
                 (
                     Meta {
@@ -829,7 +864,7 @@ mod tests {
                         leading: Vec::new(),
                         trailing: vec![Trivia::Spaces(1)]
                     },
-                    Token::Assign
+                    TokenKind::Assign.into()
                 ),
                 (
                     Meta {
@@ -837,7 +872,7 @@ mod tests {
                         leading: Vec::new(),
                         trailing: Vec::new()
                     },
-                    Token::Value(1.into())
+                    Token::Value(1.into()).into()
                 ),
                 (
                     Meta {
@@ -852,7 +887,7 @@ mod tests {
                             }
                         ]
                     },
-                    Token::Semicolon
+                    TokenKind::Semicolon.into()
                 ),
                 (
                     Meta {
@@ -860,7 +895,7 @@ mod tests {
                         leading: vec![Trivia::Newline(1)],
                         trailing: Vec::new(),
                     },
-                    Token::CurlyBClose
+                    TokenKind::CurlyBClose.into()
                 ),
                 (
                     Meta {
@@ -875,7 +910,7 @@ mod tests {
                         ],
                         trailing: Vec::new()
                     },
-                    Token::EOF
+                    TokenKind::EOF.into()
                 )
             ])
         );
@@ -899,9 +934,9 @@ mod tests {
         three single quotes: ''''
     '';
 }"#),
-            Ok(vec![
-                Token::CurlyBOpen,
-                    Token::Ident("multiline".into()), Token::Assign,
+            Ok(tokens![
+                TokenKind::CurlyBOpen,
+                    Token::Ident("multiline".into()), TokenKind::Assign,
                     Token::Value(Value::Str {
                         multiline: true,
                         original: r#"
@@ -919,7 +954,7 @@ mod tests {
                             indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\n\
                             two single quotes: ''\nthree single quotes: '''\n".into()
                     }),
-                Token::Semicolon, Token::CurlyBClose
+                TokenKind::Semicolon, TokenKind::CurlyBClose
             ])
         );
         assert_eq!(
@@ -984,14 +1019,14 @@ mod tests {
                                         leading: vec![Trivia::Spaces(1)],
                                         trailing: vec![Trivia::Spaces(1)]
                                     },
-                                    Token::CurlyBOpen
+                                    TokenKind::CurlyBOpen.into()
                                 ),
                                 (meta! { start: 14, end: 19, trailing: 1 }, Token::Ident("world".into())),
-                                (meta! { start: 20, end: 21, trailing: 1 }, Token::Assign),
+                                (meta! { start: 20, end: 21, trailing: 1 }, TokenKind::Assign.into()),
                                 (meta! { start: 22, end: 29              }, Token::Value("World".into())),
-                                (meta! { start: 29, end: 30, trailing: 1 }, Token::Semicolon),
-                                (meta! { start: 31, end: 32              }, Token::CurlyBClose),
-                                (meta! { start: 32, end: 33              }, Token::Dot),
+                                (meta! { start: 29, end: 30, trailing: 1 }, TokenKind::Semicolon.into()),
+                                (meta! { start: 31, end: 32              }, TokenKind::CurlyBClose.into()),
+                                (meta! { start: 32, end: 33              }, TokenKind::Dot.into()),
                                 (meta! { start: 33, end: 38, trailing: 1 }, Token::Ident("world".into()))
                             ],
                             meta! { start: 39, end: 40 }
@@ -1086,30 +1121,30 @@ mod tests {
     fn math() {
         assert_eq!(
             tokenize("1 + 2 * 3"),
-            Ok(vec![Token::Value(1.into()), Token::Add, Token::Value(2.into()), Token::Mul, Token::Value(3.into())])
+            Ok(tokens![Token::Value(1.into()), TokenKind::Add, Token::Value(2.into()), TokenKind::Mul, Token::Value(3.into())])
         );
         assert_eq!(
             tokenize("5 * -(3 - 2)"),
-            Ok(vec![
-                Token::Value(5.into()), Token::Mul,
-                Token::Sub, Token::ParenOpen,
-                    Token::Value(3.into()), Token::Sub, Token::Value(2.into()),
-                Token::ParenClose
+            Ok(tokens![
+                Token::Value(5.into()), TokenKind::Mul,
+                TokenKind::Sub, TokenKind::ParenOpen,
+                    Token::Value(3.into()), TokenKind::Sub, Token::Value(2.into()),
+                TokenKind::ParenClose
             ])
         );
         assert_eq!(
             tokenize("a/ 3"), // <- could get mistaken for a path
-            Ok(vec![Token::Ident("a".into()), Token::Div, Token::Value(3.into())])
+            Ok(tokens![Token::Ident("a".into()), TokenKind::Div, Token::Value(3.into())])
         );
     }
     #[test]
     fn let_in() {
         assert_eq!(
             tokenize("let a = 3; in a"),
-            Ok(vec![
-                Token::Let,
-                    Token::Ident("a".into()), Token::Assign, Token::Value(3.into()), Token::Semicolon,
-                Token::In,
+            Ok(tokens![
+                TokenKind::Let,
+                    Token::Ident("a".into()), TokenKind::Assign, Token::Value(3.into()), TokenKind::Semicolon,
+                TokenKind::In,
                     Token::Ident("a".into())
             ])
         );
@@ -1118,8 +1153,8 @@ mod tests {
     fn with() {
         assert_eq!(
             tokenize("with namespace; expr"),
-            Ok(vec![
-                Token::With, Token::Ident("namespace".into()), Token::Semicolon,
+            Ok(tokens![
+                TokenKind::With, Token::Ident("namespace".into()), TokenKind::Semicolon,
                 Token::Ident("expr".into())
             ])
         );
@@ -1145,8 +1180,8 @@ mod tests {
     fn import() {
         assert_eq!(
             tokenize("import <nixpkgs>"),
-            Ok(vec![
-                Token::Import,
+            Ok(tokens![
+                TokenKind::Import,
                 Token::Value(Value::Path(Anchor::Store, "nixpkgs".into()))
             ])
         );
@@ -1155,19 +1190,19 @@ mod tests {
     fn list() {
         assert_eq!(
             tokenize(r#"[a 2 3 "lol"]"#),
-            Ok(vec![
-               Token::SquareBOpen,
+            Ok(tokens![
+               TokenKind::SquareBOpen,
                Token::Ident("a".into()), Token::Value(2.into()), Token::Value(3.into()),
                Token::Value("lol".into()),
-               Token::SquareBClose
+               TokenKind::SquareBClose
             ])
         );
         assert_eq!(
             tokenize("[1] ++ [2] ++ [3]"),
-            Ok(vec![
-               Token::SquareBOpen, Token::Value(1.into()), Token::SquareBClose, Token::Concat,
-               Token::SquareBOpen, Token::Value(2.into()), Token::SquareBClose, Token::Concat,
-               Token::SquareBOpen, Token::Value(3.into()), Token::SquareBClose
+            Ok(tokens![
+               TokenKind::SquareBOpen, Token::Value(1.into()), TokenKind::SquareBClose, TokenKind::Concat,
+               TokenKind::SquareBOpen, Token::Value(2.into()), TokenKind::SquareBClose, TokenKind::Concat,
+               TokenKind::SquareBOpen, Token::Value(3.into()), TokenKind::SquareBClose
             ])
         );
     }
@@ -1175,9 +1210,9 @@ mod tests {
     fn functions() {
         assert_eq!(
             tokenize("a: b: a + b"),
-            Ok(vec![
-               Token::Ident("a".into()), Token::Colon, Token::Ident("b".into()), Token::Colon,
-               Token::Ident("a".into()), Token::Add, Token::Ident("b".into())
+            Ok(tokens![
+               Token::Ident("a".into()), TokenKind::Colon, Token::Ident("b".into()), TokenKind::Colon,
+               Token::Ident("a".into()), TokenKind::Add, Token::Ident("b".into())
             ])
         );
     }
@@ -1185,13 +1220,13 @@ mod tests {
     fn patterns() {
         assert_eq!(
             tokenize(r#"{ a, b ? "default", ... } @ outer"#),
-            Ok(vec![
-               Token::CurlyBOpen,
-                   Token::Ident("a".into()), Token::Comma,
-                   Token::Ident("b".into()), Token::Question, Token::Value("default".into()), Token::Comma,
-                   Token::Ellipsis,
-               Token::CurlyBClose,
-               Token::At,
+            Ok(tokens![
+               TokenKind::CurlyBOpen,
+                   Token::Ident("a".into()), TokenKind::Comma,
+                   Token::Ident("b".into()), TokenKind::Question, Token::Value("default".into()), TokenKind::Comma,
+                   TokenKind::Ellipsis,
+               TokenKind::CurlyBClose,
+               TokenKind::At,
                Token::Ident("outer".into())
             ])
         );
@@ -1200,71 +1235,71 @@ mod tests {
     fn combine() {
         assert_eq!(
             tokenize("a//b"),
-            Ok(vec![Token::Ident("a".into()), Token::Merge, Token::Ident("b".into())])
+            Ok(tokens![Token::Ident("a".into()), TokenKind::Merge, Token::Ident("b".into())])
         );
     }
     #[test]
     fn ifs() {
         assert_eq!(
             tokenize("false -> !false && false == true || true"),
-            Ok(vec![
-                Token::Value(false.into()), Token::Implication,
-                Token::Invert, Token::Value(false.into()),
-                Token::And,
-                Token::Value(false.into()), Token::Equal, Token::Value(true.into()),
-                Token::Or,
+            Ok(tokens![
+                Token::Value(false.into()), TokenKind::Implication,
+                TokenKind::Invert, Token::Value(false.into()),
+                TokenKind::And,
+                Token::Value(false.into()), TokenKind::Equal, Token::Value(true.into()),
+                TokenKind::Or,
                 Token::Value(true.into())
             ])
         );
         assert_eq!(
             tokenize("1 < 2 && 2 <= 2 && 2 > 1 && 2 >= 2"),
-            Ok(vec![
-                Token::Value(1.into()), Token::Less, Token::Value(2.into()),
-                Token::And,
-                Token::Value(2.into()), Token::LessOrEq, Token::Value(2.into()),
-                Token::And,
-                Token::Value(2.into()), Token::More, Token::Value(1.into()),
-                Token::And,
-                Token::Value(2.into()), Token::MoreOrEq, Token::Value(2.into())
+            Ok(tokens![
+                Token::Value(1.into()), TokenKind::Less, Token::Value(2.into()),
+                TokenKind::And,
+                Token::Value(2.into()), TokenKind::LessOrEq, Token::Value(2.into()),
+                TokenKind::And,
+                Token::Value(2.into()), TokenKind::More, Token::Value(1.into()),
+                TokenKind::And,
+                Token::Value(2.into()), TokenKind::MoreOrEq, Token::Value(2.into())
             ])
         );
         assert_eq!(
             tokenize("1 == 1 && 2 != 3"),
-            Ok(vec![
-                Token::Value(1.into()), Token::Equal, Token::Value(1.into()),
-                Token::And,
-                Token::Value(2.into()), Token::NotEqual, Token::Value(3.into())
+            Ok(tokens![
+                Token::Value(1.into()), TokenKind::Equal, Token::Value(1.into()),
+                TokenKind::And,
+                Token::Value(2.into()), TokenKind::NotEqual, Token::Value(3.into())
             ])
         );
         assert_eq!(
             tokenize("if false then 1 else if true then 2 else 3"),
-            Ok(vec![
-                Token::If, Token::Value(false.into()), Token::Then,
+            Ok(tokens![
+                TokenKind::If, Token::Value(false.into()), TokenKind::Then,
                     Token::Value(1.into()),
-                Token::Else,
-                    Token::If, Token::Value(true.into()), Token::Then,
+                TokenKind::Else,
+                    TokenKind::If, Token::Value(true.into()), TokenKind::Then,
                         Token::Value(2.into()),
-                    Token::Else,
+                    TokenKind::Else,
                         Token::Value(3.into())
             ])
         );
         assert_eq!(
             tokenize("x>=y"), // <- could be confused with store path because of the '>'
-            Ok(vec![Token::Ident("x".into()), Token::MoreOrEq, Token::Ident("y".into())])
+            Ok(tokens![Token::Ident("x".into()), TokenKind::MoreOrEq, Token::Ident("y".into())])
         );
     }
     #[test]
     fn dynamic_attrs() {
         assert_eq!(
             tokenize("a.${b}.c"),
-            Ok(vec![
+            Ok(tokens![
                 Token::Ident("a".into()),
-                Token::Dot,
+                TokenKind::Dot,
                 Token::Dynamic(
                    vec![(meta! { start: 4, end: 5 }, Token::Ident("b".into()))],
                    meta! { start: 5, end: 6 }
                 ),
-                Token::Dot,
+                TokenKind::Dot,
                 Token::Ident("c".into())
             ])
         );
