@@ -21,9 +21,7 @@ fn main() {
     };
     let errors = match rnix::parse(&content) {
         Ok(ast) => {
-            //_ast = Some(ast);
-            ast
-                .errors()
+            ast.errors()
                 .map(|(span, err)| (*span, err.to_string()))
                 .collect()
         },
