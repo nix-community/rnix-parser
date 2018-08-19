@@ -1,8 +1,37 @@
-use crate::tokenizer::Trivia;
-use super::*;
+use crate::{
+    parser::*,
+    tokenizer::{Interpol as TokenInterpol, Token, TokenKind, Trivia}
+};
 
 use std::fmt;
 
+impl fmt::Display for Trivia {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Trivia::Newline(amount) => for _ in 0..amount {
+                write!(f, "\n")?;
+            },
+            Trivia::Spaces(amount) => for _ in 0..amount {
+                write!(f, " ")?;
+            },
+            Trivia::Tabs(amount) => for _ in 0..amount {
+                write!(f, "\t")?;
+            },
+            Trivia::Comment { span: _, multiline, ref content } => {
+                if multiline {
+                    write!(f, "/*")?;
+                } else {
+                    write!(f, "#")?;
+                }
+                write!(f, "{}", content)?;
+                if multiline {
+                    write!(f, "*/")?;
+                }
+            },
+        }
+        Ok(())
+    }
+}
 impl fmt::Display for Operator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", match self {
@@ -31,6 +60,106 @@ impl fmt::Display for Unary {
             Unary::Invert => "!",
             Unary::Negate => "-"
         })
+    }
+}
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", match self {
+            TokenKind::Assert => "assert",
+            TokenKind::Else => "else",
+            TokenKind::If => "else",
+            TokenKind::Import => "import",
+            TokenKind::In => "in",
+            TokenKind::Inherit => "inherit",
+            TokenKind::Let => "let",
+            TokenKind::Rec => "rec",
+            TokenKind::Then => "then",
+            TokenKind::With => "with",
+            TokenKind::CurlyBOpen => "{",
+            TokenKind::CurlyBClose => "}",
+            TokenKind::SquareBOpen => "[",
+            TokenKind::SquareBClose => "]",
+            TokenKind::Assign => "=",
+            TokenKind::At => "@",
+            TokenKind::Colon => ":",
+            TokenKind::Comma => ",",
+            TokenKind::Dot => ".",
+            TokenKind::Ellipsis => "...",
+            TokenKind::Question => "?",
+            TokenKind::Semicolon => ";",
+            TokenKind::ParenOpen => "(",
+            TokenKind::ParenClose => ")",
+            TokenKind::Concat => "++",
+            TokenKind::Invert => "!",
+            TokenKind::Merge => "//",
+            TokenKind::Add => "+",
+            TokenKind::Sub => "-",
+            TokenKind::Mul => "*",
+            TokenKind::Div => "/",
+            TokenKind::And => "&&",
+            TokenKind::Equal => "==",
+            TokenKind::Implication => "->",
+            TokenKind::Less => "<",
+            TokenKind::LessOrEq => "<=",
+            TokenKind::More => ">",
+            TokenKind::MoreOrEq => ">=",
+            TokenKind::NotEqual => "!=",
+            TokenKind::Or => "||",
+
+            TokenKind::EOF
+            | TokenKind::Dynamic
+            | TokenKind::Ident
+            | TokenKind::Interpol
+            | TokenKind::Value => ""
+        })
+    }
+}
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        macro_rules! fmt {
+            ($meta:expr, $fmt:expr $(, $arg:expr)*) => {{
+                fmt_trivia(f, &$meta.leading)?;
+                write!(f, $fmt $(, $arg)*)?;
+                fmt_trivia(f, &$meta.trailing)?;
+            }};
+        }
+        match self {
+            Token::Simple(kind) => write!(f, "{}", kind)?,
+            Token::Dynamic(tokens, close) => {
+                write!(f, "${{")?;
+                for (meta, token) in tokens {
+                    fmt!(meta, "{}", token);
+                }
+                fmt!(close, "}}");
+            },
+            Token::Ident(name) => write!(f, "{}", name)?,
+            Token::Interpol { multiline, parts } => {
+                if *multiline {
+                    write!(f, "''")?;
+                } else {
+                    write!(f, "\"")?;
+                }
+                for part in parts {
+                    match part {
+                        TokenInterpol::Literal { original, content: _ } => write!(f, "{}", original)?,
+                        TokenInterpol::Tokens(tokens, close) => {
+                            write!(f, "${{")?;
+                            for (meta, token) in tokens {
+                                fmt!(meta, "{}", token);
+                            }
+                            fmt!(close, "}}");
+                        }
+                    }
+                }
+                if *multiline {
+                    write!(f, "''")?;
+                } else {
+                    write!(f, "\"")?;
+                }
+            },
+            Token::Value(val) => write!(f, "{}", val)?
+        }
+        Ok(())
     }
 }
 

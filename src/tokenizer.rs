@@ -1,7 +1,7 @@
 //! The tokenizer: turns a string into tokens, such as numbers, strings, and keywords
 
 use crate::value::{Anchor, Value};
-use std::{fmt::{self, Write}, mem};
+use std::mem;
 
 #[cfg(feature = "smol_str")]
 use smol_str::SmolStr;
@@ -36,33 +36,6 @@ pub enum Trivia {
         span: Span,
         multiline: bool,
         content: SmolStr
-    }
-}
-impl fmt::Display for Trivia {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Trivia::Newline(amount) => for _ in 0..amount {
-                f.write_char('\n')?;
-            },
-            Trivia::Spaces(amount) => for _ in 0..amount {
-                f.write_char(' ')?;
-            },
-            Trivia::Tabs(amount) => for _ in 0..amount {
-                f.write_char('\t')?;
-            },
-            Trivia::Comment { span: _, multiline, ref content } => {
-                if multiline {
-                    f.write_str("/*")?;
-                } else {
-                    f.write_char('#')?;
-                }
-                f.write_str(content)?;
-                if multiline {
-                    f.write_str("*/")?;
-                }
-            },
-        }
-        Ok(())
     }
 }
 
@@ -160,8 +133,8 @@ pub enum TokenKind {
     Semicolon,
 
     // Operators
-    ParenClose,
     ParenOpen,
+    ParenClose,
     Concat,
     Invert,
     Merge,

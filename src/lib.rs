@@ -16,11 +16,13 @@ macro_rules! meta {
     }};
 }
 
+#[macro_use] crate mod utils;
 pub mod parser;
 pub mod tokenizer;
-#[macro_use]
-crate mod utils;
 pub mod value;
+
+// only `impl`s, no need to expose the module
+mod display;
 
 use self::{
     parser::ParseError,

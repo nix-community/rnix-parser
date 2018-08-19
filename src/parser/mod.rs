@@ -2,8 +2,6 @@
 
 pub mod children;
 pub mod intoactualslowtree;
-// only `impl`s a function, no need to expose the module
-mod display;
 
 use crate::{
     tokenizer::{Interpol as TokenInterpol, Meta, Span, Token, TokenKind},
@@ -427,8 +425,8 @@ impl<'a, I> Parser<'a, I>
         )))
     }
     fn parse_set(&mut self, until: TokenKind) -> Result<(Meta, Vec<SetEntry>)> {
-        const RECOVER_SET: &[TokenKind] = &[TokenKind::Ident, TokenKind::Inherit, TokenKind::CurlyBClose];
         let mut values = Vec::new();
+
         loop {
             let result = do catch {
                 match self.peek_kind() {
@@ -464,14 +462,14 @@ impl<'a, I> Parser<'a, I>
                 }
             };
             if let Err(err) = result {
-                println!("{:?}", err);
-                if self.recover(RECOVER_SET) {
+                if self.recover(&[TokenKind::Ident, TokenKind::Inherit, TokenKind::CurlyBClose]) {
                     values.push(SetEntry::Error(err));
                 } else {
                     return Err(err);
                 }
             }
         }
+
         let (end, _) = self.next().unwrap(); // Won't break until reached
         Ok((end, values))
     }
