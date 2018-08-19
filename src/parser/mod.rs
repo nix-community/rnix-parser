@@ -276,8 +276,9 @@ impl<'a, I> Parser<'a, I>
         Ok(next)
     }
     fn expect(&mut self, expected: TokenKind) -> Result<Meta> {
-        if let Ok((meta, actual)) = self.next() {
+        if let Some((meta, actual)) = self.peek_meta() {
             if actual.kind() == expected {
+                let (meta, _) = self.next().unwrap();
                 Ok(meta)
             } else {
                 Err((Some(meta.span), ParseError::Expected(expected, Some(actual.kind()))))
@@ -462,7 +463,7 @@ impl<'a, I> Parser<'a, I>
                 }
             };
             if let Err(err) = result {
-                if self.recover(&[TokenKind::Ident, TokenKind::Inherit, TokenKind::CurlyBClose]) {
+                if self.recover(&[TokenKind::Ident, TokenKind::Inherit, until]) {
                     values.push(SetEntry::Error(err));
                 } else {
                     return Err(err);
