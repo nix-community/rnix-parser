@@ -1,5 +1,6 @@
 //! The parser: turns a series of tokens into an AST
 
+pub mod children;
 pub mod intoactualslowtree;
 // only `impl`s a function, no need to expose the module
 mod display;

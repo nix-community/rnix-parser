@@ -1,4 +1,4 @@
-#![feature(rust_2018_preview, catch_expr)]
+#![feature(catch_expr)]
 
 #[macro_use]
 extern crate failure;

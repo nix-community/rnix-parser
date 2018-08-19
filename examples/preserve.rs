@@ -1,4 +1,4 @@
-extern crate rnix;
+#![feature(rust_2018_preview)]
 
 use std::{env, fs};
 

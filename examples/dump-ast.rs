@@ -1,5 +1,3 @@
-extern crate rnix;
-
 use rnix::parser::intoactualslowtree::{AST as ASTActual, IntoTree};
 use std::{env, fs};
 
