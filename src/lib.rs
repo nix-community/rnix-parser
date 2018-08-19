@@ -1,8 +1,5 @@
 #![feature(rust_2018_preview)]
 
-// TEMPORARY: Until I implement an arena-based tree
-#![feature(box_patterns)]
-
 #[macro_use]
 extern crate failure;
 
