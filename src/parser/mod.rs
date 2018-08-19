@@ -32,6 +32,22 @@ pub struct AST<'a> {
     pub arena: Arena<'a, ASTNode>,
     pub root: ASTNode
 }
+impl<'a> AST<'a> {
+    pub fn errors<'r>(&'r self) -> impl Iterator<Item = &Error> + 'r {
+        self.arena.iter()
+            .filter_map(|item| match &item.1 {
+                ASTType::Set { values: Brackets(_open, values, _close), .. } => Some(values),
+                ASTType::Let(_let, Brackets(_open, values, _close)) => Some(values),
+                ASTType::LetIn(_let, values, _in, _body) => Some(values),
+                _ => None
+            })
+            .flat_map(|item| item)
+            .filter_map(|entry| match entry {
+                SetEntry::Error(error) => Some(error),
+                _ => None
+            })
+    }
+}
 
 /// An AST node, with metadata
 #[derive(Clone, Debug, PartialEq)]

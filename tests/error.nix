@@ -4,4 +4,8 @@
     invalid "entry";
     another = "valid entry";
   };
+  test2 = {
+    hello = "hi";
+    aaaa
+  };
 }

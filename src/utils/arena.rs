@@ -55,6 +55,10 @@ impl<'a, T> Arena<'a, T> {
             Arena::Borrowed(inner) => inner
         }
     }
+    /// Return an iterator over the nodes in this arena
+    pub fn iter(&self) -> ArenaIter<T> {
+        self.into_iter()
+    }
     /// Place an element into the arena
     pub fn insert(&mut self, elem: T) -> NodeId {
         let inner = self.get_mut();
@@ -80,5 +84,34 @@ impl<'a, T> Index<NodeId> for Arena<'a, T> {
 impl<'a, T> IndexMut<NodeId> for Arena<'a, T> {
     fn index_mut(&mut self, index: NodeId) -> &mut Self::Output {
         self.get_mut()[index.0].as_mut().expect("this index has been taken")
+    }
+}
+impl<'r, 'a, T> IntoIterator for &'r Arena<'a, T> {
+    type Item = &'r T;
+    type IntoIter = ArenaIter<'r, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ArenaIter {
+            slice: self.get_ref(),
+            index: 0
+        }
+    }
+}
+
+/// An iterator over an arena, created with `iter`
+pub struct ArenaIter<'a, T: 'a> {
+    slice: &'a [Option<T>],
+    index: usize
+}
+impl<'a, T> Iterator for ArenaIter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(None) = self.slice.get(self.index) {
+            self.index += 1;
+        }
+        let item = self.slice.get(self.index).map(|item| item.as_ref().unwrap());
+        self.index += 1;
+        item
     }
 }

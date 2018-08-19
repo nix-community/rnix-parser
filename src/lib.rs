@@ -258,6 +258,13 @@ special escape: $${test}
                     );
                     another = ("valid entry");
                 });
+                test2 = ({
+                    hello = ("hi");
+                    error (
+                        Some(Span { start: 130, end: Some(131) }),
+                        ParseError::Expected(TokenKind::Assign, Some(TokenKind::CurlyBClose))
+                    );
+                });
             })
         );
     }
