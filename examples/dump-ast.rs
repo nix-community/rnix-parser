@@ -17,7 +17,7 @@ fn main() {
         };
         match rnix::parse(&content) {
             Ok(mut ast) => {
-                println!("{:#?}", ASTActual::into_tree(ast.root, &mut ast.arena))
+                println!("{:#?}", ASTActual::into_tree(ast.arena.take(ast.root), &mut ast.arena))
             },
             Err(err) => eprintln!("error: {:?}", err)
         }

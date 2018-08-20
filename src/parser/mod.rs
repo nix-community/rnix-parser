@@ -798,7 +798,7 @@ mod tests {
     macro_rules! parse {
         ($($token:expr),*) => {
             super::parse(vec![$((Meta::default(), $token.into())),*])
-                .map(|mut ast| AST::into_tree(ast.root, &mut ast.arena))
+                .map(|mut ast| AST::into_tree(ast.arena.take(ast.root), &mut ast.arena))
         };
     }
 
@@ -911,17 +911,6 @@ mod tests {
             (meta! { start: 24, end: 25 }, Token::Value(3.into())),
         ]).unwrap();
         assert_eq!(
-            ast.root,
-            ASTSpan(
-                Span { start: 0, end: Some(25) },
-                ASTType::Operation(
-                    NodeId(2),
-                    (meta! { start: 2, end: 3, trailing: 1 }, Operator::Add),
-                    NodeId(3)
-                )
-            )
-        );
-        assert_eq!(
             ast.arena.get_ref(),
             &[
                 Some(ASTSpan(
@@ -961,6 +950,14 @@ mod tests {
                         NodeId(0),
                         (meta! { start: 22, end: 23, trailing: 1 }, Operator::Mul),
                         NodeId(1)
+                    )
+                )),
+                Some(ASTSpan(
+                    Span { start: 0, end: Some(25) },
+                    ASTType::Operation(
+                        NodeId(2),
+                        (meta! { start: 2, end: 3, trailing: 1 }, Operator::Add),
+                        NodeId(3)
                     )
                 ))
             ]

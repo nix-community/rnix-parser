@@ -73,7 +73,7 @@ mod tests {
 
     fn parse(input: &str) -> AST {
         let mut ast = inner_parse(input).expect("error while parsing");
-        AST::into_tree(ast.root, &mut ast.arena)
+        AST::into_tree(ast.arena.take(ast.root), &mut ast.arena)
     }
 
     #[test]
