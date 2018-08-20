@@ -8,7 +8,7 @@ use std::fmt;
 impl fmt::Display for Trivia {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Trivia::Newline(amount) => for _ in 0..amount {
+            Trivia::Newlines(amount) => for _ in 0..amount {
                 write!(f, "\n")?;
             },
             Trivia::Spaces(amount) => for _ in 0..amount {

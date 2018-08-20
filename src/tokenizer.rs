@@ -29,13 +29,37 @@ impl Span {
 /// Information about token spacing
 #[derive(Clone, Debug, PartialEq)]
 pub enum Trivia {
-    Newline(u32),
+    Newlines(u32),
     Spaces(u32),
     Tabs(u32),
     Comment {
         span: Span,
         multiline: bool,
         content: SmolStr
+    }
+}
+impl Trivia {
+    /// Convenience function that returns true if this is newline trivia
+    pub fn is_newlines(&self) -> bool {
+        match self {
+            Trivia::Newlines(_) => true,
+            _ => false
+        }
+    }
+    /// Convenience function that returns true if this is whitespace, either spaces or tabs
+    pub fn is_spaces(&self) -> bool {
+        match self {
+            Trivia::Spaces(_)
+            | Trivia::Tabs(_) => true,
+            _ => false
+        }
+    }
+    /// Convenience function that returns true if this is a comment
+    pub fn is_comment(&self) -> bool {
+        match self {
+            Trivia::Comment { .. } => true,
+            _ => false
+        }
     }
 }
 
@@ -293,7 +317,7 @@ impl<'a> Tokenizer<'a> {
                     self.next().unwrap();
                     amount += 1;
                 }
-                Some(Ok(Trivia::Newline(amount)))
+                Some(Ok(Trivia::Newlines(amount)))
             },
             Some('#') => {
                 let end = self.input.find('\n').unwrap_or(self.input.len());
@@ -818,7 +842,7 @@ mod tests {
                 (
                     Meta {
                         span: Span { start: 6, end: Some(9) },
-                        leading: vec![Trivia::Newline(1), Trivia::Spaces(4)],
+                        leading: vec![Trivia::Newlines(1), Trivia::Spaces(4)],
                         trailing: vec![
                             Trivia::Spaces(1),
                             Trivia::Comment {
@@ -865,7 +889,7 @@ mod tests {
                 (
                     Meta {
                         span: Span { start: 44, end: Some(45) },
-                        leading: vec![Trivia::Newline(1)],
+                        leading: vec![Trivia::Newlines(1)],
                         trailing: Vec::new(),
                     },
                     TokenKind::CurlyBClose.into()
@@ -874,7 +898,7 @@ mod tests {
                     Meta {
                         span: Span { start: 56, end: Some(56) },
                         leading: vec![
-                            Trivia::Newline(1),
+                            Trivia::Newlines(1),
                             Trivia::Comment {
                                 span: Span { start: 46, end: Some(56) },
                                 multiline: false,
