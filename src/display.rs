@@ -360,6 +360,6 @@ fn fmt_node<'a>(f: &mut fmt::Formatter, arena: &Arena<'a, ASTNode>, root: &ASTNo
 
 impl<'a> fmt::Display for AST<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt_node(f, &self.arena, &self.root)
+        fmt_node(f, &self.arena, &self.arena[self.root])
     }
 }

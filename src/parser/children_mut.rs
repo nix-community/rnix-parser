@@ -8,77 +8,37 @@
 // Mark all lines that should only be in that file with a *leading* // MUT.
 
 use super::*;
-pub use super::children_mut::*; // IMMUT
 
 /// A child: Either metadata, or another node
-// <<IMMUT
-pub enum Child<'a> {
-    Meta(&'a Meta),
+pub enum ChildMut<'a> {
+    Meta(&'a mut Meta),
     Node(NodeId)
 }
-impl<'a> From<&'a Meta> for Child<'a> {
-    fn from(meta: &'a Meta) -> Self {
-        Child::Meta(meta)
+impl<'a> From<&'a mut Meta> for ChildMut<'a> {
+    fn from(meta: &'a mut Meta) -> Self {
+        ChildMut::Meta(meta)
     }
 }
-impl<'a> From<&'a NodeId> for Child<'static> {
-    fn from(node: &'a NodeId) -> Self {
-        Child::Node(*node)
-    }
-}
-
-// IMMUT>>
-// MUT pub enum ChildMut<'a> {
-// MUT     Meta(&'a mut Meta),
-// MUT     Node(NodeId)
-// MUT }
-// MUT impl<'a> From<&'a mut Meta> for ChildMut<'a> {
-// MUT     fn from(meta: &'a mut Meta) -> Self {
-// MUT         ChildMut::Meta(meta)
-// MUT     }
-// MUT }
-// MUT impl<'a> From<&'a mut NodeId> for ChildMut<'static> {
-// MUT     fn from(node: &'a mut NodeId) -> Self {
-// MUT         ChildMut::Node(*node)
-// MUT     }
-// MUT }
-
-// <<IMMUT
-/// An iterator over children, created using the `children` function on ASTType
-pub struct ChildrenIter<'a> {
-    node: &'a ASTType,
-    index: usize
-}
-impl<'a> Iterator for ChildrenIter<'a> {
-    type Item = Child<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let child = self.node.child(self.index);
-        if child.is_some() {
-            self.index += 1;
-        }
-        child
+impl<'a> From<&'a mut NodeId> for ChildMut<'static> {
+    fn from(node: &'a mut NodeId) -> Self {
+        ChildMut::Node(*node)
     }
 }
 
-// IMMUT>>
 impl super::ASTType {
-    // <<IMMUT
-    /// Return an iterator over all the children of this node
-    pub fn children(&self) -> ChildrenIter {
-        ChildrenIter {
-            node: self,
-            index: 0
-        }
-    }
+    ///// Return an iterator over all the children of this node
+    //pub fn children(&mut self) -> ChildrenIter {
+    //    ChildrenIter {
+    //        node: self,
+    //        index: 0
+    //    }
+    //}
 
-    // IMMUT>>
     /// Index the children of this tree. Note: The intended
     /// usage is only for the `children` function. Which node
     /// an index actually refers to is unspecified, so don't
     /// rely on it.
-    pub fn child(&self, mut index: usize) -> Option<Child> { // IMMUT
-    // MUT pub fn child_mut(&mut self, mut index: usize) -> Option<ChildMut> {
+    pub fn child_mut(&mut self, mut index: usize) -> Option<ChildMut> {
         macro_rules! index {
             () => {{
                 #[allow(unused_assignments)]
@@ -150,18 +110,15 @@ impl super::ASTType {
                     LambdaArg::Pattern { args: Brackets(open, args, close), bind, ellipsis } => {
                         index!(maybe open);
                         for entry in args {
-                            if let Some((meta, default)) = &entry.default { // IMMUT
-                            // MUT if let Some((meta, default)) = &mut entry.default {
+                            if let Some((meta, default)) = &mut entry.default {
                                 index!(maybe meta);
                                 index!(maybe default);
                             }
                         }
                         index!(maybe close);
                         if let Some(bind) = bind {
-                            index!(maybe &bind.at); // IMMUT
-                            index!(maybe &bind.ident); // IMMUT
-                            // MUT index!(maybe &mut bind.at);
-                            // MUT index!(maybe &mut bind.ident);
+                            index!(maybe &mut bind.at);
+                            index!(maybe &mut bind.ident);
                         }
                         if let Some(ellipsis) = ellipsis {
                             index!(maybe ellipsis);

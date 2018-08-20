@@ -1,5 +1,6 @@
 //! The parser: turns a series of tokens into an AST
 
+mod children_mut;
 pub mod children;
 pub mod intoactualslowtree;
 
@@ -30,7 +31,7 @@ pub enum ParseError {
 /// An AST with the arena and node
 pub struct AST<'a> {
     pub arena: Arena<'a, ASTNode>,
-    pub root: ASTNode
+    pub root: NodeId
 }
 impl<'a> AST<'a> {
     pub fn errors<'r>(&'r self) -> impl Iterator<Item = &Error> + 'r {
@@ -780,10 +781,10 @@ pub fn parse<I>(iter: I) -> Result<AST<'static>>
     let mut parser = Parser::new(iter.into_iter());
     let ast = parser.parse_expr()?;
 
-    Ok(AST {
-        arena: parser.into_arena(),
-        root: ast
-    })
+    let mut arena = parser.into_arena();
+    let root = arena.insert(ast);
+
+    Ok(AST { arena, root })
 }
 
 #[cfg(test)]
