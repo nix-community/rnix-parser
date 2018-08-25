@@ -84,6 +84,7 @@ enum IdentType {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Interpol {
     Literal {
+        span: Span,
         original: String,
         content: String
     },
@@ -377,8 +378,6 @@ impl<'a> Tokenizer<'a> {
         ident
     }
     fn next_interpol(&mut self, start: Span, string: bool) -> Result<(Vec<(Meta, Token)>, Meta)> {
-        self.next().expect("next_interpol was called in an invalid context");
-
         let mut tokens = Vec::new();
         let mut ctx = Context::Interpol {
             brackets: 0,
@@ -410,7 +409,7 @@ impl<'a> Tokenizer<'a> {
             }
         }
 
-        let mut original_start = *self;
+        let mut span_start = *self;
 
         let mut interpol = Vec::new();
         let mut literal = String::new();
@@ -436,7 +435,7 @@ impl<'a> Tokenizer<'a> {
             literal.push(self.next().unwrap());
         }
 
-        let mut original_len = self.cursor - original_start.cursor;
+        let mut span_len = self.cursor - span_start.cursor;
 
         loop {
             let whitespace = self.peek().map(char::is_whitespace).unwrap_or(false);
@@ -481,14 +480,17 @@ impl<'a> Tokenizer<'a> {
                 },
                 Some('$') => match { self.next().unwrap(); self.peek() } {
                     Some('{') => {
-                        if original_len > 0 {
+                        if span_len > 0 {
+                            let start = span_start.cursor;
                             interpol.push(Interpol::Literal {
-                                original: original_start.input[..original_len as usize].into(),
+                                span: Span { start, end: Some(start + span_len) },
+                                original: span_start.input[..span_len as usize].into(),
                                 content: mem::replace(&mut literal, String::new())
                             });
                         }
+                        self.next().unwrap();
                         let (tokens, close) = self.next_interpol(meta.span, true)?;
-                        original_start = *self;
+                        span_start = *self;
                         interpol.push(Interpol::Tokens(tokens, close));
                     },
                     Some('$') => { self.next().unwrap(); literal.push_str("$$"); }
@@ -501,7 +503,7 @@ impl<'a> Tokenizer<'a> {
 
             // When the string is closing we won't get to this point:
 
-            original_len = self.cursor - original_start.cursor;
+            span_len = self.cursor - span_start.cursor;
 
             if multiline && !whitespace {
                 min_indent = Some(min_indent.unwrap_or(std::usize::MAX).min(last_indent));
@@ -543,13 +545,15 @@ impl<'a> Tokenizer<'a> {
         if interpol.is_empty() {
             self.span_end(meta, ctx, Token::Value(Value::Str {
                 multiline,
-                original: original_start.input[..original_len as usize].into(),
+                original: span_start.input[..span_len as usize].into(),
                 content: literal.into()
             }))
         } else {
-            if original_len > 0 {
+            if span_len > 0 {
+                let start = span_start.cursor;
                 interpol.push(Interpol::Literal {
-                    original: original_start.input[..original_len as usize].into(),
+                    span: Span { start, end: Some(start + span_len) },
+                    original: span_start.input[..span_len as usize].into(),
                     content: literal
                 });
             }
@@ -664,8 +668,10 @@ impl<'a> Tokenizer<'a> {
             '>' if self.peek() == Some('=') => { self.next().unwrap(); self.span_end(meta, ctx, TokenKind::MoreOrEq) },
             '>' => self.span_end(meta, ctx, TokenKind::More),
             '$' if self.peek() == Some('{') => {
+                self.next().unwrap();
+                meta.span.end = Some(self.cursor);
                 let (tokens, close) = self.next_interpol(meta.span, false)?;
-                self.span_end(meta, ctx, Token::Dynamic(tokens, close))
+                Ok((meta, Token::Dynamic(tokens, close)))
             },
             'a'..='z' | 'A'..='Z' | '_' => {
                 let kind = match kind {
@@ -782,11 +788,12 @@ mod tests {
         super::tokenize(input).collect()
     }
 
-    fn interpol(content: &str) -> Interpol {
-        interpol_original(content, content)
+    fn interpol(span: Span, content: &str) -> Interpol {
+        interpol_original(span, content, content)
     }
-    fn interpol_original(original: &str, content: &str) -> Interpol {
+    fn interpol_original(span: Span, original: &str, content: &str) -> Interpol {
         Interpol::Literal {
+            span,
             original: original.into(),
             content: content.into()
         }
@@ -1007,7 +1014,7 @@ mod tests {
                 Token::Interpol {
                     multiline: false,
                     parts: vec![
-                        interpol("Hello, ".into()),
+                        interpol(Span { start: 2, end: Some(9) }, "Hello, ".into()),
                         Interpol::Tokens(
                             vec![
                                 (
@@ -1028,7 +1035,7 @@ mod tests {
                             ],
                             meta! { start: 39, end: 40 }
                         ),
-                        interpol("!".into())
+                        interpol(Span { start: 40, end: Some(41) }, "!".into())
                     ]
                 }
             )])
@@ -1044,7 +1051,7 @@ mod tests {
                 Token::Interpol {
                     multiline: false,
                     parts: vec![
-                        interpol_original("\\$".into(), "$".into()),
+                        interpol_original(Span { start: 2, end: Some(4) }, "\\$".into(), "$".into()),
                         Interpol::Tokens(
                             vec![(meta! { start: 6, end: 10 }, Token::Ident("test".into()))],
                             meta! { start: 10, end: 11 }
@@ -1064,7 +1071,7 @@ mod tests {
                 Token::Interpol {
                     multiline: true,
                     parts: vec![
-                        interpol_original("''$".into(), "$".into()),
+                        interpol_original(Span { start: 3, end: Some(6) }, "''$".into(), "$".into()),
                         Interpol::Tokens(
                             vec![(meta! { start: 8, end: 12 }, Token::Ident("test".into()))],
                             meta! { start: 12, end: 13 }
@@ -1088,7 +1095,7 @@ mod tests {
                             vec![(meta! { start: 4, end: 8 }, Token::Ident("test".into()))],
                             meta! { start: 8, end: 9 }
                         ),
-                        interpol("#123".into()),
+                        interpol(Span { start: 9, end: Some(13) }, "#123".into()),
                     ]
                 }
             )])
@@ -1104,7 +1111,7 @@ mod tests {
                 Token::Interpol {
                     multiline: true,
                     parts: vec![
-                        interpol_original("\n".into(), "".into()),
+                        interpol_original(Span { start: 3, end: Some(4) }, "\n".into(), "".into()),
                         Interpol::Tokens(
                             vec![(meta! { start: 6, end: 10 }, Token::Ident("test".into()))],
                             meta! { start: 10, end: 11 }

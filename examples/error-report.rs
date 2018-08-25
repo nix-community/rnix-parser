@@ -22,7 +22,10 @@ fn main() {
     let errors = match rnix::parse(&content) {
         Ok(ast) => {
             ast.errors()
-                .map(|(span, err)| (*span, err.to_string()))
+                .map(|node| {
+                    let (span, err) = node.error();
+                    (*span, err.to_string())
+                })
                 .collect()
         },
         Err(err) => match err {

@@ -1,4 +1,3 @@
-use rnix::parser::intoactualslowtree::{AST as ASTActual, IntoTree};
 use std::{env, fs};
 
 fn main() {
@@ -16,8 +15,8 @@ fn main() {
             }
         };
         match rnix::parse(&content) {
-            Ok(mut ast) => {
-                println!("{:#?}", ASTActual::into_tree(ast.arena.take(ast.root), &mut ast.arena))
+            Ok(ast) => {
+                println!("{:#?}", ast)
             },
             Err(err) => eprintln!("error: {:?}", err)
         }

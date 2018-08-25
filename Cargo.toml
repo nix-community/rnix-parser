@@ -11,6 +11,7 @@ repository = "https://gitlab.com/jD91mZM2/rnix"
 version = "0.3.0"
 
 [dependencies]
+arenatree = { path = "arenatree/" }
 failure = "0.1.2"
 
 smol_str = { version = "0.1.2", optional = true }
