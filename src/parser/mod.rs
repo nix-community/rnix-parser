@@ -155,7 +155,7 @@ impl ASTNode {
     }
     /// If this node has a child, it returns an iterator over that child and all its siblings.
     /// If this node is a dead end, return an empty iterator.
-    pub fn children<'a, 'b>(&self, arena: &'a Arena<'b>) -> NodeIter<'a, 'b, ASTNode> {
+    pub fn children<'a>(&self, arena: &'a Arena) -> NodeIter<'a, ASTNode> {
         NodeIter {
             arena,
             cursor: self.node.child
