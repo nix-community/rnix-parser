@@ -173,8 +173,8 @@ impl AsMut<Node> for ASTNode {
     }
 }
 
-crate type Error = (Option<Span>, ParseError);
-crate type Result<T> = std::result::Result<T, Error>;
+pub(crate) type Error = (Option<Span>, ParseError);
+pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 macro_rules! math {
     (only_once: $only_once:expr, $self:expr, $next:block, $($token:pat),*) => {{
