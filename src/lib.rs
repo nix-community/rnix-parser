@@ -16,7 +16,6 @@ macro_rules! meta {
     }};
 }
 
-#[macro_use] pub(crate) mod utils;
 pub mod parser;
 pub mod tokenizer;
 pub mod value;

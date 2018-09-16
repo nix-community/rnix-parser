@@ -1,8 +1,8 @@
 //! The parser: turns a series of tokens into an AST
 
+use arrayvec::ArrayVec;
 use crate::{
     tokenizer::{Interpol as TokenInterpol, Meta, Span, Token, TokenKind},
-    utils::stack::Stack,
     value::Value
 };
 use std::fmt;
@@ -214,7 +214,7 @@ pub struct Parser<'a, I>
     where I: Iterator<Item = (Meta, Token)>
 {
     iter: I,
-    buffer: Stack<I::Item>,
+    buffer: ArrayVec<[I::Item; 2]>,
     arena: Arena<'a>
 }
 impl<'a, I> Parser<'a, I>
@@ -228,8 +228,7 @@ impl<'a, I> Parser<'a, I>
     pub fn with_arena(arena: Arena<'a>, iter: I) -> Self {
         Self {
             iter,
-            // Can't use [None; 2] because I::Item isn't Copy
-            buffer: Stack::new([None, None]),
+            buffer: ArrayVec::new(),
             arena
         }
     }
@@ -259,9 +258,11 @@ impl<'a, I> Parser<'a, I>
 
     fn peek_meta(&mut self) -> Option<&(Meta, Token)> {
         if self.buffer.is_empty() {
-            *self.buffer.first_free() = self.iter.next();
+            if let Some(token) = self.iter.next() {
+                self.buffer.push(token);
+            }
         }
-        self.buffer.peek()
+        self.buffer.last()
     }
     fn peek(&mut self) -> Option<&Token> {
         self.peek_meta().map(|(_, token)| token)
