@@ -511,9 +511,9 @@ impl<'a, I> Parser<'a, I>
             node: Node::with_child(children)
         })
     }
-    fn parse_set_entry(&mut self, until: TokenKind, values: &mut NodeList<ASTNode>) -> Result<bool> {
+    fn parse_set_entry(&mut self, until: TokenKind) -> Result<Option<ASTNode>> {
         match self.peek_kind() {
-            token if token == Some(until) => return Ok(false),
+            token if token == Some(until) => return Ok(None),
             Some(TokenKind::Inherit) => {
                 let inherit = ASTNode::from_token(self.next().unwrap());
                 let inherit_span = inherit.span;
@@ -534,7 +534,7 @@ impl<'a, I> Parser<'a, I>
 
                     let children = self.chain(&[open, from, close]);
 
-                    values.push(self.insert(ASTNode {
+                    vars.push(self.insert(ASTNode {
                         kind: ASTKind::InheritFrom,
                         span: open_span.until(close_span),
                         data: Data::None,
@@ -553,12 +553,12 @@ impl<'a, I> Parser<'a, I>
 
                 vars.push(semi, &mut self.arena);
 
-                values.push(self.insert(ASTNode {
+                Ok(Some(ASTNode {
                     kind: ASTKind::Inherit,
                     span: inherit_span.until(semi_span),
                     data: Data::None,
                     node: Node::with_child(vars.node())
-                }), &mut self.arena);
+                }))
             },
             _ => {
                 let key = self.parse_attr()?;
@@ -578,23 +578,22 @@ impl<'a, I> Parser<'a, I>
                     value,
                     semi,
                 ]);
-                values.push(self.insert(ASTNode {
+                Ok(Some(ASTNode {
                     kind: ASTKind::SetEntry,
                     span: key_span.until(semi_span),
                     data: Data::None,
                     node: Node::with_child(entry)
-                }), &mut self.arena)
+                }))
             }
         }
-        Ok(true)
     }
     fn parse_set(&mut self, until: TokenKind) -> Result<(Option<NodeId>, ASTNode)> {
         let mut values = NodeList::new();
 
         loop {
-            match self.parse_set_entry(until, &mut values) {
-                Ok(true) => (),
-                Ok(false) => break,
+            match self.parse_set_entry(until) {
+                Ok(Some(value)) => values.push(self.insert(value), &mut self.arena),
+                Ok(None) => break,
                 Err(err) => {
                     if self.recover(&[TokenKind::Ident, TokenKind::Inherit, until]) {
                         values.push(self.insert(ASTNode {

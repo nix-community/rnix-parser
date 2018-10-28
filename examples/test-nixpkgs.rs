@@ -1,5 +1,5 @@
-#[macro_use]
-extern crate failure;
+#[macro_use] extern crate failure;
+extern crate rnix;
 
 use failure::Error;
 use std::{env, fs, path::Path};

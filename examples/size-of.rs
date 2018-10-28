@@ -1,3 +1,5 @@
+extern crate rnix;
+
 use std::mem;
 
 use rnix::{parser::*, tokenizer::{Meta, Span, Trivia}};

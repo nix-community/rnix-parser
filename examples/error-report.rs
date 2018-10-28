@@ -1,3 +1,5 @@
+extern crate rnix;
+
 use rnix::Error as NixError;
 use std::{env, fs, io::{self, Write}};
 

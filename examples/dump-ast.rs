@@ -1,3 +1,5 @@
+extern crate rnix;
+
 use std::{env, fs};
 
 fn main() {
