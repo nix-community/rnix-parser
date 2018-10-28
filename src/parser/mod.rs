@@ -6,7 +6,7 @@ use crate::{
     value::Value
 };
 use std::fmt;
-pub use arenatree::NodeId;
+pub use arenatree::{NodeId, Node};
 use arenatree::*;
 
 pub mod types;
