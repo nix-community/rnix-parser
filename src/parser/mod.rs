@@ -1,13 +1,13 @@
 //! The parser: turns a series of tokens into an AST
 
 use arrayvec::ArrayVec;
-use crate::{
+use ::{
     tokenizer::{Interpol as TokenInterpol, Meta, Span, Token, TokenKind},
     value::Value
 };
-use std::fmt;
+use std::{self, fmt};
 pub use arenatree::NodeId;
-use arenatree::*;
+use arenatree::{self, *};
 
 pub mod types;
 
@@ -286,14 +286,13 @@ impl<'a, I> Parser<'a, I>
     }
     fn expect(&mut self, expected: TokenKind) -> Result<(Meta, Token)> {
         if let Some((meta, actual)) = self.peek_meta() {
-            if actual.kind() == expected {
-                Ok(self.next().unwrap())
-            } else {
-                Err((Some(meta.span), ParseError::Expected(expected, Some(actual.kind()))))
+            if actual.kind() != expected {
+                return Err((Some(meta.span), ParseError::Expected(expected, Some(actual.kind()))));
             }
         } else {
-            Err((None, ParseError::Expected(expected, None)))
+            return Err((None, ParseError::Expected(expected, None)));
         }
+        Ok(self.next().unwrap())
     }
     fn recover(&mut self, recover: &[TokenKind]) -> bool {
         loop {
@@ -512,96 +511,101 @@ impl<'a, I> Parser<'a, I>
             node: Node::with_child(children)
         })
     }
+    fn parse_set_entry(&mut self, until: TokenKind, values: &mut NodeList<ASTNode>) -> Result<bool> {
+        match self.peek_kind() {
+            token if token == Some(until) => return Ok(false),
+            Some(TokenKind::Inherit) => {
+                let inherit = ASTNode::from_token(self.next().unwrap());
+                let inherit_span = inherit.span;
+                let inherit = self.insert(inherit);
+
+                let mut vars = NodeList::new();
+                vars.push(inherit, &mut self.arena);
+
+                if self.peek_kind() == Some(TokenKind::ParenOpen) {
+                    let open = ASTNode::from_token(self.next().unwrap());
+                    let open_span = open.span;
+                    let open = self.insert(open);
+                    let from = self.parse_expr()?;
+                    let from = self.insert(from);
+                    let close = ASTNode::from_token(self.expect(TokenKind::ParenClose)?);
+                    let close_span = close.span;
+                    let close = self.insert(close);
+
+                    let children = self.chain(&[open, from, close]);
+
+                    values.push(self.insert(ASTNode {
+                        kind: ASTKind::InheritFrom,
+                        span: open_span.until(close_span),
+                        data: Data::None,
+                        node: Node::with_child(children)
+                    }), &mut self.arena)
+                }
+
+                while let Some(Token::Ident(_)) = self.peek() {
+                    let ident = self.next_ident().unwrap();
+                    vars.push(self.insert(ident), &mut self.arena);
+                }
+
+                let semi = ASTNode::from_token(self.expect(TokenKind::Semicolon)?);
+                let semi_span = semi.span;
+                let semi = self.insert(semi);
+
+                vars.push(semi, &mut self.arena);
+
+                values.push(self.insert(ASTNode {
+                    kind: ASTKind::Inherit,
+                    span: inherit_span.until(semi_span),
+                    data: Data::None,
+                    node: Node::with_child(vars.node())
+                }), &mut self.arena);
+            },
+            _ => {
+                let key = self.parse_attr()?;
+                let key_span = key.span;
+                let key = self.insert(key);
+                let assign = ASTNode::from_token(self.expect(TokenKind::Assign)?);
+                let assign = self.insert(assign);
+                let value = self.parse_expr()?;
+                let value = self.insert(value);
+                let semi = ASTNode::from_token(self.expect(TokenKind::Semicolon)?);
+                let semi_span = semi.span;
+                let semi = self.insert(semi);
+
+                let entry = self.chain(&[
+                    key,
+                    assign,
+                    value,
+                    semi,
+                ]);
+                values.push(self.insert(ASTNode {
+                    kind: ASTKind::SetEntry,
+                    span: key_span.until(semi_span),
+                    data: Data::None,
+                    node: Node::with_child(entry)
+                }), &mut self.arena)
+            }
+        }
+        Ok(true)
+    }
     fn parse_set(&mut self, until: TokenKind) -> Result<(Option<NodeId>, ASTNode)> {
         let mut values = NodeList::new();
 
         loop {
-            let result = try {
-                match self.peek_kind() {
-                    token if token == Some(until) => break,
-                    Some(TokenKind::Inherit) => {
-                        let inherit = ASTNode::from_token(self.next().unwrap());
-                        let inherit_span = inherit.span;
-                        let inherit = self.insert(inherit);
-
-                        let mut vars = NodeList::new();
-                        vars.push(inherit, &mut self.arena);
-
-                        if self.peek_kind() == Some(TokenKind::ParenOpen) {
-                            let open = ASTNode::from_token(self.next().unwrap());
-                            let open_span = open.span;
-                            let open = self.insert(open);
-                            let from = self.parse_expr()?;
-                            let from = self.insert(from);
-                            let close = ASTNode::from_token(self.expect(TokenKind::ParenClose)?);
-                            let close_span = close.span;
-                            let close = self.insert(close);
-
-                            let children = self.chain(&[open, from, close]);
-
-                            vars.push(self.insert(ASTNode {
-                                kind: ASTKind::InheritFrom,
-                                span: open_span.until(close_span),
-                                data: Data::None,
-                                node: Node::with_child(children)
-                            }), &mut self.arena)
-                        }
-
-                        while let Some(Token::Ident(_)) = self.peek() {
-                            let ident = self.next_ident().unwrap();
-                            vars.push(self.insert(ident), &mut self.arena);
-                        }
-
-                        let semi = ASTNode::from_token(self.expect(TokenKind::Semicolon)?);
-                        let semi_span = semi.span;
-                        let semi = self.insert(semi);
-
-                        vars.push(semi, &mut self.arena);
-
+            match self.parse_set_entry(until, &mut values) {
+                Ok(true) => (),
+                Ok(false) => break,
+                Err(err) => {
+                    if self.recover(&[TokenKind::Ident, TokenKind::Inherit, until]) {
                         values.push(self.insert(ASTNode {
-                            kind: ASTKind::Inherit,
-                            span: inherit_span.until(semi_span),
-                            data: Data::None,
-                            node: Node::with_child(vars.node())
+                            kind: ASTKind::Error,
+                            span: Span::default(),
+                            data: Data::Error(err),
+                            node: Node::default()
                         }), &mut self.arena);
-                    },
-                    _ => {
-                        let key = self.parse_attr()?;
-                        let key_span = key.span;
-                        let key = self.insert(key);
-                        let assign = ASTNode::from_token(self.expect(TokenKind::Assign)?);
-                        let assign = self.insert(assign);
-                        let value = self.parse_expr()?;
-                        let value = self.insert(value);
-                        let semi = ASTNode::from_token(self.expect(TokenKind::Semicolon)?);
-                        let semi_span = semi.span;
-                        let semi = self.insert(semi);
-
-                        let entry = self.chain(&[
-                            key,
-                            assign,
-                            value,
-                            semi,
-                        ]);
-                        values.push(self.insert(ASTNode {
-                            kind: ASTKind::SetEntry,
-                            span: key_span.until(semi_span),
-                            data: Data::None,
-                            node: Node::with_child(entry)
-                        }), &mut self.arena)
+                    } else {
+                        return Err(err);
                     }
-                }
-            };
-            if let Err(err) = result {
-                if self.recover(&[TokenKind::Ident, TokenKind::Inherit, until]) {
-                    values.push(self.insert(ASTNode {
-                        kind: ASTKind::Error,
-                        span: Span::default(),
-                        data: Data::Error(err),
-                        node: Node::default()
-                    }), &mut self.arena);
-                } else {
-                    return Err(err);
                 }
             }
         }
@@ -783,33 +787,34 @@ impl<'a, I> Parser<'a, I>
             let attr_span = attr.span;
             let attr = self.insert(attr);
 
-            match self.peek() {
-                Some(Token::Ident(s)) if s == OR => {
-                    let or = self.next_ident().unwrap();
-                    let or = self.insert(or);
-                    let default = self.parse_val()?;
-                    let default_span = default.span;
-                    let default = self.insert(default);
+            let or = match self.peek() {
+                Some(Token::Ident(s)) if s == OR => true,
+                _ => false
+            };
+            if or {
+                let or = self.next_ident().unwrap();
+                let or = self.insert(or);
+                let default = self.parse_val()?;
+                let default_span = default.span;
+                let default = self.insert(default);
 
-                    let children = self.chain(&[val_id, dot, attr, or, default]);
+                let children = self.chain(&[val_id, dot, attr, or, default]);
 
-                    val = ASTNode {
-                        kind: ASTKind::OrDefault,
-                        span: val_span.until(default_span),
-                        data: Data::None,
-                        node: Node::with_child(children)
-                    };
-                },
-                _ => {
-                    let children = self.chain(&[val_id, dot, attr]);
+                val = ASTNode {
+                    kind: ASTKind::OrDefault,
+                    span: val_span.until(default_span),
+                    data: Data::None,
+                    node: Node::with_child(children)
+                };
+            } else {
+                let children = self.chain(&[val_id, dot, attr]);
 
-                    val = ASTNode {
-                        kind: ASTKind::IndexSet,
-                        span: val_span.until(attr_span),
-                        data: Data::None,
-                        node: Node::with_child(children)
-                    };
-                }
+                val = ASTNode {
+                    kind: ASTKind::IndexSet,
+                    span: val_span.until(attr_span),
+                    data: Data::None,
+                    node: Node::with_child(children)
+                };
             }
         }
 
@@ -1089,7 +1094,7 @@ pub fn parse<I>(iter: I) -> Result<AST<'static>>
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    use ::{
         tokenizer::{Interpol as TokenInterpol, Meta, Span, Token, TokenKind},
         value::{Anchor, Value}
     };

@@ -1,7 +1,7 @@
-#![feature(try_blocks)]
-
-#[macro_use]
-extern crate failure;
+#[cfg(feature = "smol_str")] extern crate smol_str;
+#[macro_use] extern crate failure;
+extern crate arenatree;
+extern crate arrayvec;
 
 #[cfg(test)]
 macro_rules! meta {

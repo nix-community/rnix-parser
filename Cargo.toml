@@ -1,7 +1,7 @@
 [package]
 authors = ["jD91mZM2 <me@krake.one>"]
 description = "A Nix parser written in Rust"
-edition = "2018"
+#edition = "2018"
 license-file = "LICENSE"
 name = "rnix"
 readme = "README.md"
@@ -9,7 +9,8 @@ repository = "https://gitlab.com/jD91mZM2/rnix"
 version = "0.4.1"
 
 [dependencies]
-arenatree = "0.1.1"
+#arenatree = "0.1.1"
+arenatree = { git = "https://gitlab.com/jD91mZM2/arenatree" }
 arrayvec = "0.4.7"
 failure = "0.1.2"
 

@@ -1,4 +1,4 @@
-use crate::{
+use ::{
     parser::*,
     tokenizer::{Interpol as TokenInterpol, Token, TokenKind, Trivia}
 };

@@ -1,7 +1,7 @@
 //! The tokenizer: turns a string into tokens, such as numbers, strings, and keywords
 
-use crate::value::{Anchor, Value};
-use std::mem;
+use ::value::{Anchor, Value};
+use std::{self, mem};
 
 #[cfg(feature = "smol_str")]
 use smol_str::SmolStr;
@@ -774,7 +774,7 @@ pub fn tokenize<'a>(input: &'a str) -> impl Iterator<Item = Item> + 'a {
 
 #[cfg(test)]
 mod tests {
-    use crate::value::{Anchor, Value};
+    use ::value::{Anchor, Value};
     use super::{Interpol, Meta, Span, Token, TokenKind, TokenizeError, Trivia};
 
     fn tokenize(input: &str) -> Result<Vec<Token>, TokenizeError> {
