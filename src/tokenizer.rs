@@ -13,6 +13,7 @@ enum IdentType {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Token {
     // Internals
+    Comment,
     Error,
     Whitespace,
 
@@ -205,7 +206,24 @@ impl<'a> Iterator for Tokenizer<'a> {
         let start = self.state;
 
         if self.consume(char::is_whitespace) > 0 {
-            return Some((Token::Whitespace, self.string_since(start)))
+            return Some((Token::Whitespace, self.string_since(start)));
+        }
+
+        if self.peek() == Some('#') {
+            self.consume(|c| c != '\n');
+            self.next(); // consume the newline, if any
+            return Some((Token::Comment, self.string_since(start)));
+        }
+        if self.remaining().starts_with("/*") {
+            loop {
+                self.consume(|c| c != '*');
+                self.next(); // consume the '*', if any
+                match self.next() {
+                    None => return Some((Token::Error, self.string_since(start))),
+                    Some('/') => return Some((Token::Comment, self.string_since(start))),
+                    _ => ()
+                }
+            }
         }
 
         if self.remaining().starts_with("...") {
@@ -589,6 +607,28 @@ mod tests {
                     (Token::InterpolEnd, r#"}""#),
                 (Token::InterpolEnd, r#"}''"#),
                 (Token::Whitespace, " ")
+            ]
+        );
+    }
+    #[test]
+    fn comments() {
+        assert_eq!(
+            tokenize("{ a = /* multiline * comment */ 123;# single line\n} # single line at the end"),
+            tokens![
+                (Token::CurlyBOpen, "{"),
+                (Token::Whitespace, " "),
+                (Token::Ident, "a"),
+                (Token::Whitespace, " "),
+                (Token::Assign, "="),
+                (Token::Whitespace, " "),
+                (Token::Comment, "/* multiline * comment */"),
+                (Token::Whitespace, " "),
+                (Token::Value, "123"),
+                (Token::Semicolon, ";"),
+                (Token::Comment, "# single line\n"),
+                (Token::CurlyBClose, "}"),
+                (Token::Whitespace, " "),
+                (Token::Comment, "# single line at the end")
             ]
         );
     }
