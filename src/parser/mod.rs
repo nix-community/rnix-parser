@@ -338,52 +338,25 @@ impl<I> Parser<I>
             match self.peek() {
                 None => break,
                 token if token == Some(until) => break,
-                //Some(TokenKind::Inherit) => {
-                //    let inherit = ASTNode::from_token(self.next().unwrap());
-                //    let inherit_span = inherit.span;
-                //    let inherit = self.insert(inherit);
+                Some(Token::Inherit) => {
+                    self.builder.start_internal(NodeType::Marker(ASTKind::Inherit));
+                    self.bump();
 
-                //    let mut vars = NodeList::new();
-                //    vars.push(inherit, &mut self.arena);
+                    if self.peek() == Some(Token::ParenOpen) {
+                        self.builder.start_internal(NodeType::Marker(ASTKind::InheritFrom));
+                        self.bump();
+                        self.parse_expr();
+                        self.expect(Token::ParenClose);
+                        self.builder.finish_internal();
+                    }
 
-                //    if self.peek_kind() == Some(TokenKind::ParenOpen) {
-                //        let open = ASTNode::from_token(self.next().unwrap());
-                //        let open_span = open.span;
-                //        let open = self.insert(open);
-                //        let from = self.parse_expr()?;
-                //        let from = self.insert(from);
-                //        let close = ASTNode::from_token(self.expect(TokenKind::ParenClose)?);
-                //        let close_span = close.span;
-                //        let close = self.insert(close);
+                    while let Some(Token::Ident) = self.peek() {
+                        self.bump();
+                    }
 
-                //        let children = self.chain(&[open, from, close]);
-
-                //        vars.push(self.insert(ASTNode {
-                //            kind: ASTKind::InheritFrom,
-                //            span: open_span.until(close_span),
-                //            data: Data::None,
-                //            node: Node::with_child(children)
-                //        }), &mut self.arena)
-                //    }
-
-                //    while let Some(Token::Ident(_)) = self.peek() {
-                //        let ident = self.next_ident().unwrap();
-                //        vars.push(self.insert(ident), &mut self.arena);
-                //    }
-
-                //    let semi = ASTNode::from_token(self.expect(TokenKind::Semicolon)?);
-                //    let semi_span = semi.span;
-                //    let semi = self.insert(semi);
-
-                //    vars.push(semi, &mut self.arena);
-
-                //    values.push(self.insert(ASTNode {
-                //        kind: ASTKind::Inherit,
-                //        span: inherit_span.until(semi_span),
-                //        data: Data::None,
-                //        node: Node::with_child(vars.node())
-                //    }), &mut self.arena);
-                //},
+                    self.expect(Token::Semicolon);
+                    self.builder.finish_internal();
+                },
                 Some(_) => {
                     self.builder.start_internal(NodeType::Marker(ASTKind::SetEntry));
                     self.parse_attr();
@@ -404,47 +377,21 @@ impl<I> Parser<I>
                 self.bump();
                 self.parse_expr();
                 self.bump();
+                self.builder.finish_internal();
             },
-            //(TokenKind::Import, _) => {
-            //    let import = ASTNode::from_token_kind(meta, kind);
-            //    let import_span = import.span;
-            //    let import = self.insert(import);
-            //    let value = self.parse_val()?;
-            //    let value_span = value.span;
-            //    let value = self.insert(value);
-
-            //    let children = self.chain(&[import, value]);
-
-            //    ASTNode {
-            //        kind: ASTKind::Import,
-            //        span: import_span.until(value_span),
-            //        data: Data::None,
-            //        node: Node::with_child(children)
-            //    }
-            //},
-            //(TokenKind::Rec, _) => {
-            //    let rec = ASTNode::from_token_kind(meta, kind);
-            //    let rec_span = rec.span;
-            //    let rec = self.insert(rec);
-            //    let open = ASTNode::from_token(self.expect(TokenKind::CurlyBOpen)?);
-            //    let open = self.insert(open);
-            //    let (values, close) = self.parse_set(TokenKind::CurlyBClose)?;
-            //    let close_span = close.span;
-            //    let close = self.insert(close);
-
-            //    let children = if let Some(values) = values {
-            //        self.chain(&[rec, open, values, close])
-            //    } else {
-            //        self.chain(&[rec, open, close])
-            //    };
-
-            //    ASTNode {
-            //        kind: ASTKind::Set,
-            //        span: rec_span.until(close_span),
-            //        data: Data::None,
-            //        node: Node::with_child(children)
-            //    }
-            //},
+            Some(Token::Import) => {
+                self.builder.start_internal(NodeType::Marker(ASTKind::Import));
+                self.bump();
+                self.parse_val();
+                self.builder.finish_internal();
+            },
+            Some(Token::Rec) => {
+                self.builder.start_internal(NodeType::Marker(ASTKind::Set));
+                self.bump();
+                self.expect(Token::CurlyBOpen);
+                self.parse_set(Token::CurlyBClose);
+                self.builder.finish_internal();
+            },
             Some(Token::CurlyBOpen) => {
             //    let temporary = self.next()?;
             //    match (temporary.1.kind(), self.peek_kind()) {
@@ -657,72 +604,30 @@ impl<I> Parser<I>
     /// Parse Nix code into an AST
     pub fn parse_expr(&mut self) {
         match self.peek() {
-            //Some(TokenKind::Let) => {
-            //    let let_ = ASTNode::from_token(self.next().unwrap());
-            //    let let_span = let_.span;
-            //    let let_ = self.insert(let_);
-            //    if self.peek_kind() == Some(TokenKind::CurlyBOpen) {
-            //        let open = ASTNode::from_token(self.next().unwrap());
-            //        let open_span = open.span;
-            //        let open = self.insert(open);
-            //        let (values, close) = self.parse_set(TokenKind::CurlyBClose)?;
-            //        let close_span = close.span;
-            //        let close = self.insert(close);
+            Some(Token::Let) => {
+                let checkpoint = self.builder.wrap_checkpoint();
+                self.bump();
 
-            //        let children = if let Some(values) = values {
-            //            self.chain(&[let_, open, values, close])
-            //        } else {
-            //            self.chain(&[let_, open, close])
-            //        };
-
-            //        ASTNode {
-            //            kind: ASTKind::Let,
-            //            span: open_span.until(close_span),
-            //            data: Data::None,
-            //            node: Node::with_child(children)
-            //        }
-            //    } else {
-            //        let (values, in_) = self.parse_set(TokenKind::In)?;
-            //        let in_ = self.insert(in_);
-            //        let expr = self.parse_expr()?;
-            //        let expr_span = expr.span;
-            //        let expr = self.insert(expr);
-
-            //        let children = if let Some(values) = values {
-            //            self.chain(&[let_, values, in_, expr])
-            //        } else {
-            //            self.chain(&[let_, in_, expr])
-            //        };
-
-            //        ASTNode {
-            //            kind: ASTKind::LetIn,
-            //            span: let_span.until(expr_span),
-            //            data: Data::None,
-            //            node: Node::with_child(children)
-            //        }
-            //    }
-            //},
-            //Some(TokenKind::With) => {
-            //    let with = ASTNode::from_token(self.next().unwrap());
-            //    let with_span = with.span;
-            //    let with = self.insert(with);
-            //    let namespace = self.parse_expr()?;
-            //    let namespace = self.insert(namespace);
-            //    let semi = ASTNode::from_token(self.expect(TokenKind::Semicolon)?);
-            //    let semi = self.insert(semi);
-            //    let body = self.parse_expr()?;
-            //    let body_span = body.span;
-            //    let body = self.insert(body);
-
-            //    let children = self.chain(&[with, namespace, semi, body]);
-
-            //    ASTNode {
-            //        kind: ASTKind::With,
-            //        span: with_span.until(body_span),
-            //        data: Data::None,
-            //        node: Node::with_child(children)
-            //    }
-            //},
+                if self.peek() == Some(Token::CurlyBOpen) {
+                    self.builder.wrap_internal(checkpoint, NodeType::Marker(ASTKind::Let));
+                    self.bump();
+                    self.parse_set(Token::CurlyBClose);
+                    self.builder.finish_internal();
+                } else {
+                    self.builder.wrap_internal(checkpoint, NodeType::Marker(ASTKind::LetIn));
+                    self.parse_set(Token::In);
+                    self.parse_expr();
+                    self.builder.finish_internal();
+                }
+            },
+            Some(Token::With) => {
+                self.builder.start_internal(NodeType::Marker(ASTKind::With));
+                self.bump();
+                self.parse_expr();
+                self.expect(Token::Semicolon);
+                self.parse_expr();
+                self.builder.finish_internal();
+            },
             //Some(TokenKind::If) => {
             //    let if_ = ASTNode::from_token(self.next().unwrap());
             //    let if_span = if_.span;
@@ -748,27 +653,14 @@ impl<I> Parser<I>
             //        node: Node::with_child(children)
             //    }
             //},
-            //Some(TokenKind::Assert) => {
-            //    let assert = ASTNode::from_token(self.next().unwrap());
-            //    let assert_span = assert.span;
-            //    let assert = self.insert(assert);
-            //    let condition = self.parse_expr()?;
-            //    let condition = self.insert(condition);
-            //    let semi = ASTNode::from_token(self.expect(TokenKind::Semicolon)?);
-            //    let semi = self.insert(semi);
-            //    let body = self.parse_expr()?;
-            //    let body_span = body.span;
-            //    let body = self.insert(body);
-
-            //    let children = self.chain(&[assert, condition, semi, body]);
-
-            //    ASTNode {
-            //        kind: ASTKind::Assert,
-            //        span: assert_span.until(body_span),
-            //        data: Data::None,
-            //        node: Node::with_child(children)
-            //    }
-            //},
+            Some(Token::Assert) => {
+                self.builder.start_internal(NodeType::Marker(ASTKind::Assert));
+                self.bump();
+                self.parse_expr();
+                self.expect(Token::Semicolon);
+                self.parse_expr();
+                self.builder.finish_internal();
+            },
             _ => {
                 self.parse_math();
 
@@ -883,25 +775,30 @@ Marker(Root)@[0; 45)
     Token(CurlyBClose)@[44; 45)
 "
         );
-//        assert_eq!(
-//            [
-//                TokenKind::Rec, TokenKind::CurlyBOpen,
-//                Token::Ident("test".into()), TokenKind::Assign, Token::Value(1.into()), TokenKind::Semicolon,
-//                TokenKind::CurlyBClose
-//            ],
-//            "\
-//Set
-//  Token = Rec
-//  Token = CurlyBOpen
-//  SetEntry
-//    Attribute
-//      Ident = test
-//    Token = Assign
-//    Value = 1
-//    Token = Semicolon
-//  Token = CurlyBClose
-//"
-//        );
+        assert_eq!(
+            [
+                (Token::Rec, "rec"),
+                (Token::CurlyBOpen, "{"),
+                (Token::Ident, "test"),
+                (Token::Assign, "="),
+                (Token::Value, "1"),
+                (Token::Semicolon, ";"),
+                (Token::CurlyBClose, "}")
+            ],
+            "\
+Marker(Root)@[0; 12)
+  Marker(Set)@[0; 12)
+    Token(Rec)@[0; 3)
+    Token(CurlyBOpen)@[3; 4)
+    Marker(SetEntry)@[4; 11)
+      Marker(Attribute)@[4; 8)
+        Token(Ident)@[4; 8)
+      Token(Assign)@[8; 9)
+      Token(Value)@[9; 10)
+      Token(Semicolon)@[10; 11)
+    Token(CurlyBClose)@[11; 12)
+"
+        );
         assert_eq!(
             [
                 (Token::CurlyBOpen, "{"),
@@ -1014,73 +911,96 @@ Marker(Root)@[0; 13)
                 (Token::ParenClose, ")")
             ],
             "\
-Marker(Operation)@[0; 8)
-  Token(Value)@[0; 1)
-  Token(Mul)@[1; 2)
-  Marker(Unary)@[2; 8)
-    Token(Sub)@[2; 3)
-    Marker(Paren)@[3; 8)
-      Token(ParenOpen)@[3; 4)
-      Marker(Operation)@[4; 7)
-        Token(Value)@[4; 5)
-        Token(Sub)@[5; 6)
-        Token(Value)@[6; 7)
-      Token(ParenClose)@[7; 8)
+Marker(Root)@[0; 8)
+  Marker(Operation)@[0; 8)
+    Token(Value)@[0; 1)
+    Token(Mul)@[1; 2)
+    Marker(Unary)@[2; 8)
+      Token(Sub)@[2; 3)
+      Marker(Paren)@[3; 8)
+        Token(ParenOpen)@[3; 4)
+        Marker(Operation)@[4; 7)
+          Token(Value)@[4; 5)
+          Token(Sub)@[5; 6)
+          Token(Value)@[6; 7)
+        Token(ParenClose)@[7; 8)
 "
         );
     }
-//    #[test]
-//    fn let_in() {
-//        assert_eq!(
-//            [
-//                TokenKind::Let,
-//                    Token::Ident("a".into()), TokenKind::Assign, Token::Value(42.into()), TokenKind::Semicolon,
-//                TokenKind::In,
-//                    Token::Ident("a".into())
-//            ],
-//            "\
-//LetIn
-//  Token = Let
-//  SetEntry
-//    Attribute
-//      Ident = a
-//    Token = Assign
-//    Value = 42
-//    Token = Semicolon
-//  Token = In
-//  Ident = a
-//"
-//        );
-//    }
-//    #[test]
-//    fn let_legacy_syntax() {
-//        assert_eq!(
-//            [
-//                TokenKind::Let, TokenKind::CurlyBOpen,
-//                    Token::Ident("a".into()), TokenKind::Assign, Token::Value(42.into()), TokenKind::Semicolon,
-//                    Token::Ident("body".into()), TokenKind::Assign, Token::Ident("a".into()), TokenKind::Semicolon,
-//                TokenKind::CurlyBClose
-//            ],
-//            "\
-//Let
-//  Token = Let
-//  Token = CurlyBOpen
-//  SetEntry
-//    Attribute
-//      Ident = a
-//    Token = Assign
-//    Value = 42
-//    Token = Semicolon
-//  SetEntry
-//    Attribute
-//      Ident = body
-//    Token = Assign
-//    Ident = a
-//    Token = Semicolon
-//  Token = CurlyBClose
-//"
-//        );
-//    }
+    #[test]
+    fn let_in() {
+        assert_eq!(
+            [
+                (Token::Let, "let"),
+                    (Token::Whitespace, " "),
+                    (Token::Ident, "a"),
+                    (Token::Whitespace, " "),
+                    (Token::Assign, "="),
+                    (Token::Whitespace, " "),
+                    (Token::Value, "42"),
+                    (Token::Semicolon, ";"),
+                (Token::Whitespace, " "),
+                (Token::In, "in"),
+                    (Token::Whitespace, " "),
+                    (Token::Ident, "a")
+            ],
+            "\
+Marker(Root)@[0; 16)
+  Marker(LetIn)@[0; 16)
+    Token(Let)@[0; 3)
+    Token(Whitespace)@[3; 4)
+    Marker(SetEntry)@[4; 11)
+      Marker(Attribute)@[4; 6)
+        Token(Ident)@[4; 5)
+        Token(Whitespace)@[5; 6)
+      Token(Assign)@[6; 7)
+      Token(Whitespace)@[7; 8)
+      Token(Value)@[8; 10)
+      Token(Semicolon)@[10; 11)
+    Token(Whitespace)@[11; 12)
+    Token(In)@[12; 14)
+    Token(Whitespace)@[14; 15)
+    Token(Ident)@[15; 16)
+"
+        );
+    }
+    #[test]
+    fn let_legacy_syntax() {
+        assert_eq!(
+            [
+                (Token::Let, "let"),
+                (Token::CurlyBOpen, "{"),
+                    (Token::Ident, "a"),
+                        (Token::Assign, "="),
+                        (Token::Value, "42"),
+                        (Token::Semicolon, ";"),
+                    (Token::Ident, "body"),
+                        (Token::Assign, "="),
+                        (Token::Ident, "a"),
+                        (Token::Semicolon, ";"),
+                (Token::CurlyBClose, "}")
+            ],
+            "\
+Marker(Root)@[0; 17)
+  Marker(Let)@[0; 17)
+    Token(Let)@[0; 3)
+    Token(CurlyBOpen)@[3; 4)
+    Marker(SetEntry)@[4; 9)
+      Marker(Attribute)@[4; 5)
+        Token(Ident)@[4; 5)
+      Token(Assign)@[5; 6)
+      Token(Value)@[6; 8)
+      Token(Semicolon)@[8; 9)
+    Marker(SetEntry)@[9; 16)
+      Marker(Attribute)@[9; 13)
+        Token(Ident)@[9; 13)
+      Token(Assign)@[13; 14)
+      Token(Ident)@[14; 15)
+      Token(Semicolon)@[15; 16)
+    Token(CurlyBClose)@[16; 17)
+"
+        );
+    }
 //    #[test]
 //    fn interpolation() {
 //        assert_eq!(
@@ -1317,98 +1237,130 @@ Marker(Root)@[0; 14)
 "
         );
     }
-//    #[test]
-//    fn with() {
-//        assert_eq!(
-//            [
-//                TokenKind::With, Token::Ident("namespace".into()), TokenKind::Semicolon,
-//                Token::Ident("expr".into())
-//            ],
-//            "\
-//With
-//  Token = With
-//  Ident = namespace
-//  Token = Semicolon
-//  Ident = expr
-//"
-//        );
-//    }
-//    #[test]
-//    fn import() {
-//        assert_eq!(
-//            [
-//                TokenKind::Import,
-//                Token::Value(Value::Path(Anchor::Store, "nixpkgs".into())),
-//                TokenKind::CurlyBOpen, TokenKind::CurlyBClose
-//            ],
-//            "\
-//Apply
-//  Import
-//    Token = Import
-//    Value = <nixpkgs>
-//  Set
-//    Token = CurlyBOpen
-//    Token = CurlyBClose
-//"
-//        );
-//    }
-//    #[test]
-//    fn assert() {
-//        assert_eq!(
-//            [
-//                TokenKind::Assert, Token::Ident("a".into()), TokenKind::Equal, Token::Ident("b".into()), TokenKind::Semicolon,
-//                Token::Value("a == b".into())
-//            ],
-//            "\
-//Assert
-//  Token = Assert
-//  Operation
-//    Ident = a
-//    Token = Equal
-//    Ident = b
-//  Token = Semicolon
-//  Value = \"a == b\"
-//"
-//        );
-//    }
-//    #[test]
-//    fn inherit() {
-//        assert_eq!(
-//            [
-//                TokenKind::CurlyBOpen,
-//                    Token::Ident("a".into()), TokenKind::Assign, Token::Value(1.into()), TokenKind::Semicolon,
-//                    TokenKind::Inherit, Token::Ident("b".into()), Token::Ident("c".into()), TokenKind::Semicolon,
-//
-//                    TokenKind::Inherit, TokenKind::ParenOpen, Token::Ident("set".into()), TokenKind::ParenClose,
-//                    Token::Ident("c".into()), TokenKind::Semicolon,
-//                TokenKind::CurlyBClose
-//            ],
-//            "\
-//Set
-//  Token = CurlyBOpen
-//  SetEntry
-//    Attribute
-//      Ident = a
-//    Token = Assign
-//    Value = 1
-//    Token = Semicolon
-//  Inherit
-//    Token = Inherit
-//    Ident = b
-//    Ident = c
-//    Token = Semicolon
-//  Inherit
-//    Token = Inherit
-//    InheritFrom
-//      Token = ParenOpen
-//      Ident = set
-//      Token = ParenClose
-//    Ident = c
-//    Token = Semicolon
-//  Token = CurlyBClose
-//"
-//        );
-//    }
+    #[test]
+    fn with() {
+        assert_eq!(
+            [
+                (Token::With, "with"),
+                (Token::Ident, "namespace"),
+                (Token::Semicolon, ";"),
+                (Token::Ident, "expr")
+            ],
+            "\
+Marker(Root)@[0; 18)
+  Marker(With)@[0; 18)
+    Token(With)@[0; 4)
+    Token(Ident)@[4; 13)
+    Token(Semicolon)@[13; 14)
+    Token(Ident)@[14; 18)
+"
+        );
+    }
+    #[test]
+    fn import() {
+        assert_eq!(
+            [
+                (Token::Import, "import"),
+                (Token::Value, "<nixpkgs>"),
+                (Token::CurlyBOpen, "{"),
+                (Token::CurlyBClose, "}")
+            ],
+            "\
+Marker(Root)@[0; 17)
+  Marker(Apply)@[0; 17)
+    Marker(Import)@[0; 15)
+      Token(Import)@[0; 6)
+      Token(Value)@[6; 15)
+    Marker(Set)@[15; 17)
+      Token(CurlyBOpen)@[15; 16)
+      Token(CurlyBClose)@[16; 17)
+"
+        );
+    }
+    #[test]
+    fn assert() {
+        assert_eq!(
+            [
+                (Token::Assert, "assert"),
+                (Token::Ident, "a"),
+                (Token::Equal, "=="),
+                (Token::Ident, "b"),
+                (Token::Semicolon, ";"),
+                (Token::Value, "\"a == b\"")
+            ],
+            "\
+Marker(Root)@[0; 19)
+  Marker(Assert)@[0; 19)
+    Token(Assert)@[0; 6)
+    Marker(Operation)@[6; 10)
+      Token(Ident)@[6; 7)
+      Token(Equal)@[7; 9)
+      Token(Ident)@[9; 10)
+    Token(Semicolon)@[10; 11)
+    Token(Value)@[11; 19)
+"
+        );
+    }
+    #[test]
+    fn inherit() {
+        assert_eq!(
+            [
+                (Token::CurlyBOpen, "{"),
+                    (Token::Ident, "a"),
+                        (Token::Assign, "="),
+                        (Token::Value, "1"),
+                        (Token::Semicolon, ";"),
+                    (Token::Inherit, "inherit"),
+                        (Token::Whitespace, " "),
+                        (Token::Ident, "b"),
+                        (Token::Whitespace, " "),
+                        (Token::Ident, "c"),
+                        (Token::Semicolon, ";"),
+                    (Token::Inherit, "inherit"),
+                        (Token::Whitespace, " "),
+                        (Token::ParenOpen, "("),
+                        (Token::Ident, "set"),
+                        (Token::ParenClose, ")"),
+                        (Token::Whitespace, " "),
+                        (Token::Ident, "d"),
+                        (Token::Whitespace, " "),
+                        (Token::Ident, "e"),
+                        (Token::Semicolon, ";"),
+                (Token::CurlyBClose, "}")
+            ],
+            "\
+Marker(Root)@[0; 36)
+  Marker(Set)@[0; 36)
+    Token(CurlyBOpen)@[0; 1)
+    Marker(SetEntry)@[1; 5)
+      Marker(Attribute)@[1; 2)
+        Token(Ident)@[1; 2)
+      Token(Assign)@[2; 3)
+      Token(Value)@[3; 4)
+      Token(Semicolon)@[4; 5)
+    Marker(Inherit)@[5; 17)
+      Token(Inherit)@[5; 12)
+      Token(Whitespace)@[12; 13)
+      Token(Ident)@[13; 14)
+      Token(Whitespace)@[14; 15)
+      Token(Ident)@[15; 16)
+      Token(Semicolon)@[16; 17)
+    Marker(Inherit)@[17; 35)
+      Token(Inherit)@[17; 24)
+      Token(Whitespace)@[24; 25)
+      Marker(InheritFrom)@[25; 30)
+        Token(ParenOpen)@[25; 26)
+        Token(Ident)@[26; 29)
+        Token(ParenClose)@[29; 30)
+      Token(Whitespace)@[30; 31)
+      Token(Ident)@[31; 32)
+      Token(Whitespace)@[32; 33)
+      Token(Ident)@[33; 34)
+      Token(Semicolon)@[34; 35)
+    Token(CurlyBClose)@[35; 36)
+"
+        );
+    }
 //    #[test]
 //    fn ifs() {
 //        assert_eq!(
