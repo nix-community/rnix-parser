@@ -9,9 +9,9 @@ repository = "https://gitlab.com/jD91mZM2/rnix"
 version = "0.4.1"
 
 [dependencies]
-arenatree = "0.1.1"
 arrayvec = "0.4.7"
 failure = "0.1.2"
+rowan = "0.1.1"
 
 smol_str = { version = "0.1.2", optional = true }
 
