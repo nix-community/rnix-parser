@@ -3,7 +3,7 @@
 #[macro_use]
 extern crate failure;
 
-//pub mod parser;
+pub mod parser;
 pub mod tokenizer;
 //pub mod value;
 

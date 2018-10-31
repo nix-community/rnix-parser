@@ -94,6 +94,14 @@ impl Token {
             _ => false
         }
     }
+    /// This token is a comment, whitespace, or similar, and should be skipped
+    /// over by the parser.
+    pub fn is_trivia(self) -> bool {
+        match self {
+            Token::Comment | Token::Error | Token::Whitespace => true,
+            _ => false
+        }
+    }
 }
 
 fn is_valid_path_char(c: char) -> bool {
