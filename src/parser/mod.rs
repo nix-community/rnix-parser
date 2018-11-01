@@ -3,6 +3,7 @@
 use crate::tokenizer::Token;
 
 use rowan::{GreenNodeBuilder, SyntaxNode, SmolStr};
+use std::collections::VecDeque;
 
 //pub mod types;
 
@@ -13,18 +14,10 @@ const OR: &'static str = "or";
 /// An error that occured during parsing
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum ParseError {
-    #[fail(display = "can't bind pattern here, already bound before")]
-    AlreadyBound,
-    #[fail(display = "expected {:?}, found {:?}", _0, _1)]
-    Expected(Token, Option<Token>),
-    #[fail(display = "invalid type! expected {}", _0)]
-    InvalidType(&'static str),
     #[fail(display = "unexpected eof")]
     UnexpectedEOF,
     #[fail(display = "unexpected eof, wanted {:?}", _0)]
-    UnexpectedEOFWanted(Token),
-    #[fail(display = "unexpected token {:?} not applicable in this context", _0)]
-    Unexpected(Token)
+    UnexpectedEOFWanted(Token)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -87,7 +80,7 @@ struct Parser<I>
     builder: GreenNodeBuilder<Types>,
     errors: Vec<ParseError>,
 
-    buffer: Vec<I::Item>,
+    buffer: VecDeque<I::Item>,
     iter: I
 }
 impl<I> Parser<I>
@@ -98,7 +91,7 @@ impl<I> Parser<I>
             builder: GreenNodeBuilder::new(),
             errors: Vec::new(),
 
-            buffer: Vec::with_capacity(1),
+            buffer: VecDeque::with_capacity(1),
             iter
         }
     }
@@ -106,13 +99,13 @@ impl<I> Parser<I>
     fn peek_raw(&mut self) -> Option<&(Token, SmolStr)> {
         if self.buffer.is_empty() {
             if let Some(token) = self.iter.next() {
-                self.buffer.push(token);
+                self.buffer.push_back(token);
             }
         }
-        self.buffer.last()
+        self.buffer.front()
     }
     fn bump(&mut self) {
-        let next = self.buffer.pop().or_else(|| self.iter.next());
+        let next = self.buffer.pop_front().or_else(|| self.iter.next());
         match next {
             Some((token, s)) => self.builder.leaf(NodeType::Token(token), s),
             None => self.errors.push(ParseError::UnexpectedEOF)
@@ -140,60 +133,52 @@ impl<I> Parser<I>
         }
     }
 
-    //fn parse_interpol(&mut self, meta: Meta, multiline: bool, values: Vec<TokenInterpol>) -> Result<ASTNode> {
-    //    let mut parsed = NodeList::new();
-    //    for value in values {
-    //        parsed.push(match value {
-    //            TokenInterpol::Literal { span, original, content } => self.insert(ASTNode {
-    //                kind: ASTKind::InterpolLiteral,
-    //                span,
-    //                data: Data::InterpolLiteral { original, content },
-    //                node: Node::default()
-    //            }),
-    //            TokenInterpol::Tokens(tokens, close) => {
-    //                let parsed = self.parse_branch(tokens)?;
-    //                let parsed_span = parsed.span;
-    //                let parsed = self.insert(parsed);
-    //                let close_span = close.span;
-    //                let close = self.insert(ASTNode::from_token_kind(close, TokenKind::CurlyBClose));
+    fn parse_dynamic(&mut self) {
+        self.builder.start_internal(NodeType::Marker(ASTKind::Dynamic));
+        self.bump();
+        while self.peek().map(|t| t != Token::DynamicEnd).unwrap_or(false) {
+            self.parse_expr();
+        }
+        self.bump();
+        self.builder.finish_internal();
+    }
+    fn parse_interpol(&mut self) {
+        self.builder.start_internal(NodeType::Marker(ASTKind::Interpol));
 
-    //                let children = self.chain(&[parsed, close]);
+        self.builder.start_internal(NodeType::Marker(ASTKind::InterpolLiteral));
+        self.bump();
+        self.builder.finish_internal();
 
-    //                self.insert(ASTNode {
-    //                    kind: ASTKind::InterpolAst,
-    //                    span: parsed_span.until(close_span),
-    //                    data: Data::None,
-    //                    node: Node::with_child(children)
-    //                })
-    //            }
-    //        }, &mut self.arena);
-    //    }
-    //    Ok(ASTNode {
-    //        kind: ASTKind::Interpol,
-    //        span: meta.span,
-    //        data: Data::Interpol { meta, multiline },
-    //        node: Node::with_child(parsed.node())
-    //    })
-    //}
+        self.builder.start_internal(NodeType::Marker(ASTKind::InterpolAst));
+        loop {
+            match self.peek() {
+                None | Some(Token::InterpolEnd) => {
+                    self.builder.finish_internal();
+
+                    self.builder.start_internal(NodeType::Marker(ASTKind::InterpolLiteral));
+                    self.bump();
+                    self.builder.finish_internal();
+                    break;
+                },
+                Some(Token::InterpolEndStart) => {
+                    self.builder.finish_internal();
+
+                    self.builder.start_internal(NodeType::Marker(ASTKind::InterpolLiteral));
+                    self.bump();
+                    self.builder.finish_internal();
+
+                    self.builder.start_internal(NodeType::Marker(ASTKind::InterpolAst));
+                },
+                Some(_) => self.parse_expr()
+            }
+        }
+
+        self.builder.finish_internal();
+    }
     fn next_attr(&mut self) {
         match self.peek() {
-            //(meta, Token::Dynamic(tokens, close)) => {
-            //    let open = ASTNode::from_token_kind(meta, TokenKind::Dynamic);
-            //    let open_span = open.span;
-            //    let open = self.insert(open);
-            //    let parsed = self.parse_branch(tokens)?;
-            //    let parsed = self.insert(parsed);
-            //    let close_span = close.span;
-            //    let close = self.insert(ASTNode::from_token_kind(close, TokenKind::CurlyBClose));
-            //    let children = self.chain(&[open, parsed, close]);
-            //    Ok(ASTNode {
-            //        kind: ASTKind::Dynamic,
-            //        span: open_span.until(close_span),
-            //        data: Data::None,
-            //        node: Node::with_child(children)
-            //    })
-            //},
-            //(meta, Token::Interpol { multiline, parts }) => self.parse_interpol(meta, multiline, parts),
+            Some(Token::DynamicStart) => self.parse_dynamic(),
+            Some(Token::InterpolStart) => self.parse_interpol(),
             Some(Token::Value) => self.bump(),
             _ => self.expect(Token::Ident)
         }
@@ -211,128 +196,55 @@ impl<I> Parser<I>
         }
         self.builder.finish_internal();
     }
-    //fn next_ident(&mut self) -> Result<ASTNode> {
-    //    match self.next()? {
-    //        (meta, Token::Ident(name)) => Ok(ASTNode::from_ident(meta, name)),
-    //        (meta, token) => Err((Some(meta.span), ParseError::Expected(TokenKind::Ident, Some(token.kind()))))
-    //    }
-    //}
-    //fn parse_pattern(&mut self, open: Meta, bind: Option<(ASTNode, ASTNode)>) -> Result<ASTNode> {
-    //    let start = bind.as_ref().map(|(ident, _)| ident.span).unwrap_or(open.span);
+    fn parse_pattern(&mut self, bound: bool) {
+        if self.peek().map(|t| t == Token::CurlyBClose).unwrap_or(true) {
+            self.bump();
+        } else {
+            loop {
+                match self.peek() {
+                    Some(Token::Ellipsis) => {
+                        self.bump();
+                        self.expect(Token::CurlyBClose);
+                        break;
+                    },
+                    Some(Token::Ident) => {
+                        self.builder.start_internal(NodeType::Marker(ASTKind::PatEntry));
+                        self.bump();
+                        if let Some(Token::Question) = self.peek() {
+                            self.bump();
+                            self.parse_expr();
+                        }
+                        self.builder.finish_internal();
 
-    //    let mut pattern = NodeList::new();
-    //    let bind = if let Some((ident, at)) = bind {
-    //        let ident_span = ident.span;
-    //        let ident = self.insert(ident);
-    //        let at_span = at.span;
-    //        let at = self.insert(at);
-    //        let children = self.chain(&[ident, at]);
+                        match self.peek() {
+                            Some(Token::Comma) => self.bump(),
+                            _ => {
+                                self.expect(Token::CurlyBClose);
+                                break;
+                            },
+                        }
+                    },
+                    None => {
+                        self.errors.push(ParseError::UnexpectedEOFWanted(Token::Ident));
+                        break;
+                    },
+                    Some(_) => {
+                        self.builder.start_internal(NodeType::Marker(ASTKind::Error));
+                        self.bump();
+                        self.builder.finish_internal();
+                    }
+                }
+            }
+        }
 
-    //        pattern.push(self.insert(ASTNode {
-    //            kind: ASTKind::PatBind,
-    //            span: ident_span.until(at_span),
-    //            data: Data::None,
-    //            node: Node::with_child(children)
-    //        }), &mut self.arena);
-    //        true
-    //    } else {
-    //        false
-    //    };
-
-    //    let open = ASTNode::from_token_kind(open, TokenKind::CurlyBOpen);
-    //    let open = self.insert(open);
-    //    pattern.push(open, &mut self.arena);
-
-    //    loop {
-    //        let mut entry = NodeList::new();
-
-    //        let ident = match self.peek_kind() {
-    //            Some(TokenKind::Ellipsis) => {
-    //                let ellipsis = ASTNode::from_token(self.next().unwrap());
-    //                pattern.push(self.insert(ellipsis), &mut self.arena);
-    //                break;
-    //            },
-    //            Some(TokenKind::CurlyBClose) => break,
-    //            _ => self.next_ident()?,
-    //        };
-    //        let ident_span = ident.span;
-    //        let mut end_span = ident_span;
-    //        entry.push(self.insert(ident), &mut self.arena);
-    //        if self.peek_kind() == Some(TokenKind::Question) {
-    //            let question = ASTNode::from_token(self.next().unwrap());
-    //            let expr = self.parse_expr()?;
-    //            end_span = expr.span;
-    //            entry.push_all(&[
-    //                self.insert(question),
-    //                self.insert(expr),
-    //            ], &mut self.arena);
-    //        }
-    //        let comma = match self.peek_kind() {
-    //            Some(TokenKind::Comma) => {
-    //                let comma = ASTNode::from_token(self.next().unwrap());
-    //                end_span = comma.span;
-    //                entry.push(self.insert(comma), &mut self.arena);
-    //                true
-    //            },
-    //            _ => false
-    //        };
-    //        pattern.push(self.insert(ASTNode {
-    //            kind: ASTKind::PatEntry,
-    //            span: ident_span.until(end_span),
-    //            data: Data::None,
-    //            node: Node::with_child(entry.node())
-    //        }), &mut self.arena);
-    //        if !comma {
-    //            break;
-    //        }
-    //    }
-
-    //    let close = ASTNode::from_token(self.expect(TokenKind::CurlyBClose)?);
-    //    let mut end_span = close.span;
-    //    pattern.push(self.insert(close), &mut self.arena);
-
-    //    if let Some(TokenKind::At) = self.peek_kind() {
-    //        let at = ASTNode::from_token(self.next().unwrap());
-    //        if bind {
-    //            return Err((Some(at.span), ParseError::AlreadyBound));
-    //        }
-    //        let at_span = at.span;
-    //        let at = self.insert(at);
-    //        let ident = self.next_ident()?;
-    //        end_span = ident.span;
-    //        let ident = self.insert(ident);
-
-    //        let children = self.chain(&[at, ident]);
-
-    //        pattern.push(self.insert(ASTNode {
-    //            kind: ASTKind::PatBind,
-    //            span: at_span.until(end_span),
-    //            data: Data::None,
-    //            node: Node::with_child(children)
-    //        }), &mut self.arena);
-    //    }
-
-    //    let pattern = self.insert(ASTNode {
-    //        kind: ASTKind::Pattern,
-    //        span: start.until(end_span),
-    //        data: Data::None,
-    //        node: Node::with_child(pattern.node())
-    //    });
-    //    let colon = ASTNode::from_token(self.expect(TokenKind::Colon)?);
-    //    let colon = self.insert(colon);
-    //    let expr = self.parse_expr()?;
-    //    let expr_span = expr.span;
-    //    let expr = self.insert(expr);
-
-    //    let children = self.chain(&[pattern, colon, expr]);
-
-    //    Ok(ASTNode {
-    //        kind: ASTKind::Lambda,
-    //        span: start.until(expr_span),
-    //        data: Data::None,
-    //        node: Node::with_child(children)
-    //    })
-    //}
+        if self.peek() == Some(Token::At) {
+            let kind = if bound { ASTKind::Error } else { ASTKind::PatBind };
+            self.builder.start_internal(NodeType::Marker(kind));
+            self.bump();
+            self.expect(Token::Ident);
+            self.builder.finish_internal();
+        }
+    }
     fn parse_set(&mut self, until: Token) {
         loop {
             match self.peek() {
@@ -370,7 +282,7 @@ impl<I> Parser<I>
         self.bump(); // the final close, like '}'
     }
     fn parse_val(&mut self) {
-        let checkpoint = self.builder.wrap_checkpoint();
+        let checkpoint = self.builder.checkpoint();
         match self.peek() {
             Some(Token::ParenOpen) => {
                 self.builder.start_internal(NodeType::Marker(ASTKind::Paren));
@@ -393,112 +305,94 @@ impl<I> Parser<I>
                 self.builder.finish_internal();
             },
             Some(Token::CurlyBOpen) => {
-            //    let temporary = self.next()?;
-            //    match (temporary.1.kind(), self.peek_kind()) {
-            //        (TokenKind::Ident, Some(TokenKind::Comma))
-            //                | (TokenKind::Ident, Some(TokenKind::Question))
-            //                | (TokenKind::Ellipsis, Some(TokenKind::CurlyBClose))
-            //                | (TokenKind::Ident, Some(TokenKind::CurlyBClose))
-            //                | (TokenKind::CurlyBClose, Some(TokenKind::Colon))
-            //                | (TokenKind::CurlyBClose, Some(TokenKind::At)) => {
-            //            // We did a lookahead, put it back
-            //            self.buffer.push(temporary);
-            //            self.parse_pattern(meta, None)?
-            //        },
-            //        _ => {
-            //            // We did a lookahead, put it back
-            //            self.buffer.push(temporary);
-            //
+                // Do a lookahead:
+                let mut peek = [None, None];
+                for i in 0..2 {
+                    let mut token;
+                    peek[i] = loop {
+                        token = self.iter.next();
+                        let kind = token.as_ref().map(|&(t, _)| t);
+                        if let Some(token) = token {
+                            self.buffer.push_back(token);
+                        }
+                        if kind.map(|t| !t.is_trivia()).unwrap_or(true) {
+                            break kind;
+                        }
+                    };
+                }
+
+                match peek {
+                    [Some(Token::Ident), Some(Token::Comma)]
+                    | [Some(Token::Ident), Some(Token::Question)]
+                    | [Some(Token::Ident), Some(Token::CurlyBClose)]
+                    | [Some(Token::Ellipsis), Some(Token::CurlyBClose)]
+                    | [Some(Token::CurlyBClose), Some(Token::Colon)]
+                    | [Some(Token::CurlyBClose), Some(Token::At)] => {
+                        // This looks like a pattern
+                        self.builder.start_internal(NodeType::Marker(ASTKind::Lambda));
+
+                        self.builder.start_internal(NodeType::Marker(ASTKind::Pattern));
+                        self.bump();
+                        self.parse_pattern(false);
+                        self.builder.finish_internal();
+
+                        self.expect(Token::Colon);
+                        self.parse_expr();
+
+                        self.builder.finish_internal();
+                    },
+                    _ => {
+                        // This looks like a set
                         self.builder.start_internal(NodeType::Marker(ASTKind::Set));
                         self.bump();
                         self.parse_set(Token::CurlyBClose);
                         self.builder.finish_internal();
-
-            //            let open_span = meta.span;
-            //            let open = self.insert(ASTNode::from_token_kind(meta, kind));
-            //            let (values, close) = self.parse_set(TokenKind::CurlyBClose)?;
-            //            let close_span = close.span;
-            //            let close = self.insert(close);
-
-            //            let children = if let Some(values) = values {
-            //                self.chain(&[open, values, close])
-            //            } else {
-            //                self.chain(&[open, close])
-            //            };
-
-            //            ASTNode {
-            //                kind: ASTKind::Set,
-            //                span: open_span.until(close_span),
-            //                data: Data::None,
-            //                node: Node::with_child(children)
-            //            }
-            //        }
-            //    }
+                    }
+                }
             },
-            //(TokenKind::SquareBOpen, _) => {
-            //    let mut values = NodeList::new();
+            Some(Token::SquareBOpen) => {
+                self.builder.start_internal(NodeType::Marker(ASTKind::List));
+                self.bump();
+                while self.peek().map(|t| t != Token::SquareBClose).unwrap_or(false) {
+                    self.builder.start_internal(NodeType::Marker(ASTKind::ListItem));
+                    self.parse_val();
+                    self.builder.finish_internal();
+                }
+                self.bump();
+                self.builder.finish_internal();
+            },
+            Some(Token::DynamicStart) => self.parse_dynamic(),
+            Some(Token::InterpolStart) => self.parse_interpol(),
+            Some(Token::Value) => self.bump(),
+            Some(Token::Ident) => {
+                let checkpoint = self.builder.checkpoint();
+                self.bump();
 
-            //    let open = ASTNode::from_token_kind(meta, kind);
-            //    let open_span = open.span;
-            //    values.push(self.insert(open), &mut self.arena);
+                match self.peek() {
+                    Some(Token::Colon) => {
+                        self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::Lambda));
+                        self.bump();
+                        self.parse_expr();
+                        self.builder.finish_internal();
+                    },
+                    Some(Token::At) => {
+                        self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::Lambda));
+                        self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::Pattern));
+                        self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::PatBind));
+                        self.bump();
+                        self.builder.finish_internal(); // PatBind
 
-            //    loop {
-            //        match self.peek_kind() {
-            //            None | Some(TokenKind::SquareBClose) => break,
-            //            _ => {
-            //                let val = self.parse_val()?;
-            //                let val_span = val.span;
-            //                let val = self.insert(val);
-            //                values.push(self.insert(ASTNode {
-            //                    kind: ASTKind::ListItem,
-            //                    span: val_span,
-            //                    data: Data::None,
-            //                    node: Node::with_child(val)
-            //                }), &mut self.arena);
-            //            }
-            //        }
-            //    }
-            //    let close = ASTNode::from_token(self.expect(TokenKind::SquareBClose)?);
-            //    let close_span = close.span;
-            //    values.push(self.insert(close), &mut self.arena);
+                        self.expect(Token::CurlyBOpen);
+                        self.parse_pattern(true);
+                        self.builder.finish_internal(); // Pattern
 
-            //    ASTNode {
-            //        kind: ASTKind::List,
-            //        span: open_span.until(close_span),
-            //        data: Data::None,
-            //        node: Node::with_child(values.node())
-            //    }
-            //},
-            //(_, Token::Dynamic(tokens, close)) => {
-            //    let open = ASTNode::from_token_kind(meta, kind);
-            //    let open_span = open.span;
-            //    let open = self.insert(open);
-            //    let parsed = self.parse_branch(tokens)?;
-            //    let parsed = self.insert(parsed);
-            //    let close_span = close.span;
-            //    let close = self.insert(ASTNode::from_token_kind(close, TokenKind::CurlyBClose));
-            //    let children = self.chain(&[open, parsed, close]);
-            //    ASTNode {
-            //        kind: ASTKind::Dynamic,
-            //        span: open_span.until(close_span),
-            //        data: Data::None,
-            //        node: Node::with_child(children)
-            //    }
-            //},
-            //(_, Token::Value(val)) => ASTNode::from_value(meta, val),
-            //(_, Token::Ident(name)) => if self.peek_kind() == Some(TokenKind::At) {
-            //    let ident = ASTNode::from_ident(meta, name);
-            //    let at = ASTNode::from_token(self.next().unwrap());
-            //    let (open, _) = self.expect(TokenKind::CurlyBOpen)?;
-
-            //    self.parse_pattern(open, Some((ident, at)))?
-            //} else {
-            //    ASTNode::from_ident(meta, name)
-            //},
-            //(_, Token::Interpol { multiline, parts }) => self.parse_interpol(meta, multiline, parts)?,
-            //(kind, _) => return Err((Some(meta.span), ParseError::Unexpected(kind)))
-            Some(Token::Ident)
-            | Some(Token::Value) => self.bump(),
+                        self.expect(Token::Colon);
+                        self.parse_expr();
+                        self.builder.finish_internal(); // Lambda
+                    },
+                    _ => ()
+                }
+            },
             _ => {
                 self.builder.start_internal(NodeType::Marker(ASTKind::Error));
                 self.bump();
@@ -507,14 +401,14 @@ impl<I> Parser<I>
         }
 
         while self.peek() == Some(Token::Dot) {
-            self.builder.wrap_internal(checkpoint, NodeType::Marker(ASTKind::IndexSet));
+            self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::IndexSet));
             self.bump();
             self.next_attr();
             self.builder.finish_internal();
 
             match self.peek_data() {
                 Some((Token::Ident, s)) if s == OR => {
-                    self.builder.wrap_internal(checkpoint, NodeType::Marker(ASTKind::OrDefault));
+                    self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::OrDefault));
                     self.bump();
                     self.parse_val();
                     self.builder.finish_internal();
@@ -524,11 +418,11 @@ impl<I> Parser<I>
         }
     }
     fn parse_fn(&mut self) {
-        let checkpoint = self.builder.wrap_checkpoint();
+        let checkpoint = self.builder.checkpoint();
         self.parse_val();
 
         while self.peek().map(|t| t.is_fn_arg()).unwrap_or(false) {
-            self.builder.wrap_internal(checkpoint, NodeType::Marker(ASTKind::Apply));
+            self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::Apply));
             self.parse_val();
             self.builder.finish_internal();
         }
@@ -544,10 +438,10 @@ impl<I> Parser<I>
         }
     }
     fn handle_operation(&mut self, once: bool, next: fn(&mut Self), ops: &[Token]) {
-        let checkpoint = self.builder.wrap_checkpoint();
+        let checkpoint = self.builder.checkpoint();
         next(self);
         while self.peek().map(|t| ops.contains(&t)).unwrap_or(false) {
-            self.builder.wrap_internal(checkpoint, NodeType::Marker(ASTKind::Operation));
+            self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::Operation));
             self.bump();
             next(self);
             self.builder.finish_internal();
@@ -605,16 +499,16 @@ impl<I> Parser<I>
     pub fn parse_expr(&mut self) {
         match self.peek() {
             Some(Token::Let) => {
-                let checkpoint = self.builder.wrap_checkpoint();
+                let checkpoint = self.builder.checkpoint();
                 self.bump();
 
                 if self.peek() == Some(Token::CurlyBOpen) {
-                    self.builder.wrap_internal(checkpoint, NodeType::Marker(ASTKind::Let));
+                    self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::Let));
                     self.bump();
                     self.parse_set(Token::CurlyBClose);
                     self.builder.finish_internal();
                 } else {
-                    self.builder.wrap_internal(checkpoint, NodeType::Marker(ASTKind::LetIn));
+                    self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::LetIn));
                     self.parse_set(Token::In);
                     self.parse_expr();
                     self.builder.finish_internal();
@@ -628,31 +522,16 @@ impl<I> Parser<I>
                 self.parse_expr();
                 self.builder.finish_internal();
             },
-            //Some(TokenKind::If) => {
-            //    let if_ = ASTNode::from_token(self.next().unwrap());
-            //    let if_span = if_.span;
-            //    let if_ = self.insert(if_);
-            //    let condition = self.parse_expr()?;
-            //    let condition = self.insert(condition);
-            //    let then = ASTNode::from_token(self.expect(TokenKind::Then)?);
-            //    let then = self.insert(then);
-            //    let body = self.parse_expr()?;
-            //    let body = self.insert(body);
-            //    let else_ = ASTNode::from_token(self.expect(TokenKind::Else)?);
-            //    let else_ = self.insert(else_);
-            //    let else_body = self.parse_expr()?;
-            //    let else_body_span = else_body.span;
-            //    let else_body = self.insert(else_body);
-
-            //    let children = self.chain(&[if_, condition, then, body, else_, else_body]);
-
-            //    ASTNode {
-            //        kind: ASTKind::IfElse,
-            //        span: if_span.until(else_body_span),
-            //        data: Data::None,
-            //        node: Node::with_child(children)
-            //    }
-            //},
+            Some(Token::If) => {
+                self.builder.start_internal(NodeType::Marker(ASTKind::IfElse));
+                self.bump();
+                self.parse_expr();
+                self.expect(Token::Then);
+                self.parse_expr();
+                self.expect(Token::Else);
+                self.parse_expr();
+                self.builder.finish_internal();
+            },
             Some(Token::Assert) => {
                 self.builder.start_internal(NodeType::Marker(ASTKind::Assert));
                 self.bump();
@@ -661,28 +540,7 @@ impl<I> Parser<I>
                 self.parse_expr();
                 self.builder.finish_internal();
             },
-            _ => {
-                self.parse_math();
-
-                //if val.kind == ASTKind::Ident && self.peek_kind() == Some(TokenKind::Colon) {
-                //    let val_span = val.span;
-                //    let val = self.insert(val);
-                //    let colon = ASTNode::from_token(self.next().unwrap());
-                //    let colon = self.insert(colon);
-                //    let expr = self.parse_expr()?;
-                //    let expr_span = expr.span;
-                //    let expr = self.insert(expr);
-
-                //    let children = self.chain(&[val, colon, expr]);
-
-                //    ASTNode {
-                //        kind: ASTKind::Lambda,
-                //        span: val_span.until(expr_span),
-                //        data: Data::None,
-                //        node: Node::with_child(children)
-                //    }
-                //}
-            }
+            _ => self.parse_math()
         }
     }
 }
@@ -811,55 +669,62 @@ Marker(Root)@[0; 2)
     Token(CurlyBClose)@[1; 2)
 "
         );
-//        assert_eq!(
-//            [
-//                TokenKind::CurlyBOpen,
-//
-//                Token::Ident("a".into()),
-//                    TokenKind::Dot, Token::Value("b".into()),
-//                TokenKind::Assign, Token::Value(1.into()), TokenKind::Semicolon,
-//
-//                Token::Interpol {
-//                    multiline: false,
-//                    parts: vec![
-//                        TokenInterpol::Literal {
-//                            span: Span::default(),
-//                            original: "c".into(),
-//                            content: "c".into()
-//                        }
-//                    ]
-//                },
-//                TokenKind::Dot, Token::Dynamic(vec![(Meta::default(), Token::Ident("d".into()))], Meta::default()),
-//                TokenKind::Assign, Token::Value(2.into()), TokenKind::Semicolon,
-//
-//                TokenKind::CurlyBClose
-//            ],
-//            "\
-//Set
-//  Token = CurlyBOpen
-//  SetEntry
-//    Attribute
-//      Ident = a
-//      Token = Dot
-//      Value = \"b\"
-//    Token = Assign
-//    Value = 1
-//    Token = Semicolon
-//  SetEntry
-//    Attribute
-//      Interpol { multiline: false }
-//        InterpolLiteral = \"c\"
-//      Token = Dot
-//      Dynamic
-//        Token = Dynamic
-//        Ident = d
-//        Token = CurlyBClose
-//    Token = Assign
-//    Value = 2
-//    Token = Semicolon
-//  Token = CurlyBClose
-//"
-//        );
+        assert_eq!(
+            [
+                (Token::CurlyBOpen, "{"),
+
+                (Token::Ident, "a"),
+                    (Token::Dot, "."),
+                    (Token::Ident, "b"),
+                (Token::Assign, "="),
+                (Token::Value, "2"),
+                (Token::Semicolon, ";"),
+
+                (Token::InterpolStart, "\"${"),
+                    (Token::Ident, "c"),
+                (Token::InterpolEnd, "}\""),
+                    (Token::Dot, "."),
+                    (Token::DynamicStart, "${"),
+                        (Token::Ident, "d"),
+                    (Token::DynamicEnd, "${"),
+                (Token::Assign, "="),
+                (Token::Value, "3"),
+                (Token::Semicolon, ";"),
+
+                (Token::CurlyBClose, "}")
+            ],
+            "\
+Marker(Root)@[0; 23)
+  Marker(Set)@[0; 23)
+    Token(CurlyBOpen)@[0; 1)
+    Marker(SetEntry)@[1; 7)
+      Marker(Attribute)@[1; 4)
+        Token(Ident)@[1; 2)
+        Token(Dot)@[2; 3)
+        Token(Ident)@[3; 4)
+      Token(Assign)@[4; 5)
+      Token(Value)@[5; 6)
+      Token(Semicolon)@[6; 7)
+    Marker(SetEntry)@[7; 22)
+      Marker(Attribute)@[7; 19)
+        Marker(Interpol)@[7; 13)
+          Marker(InterpolLiteral)@[7; 10)
+            Token(InterpolStart)@[7; 10)
+          Marker(InterpolAst)@[10; 11)
+            Token(Ident)@[10; 11)
+          Marker(InterpolLiteral)@[11; 13)
+            Token(InterpolEnd)@[11; 13)
+        Token(Dot)@[13; 14)
+        Marker(Dynamic)@[14; 19)
+          Token(DynamicStart)@[14; 16)
+          Token(Ident)@[16; 17)
+          Token(DynamicEnd)@[17; 19)
+      Token(Assign)@[19; 20)
+      Token(Value)@[20; 21)
+      Token(Semicolon)@[21; 22)
+    Token(CurlyBClose)@[22; 23)
+"
+        );
     }
     #[test]
     fn math() {
@@ -1001,60 +866,116 @@ Marker(Root)@[0; 17)
 "
         );
     }
-//    #[test]
-//    fn interpolation() {
-//        assert_eq!(
-//            [
-//                Token::Interpol {
-//                    multiline: false,
-//                    parts: vec![
-//                        TokenInterpol::Literal {
-//                            span: Span::default(),
-//                            original: "Hello, ".into(),
-//                            content: "Hello, ".into()
-//                        },
-//                        TokenInterpol::Tokens(
-//                            vec![
-//                                (Meta::default(), TokenKind::CurlyBOpen.into()),
-//                                (Meta::default(), Token::Ident("world".into())),
-//                                (Meta::default(), TokenKind::Assign.into()),
-//                                (Meta::default(), Token::Value("World".into())),
-//                                (Meta::default(), TokenKind::Semicolon.into()),
-//                                (Meta::default(), TokenKind::CurlyBClose.into()),
-//                                (Meta::default(), TokenKind::Dot.into()),
-//                                (Meta::default(), Token::Ident("world".into()))
-//                            ],
-//                            Meta::default()
-//                        ),
-//                        TokenInterpol::Literal {
-//                            span: Span::default(),
-//                            original: "!".into(),
-//                            content: "!".into()
-//                        }
-//                    ]
-//                }
-//            ],
-//            "\
-//Interpol { multiline: false }
-//  InterpolLiteral = \"Hello, \"
-//  InterpolAst
-//    IndexSet
-//      Set
-//        Token = CurlyBOpen
-//        SetEntry
-//          Attribute
-//            Ident = world
-//          Token = Assign
-//          Value = \"World\"
-//          Token = Semicolon
-//        Token = CurlyBClose
-//      Token = Dot
-//      Ident = world
-//    Token = CurlyBClose
-//  InterpolLiteral = \"!\"
-//"
-//        );
-//    }
+    #[test]
+    fn interpolation() {
+        assert_eq!(
+            [
+                (Token::Whitespace, " "),
+                (Token::InterpolStart, r#""Hello, ${"#),
+                    (Token::Whitespace, " "),
+                    (Token::CurlyBOpen, "{"),
+                    (Token::Whitespace, " "),
+                    (Token::Ident, "world"),
+                    (Token::Whitespace, " "),
+                    (Token::Assign, "="),
+                    (Token::Whitespace, " "),
+                    (Token::Value, r#""World""#),
+                    (Token::Semicolon, ";"),
+                    (Token::Whitespace, " "),
+                    (Token::CurlyBClose, "}"),
+                    (Token::Dot, "."),
+                    (Token::Ident, "world"),
+                    (Token::Whitespace, " "),
+                (Token::InterpolEnd, r#"}!""#),
+                (Token::Whitespace, " ")
+            ],
+            "\
+Marker(Root)@[0; 43)
+  Token(Whitespace)@[0; 1)
+  Marker(Interpol)@[1; 42)
+    Marker(InterpolLiteral)@[1; 11)
+      Token(InterpolStart)@[1; 11)
+    Marker(InterpolAst)@[11; 39)
+      Token(Whitespace)@[11; 12)
+      Marker(IndexSet)@[12; 38)
+        Marker(Set)@[12; 32)
+          Token(CurlyBOpen)@[12; 13)
+          Token(Whitespace)@[13; 14)
+          Marker(SetEntry)@[14; 30)
+            Marker(Attribute)@[14; 20)
+              Token(Ident)@[14; 19)
+              Token(Whitespace)@[19; 20)
+            Token(Assign)@[20; 21)
+            Token(Whitespace)@[21; 22)
+            Token(Value)@[22; 29)
+            Token(Semicolon)@[29; 30)
+          Token(Whitespace)@[30; 31)
+          Token(CurlyBClose)@[31; 32)
+        Token(Dot)@[32; 33)
+        Token(Ident)@[33; 38)
+      Token(Whitespace)@[38; 39)
+    Marker(InterpolLiteral)@[39; 42)
+      Token(InterpolEnd)@[39; 42)
+  Token(Whitespace)@[42; 43)
+"
+        );
+      assert_eq!(
+          [
+                (Token::Whitespace, " "),
+                (Token::InterpolStart, r#""${"#),
+                    (Token::Ident, "hello"),
+                (Token::InterpolEndStart, r#"} ${"#),
+                    (Token::Ident, "world"),
+                (Token::InterpolEnd, r#"}""#),
+                (Token::Whitespace, " ")
+          ],
+          "\
+Marker(Root)@[0; 21)
+  Token(Whitespace)@[0; 1)
+  Marker(Interpol)@[1; 20)
+    Marker(InterpolLiteral)@[1; 4)
+      Token(InterpolStart)@[1; 4)
+    Marker(InterpolAst)@[4; 9)
+      Token(Ident)@[4; 9)
+    Marker(InterpolLiteral)@[9; 13)
+      Token(InterpolEndStart)@[9; 13)
+    Marker(InterpolAst)@[13; 18)
+      Token(Ident)@[13; 18)
+    Marker(InterpolLiteral)@[18; 20)
+      Token(InterpolEnd)@[18; 20)
+  Token(Whitespace)@[20; 21)
+"
+      );
+      assert_eq!(
+          [
+                (Token::Whitespace, " "),
+                (Token::InterpolStart, r#"''${"#),
+                    (Token::InterpolStart, r#""${"#),
+                        (Token::Ident, "var"),
+                    (Token::InterpolEnd, r#"}""#),
+                (Token::InterpolEnd, r#"}''"#),
+                (Token::Whitespace, " ")
+          ],
+          "\
+Marker(Root)@[0; 17)
+  Token(Whitespace)@[0; 1)
+  Marker(Interpol)@[1; 16)
+    Marker(InterpolLiteral)@[1; 5)
+      Token(InterpolStart)@[1; 5)
+    Marker(InterpolAst)@[5; 13)
+      Marker(Interpol)@[5; 13)
+        Marker(InterpolLiteral)@[5; 8)
+          Token(InterpolStart)@[5; 8)
+        Marker(InterpolAst)@[8; 11)
+          Token(Ident)@[8; 11)
+        Marker(InterpolLiteral)@[11; 13)
+          Token(InterpolEnd)@[11; 13)
+    Marker(InterpolLiteral)@[13; 16)
+      Token(InterpolEnd)@[13; 16)
+  Token(Whitespace)@[16; 17)
+"
+      );
+    }
     #[test]
     fn index_set() {
         assert_eq!(
@@ -1106,42 +1027,43 @@ Marker(Root)@[0; 10)
     Token(CurlyBClose)@[9; 10)
 "
         );
-//        assert_eq!(
-//            [
-//                Token::Ident("test".into()),
-//                    TokenKind::Dot, Token::Value("invalid ident".into()),
-//                    TokenKind::Dot, Token::Interpol {
-//                        multiline: false,
-//                        parts: vec![
-//                            TokenInterpol::Literal {
-//                                span: Span::default(),
-//                                original: "hi".into(),
-//                                content: "hi".into()
-//                            }
-//                        ]
-//                    },
-//                    TokenKind::Dot, Token::Dynamic(
-//                        vec![(Meta::default(), Token::Ident("a".into()))],
-//                        Meta::default()
-//                    )
-//            ],
-//            "\
-//IndexSet
-//  IndexSet
-//    IndexSet
-//      Ident = test
-//      Token = Dot
-//      Value = \"invalid ident\"
-//    Token = Dot
-//    Interpol { multiline: false }
-//      InterpolLiteral = \"hi\"
-//  Token = Dot
-//  Dynamic
-//    Token = Dynamic
-//    Ident = a
-//    Token = CurlyBClose
-//"
-//        );
+        assert_eq!(
+            [
+                (Token::Ident, "test"),
+                    (Token::Dot, "."),
+                    (Token::Value, "invalid ident"),
+                    (Token::Dot, "."),
+                    (Token::InterpolStart, "\"${"),
+                        (Token::Ident, "hi"),
+                    (Token::InterpolEnd, "}\""),
+                    (Token::Dot, "."),
+                    (Token::DynamicStart, "${"),
+                        (Token::Ident, "a"),
+                    (Token::DynamicEnd, "}")
+            ],
+            "\
+Marker(Root)@[0; 31)
+  Marker(IndexSet)@[0; 31)
+    Marker(IndexSet)@[0; 26)
+      Marker(IndexSet)@[0; 18)
+        Token(Ident)@[0; 4)
+        Token(Dot)@[4; 5)
+        Token(Value)@[5; 18)
+      Token(Dot)@[18; 19)
+      Marker(Interpol)@[19; 26)
+        Marker(InterpolLiteral)@[19; 22)
+          Token(InterpolStart)@[19; 22)
+        Marker(InterpolAst)@[22; 24)
+          Token(Ident)@[22; 24)
+        Marker(InterpolLiteral)@[24; 26)
+          Token(InterpolEnd)@[24; 26)
+    Token(Dot)@[26; 27)
+    Marker(Dynamic)@[27; 31)
+      Token(DynamicStart)@[27; 29)
+      Token(Ident)@[29; 30)
+      Token(DynamicEnd)@[30; 31)
+"
+        );
     }
     #[test]
     fn isset() {
@@ -1361,348 +1283,478 @@ Marker(Root)@[0; 36)
 "
         );
     }
-//    #[test]
-//    fn ifs() {
-//        assert_eq!(
-//            [
-//                Token::Value(false.into()), TokenKind::Implication,
-//                TokenKind::Invert, Token::Value(false.into()),
-//                TokenKind::And,
-//                Token::Value(false.into()), TokenKind::Equal, Token::Value(true.into()),
-//                TokenKind::Or,
-//                Token::Value(true.into())
-//            ],
-//            "\
-//Operation
-//  Value = false
-//  Token = Implication
-//  Operation
-//    Operation
-//      Unary
-//        Token = Invert
-//        Value = false
-//      Token = And
-//      Operation
-//        Value = false
-//        Token = Equal
-//        Value = true
-//    Token = Or
-//    Value = true
-//"
-//        );
-//        assert_eq!(
-//            [
-//                Token::Value(1.into()), TokenKind::Less, Token::Value(2.into()),
-//                TokenKind::Or,
-//                Token::Value(2.into()), TokenKind::LessOrEq, Token::Value(2.into()),
-//                TokenKind::And,
-//                Token::Value(2.into()), TokenKind::More, Token::Value(1.into()),
-//                TokenKind::And,
-//                Token::Value(2.into()), TokenKind::MoreOrEq, Token::Value(2.into())
-//            ],
-//            "\
-//Operation
-//  Operation
-//    Value = 1
-//    Token = Less
-//    Value = 2
-//  Token = Or
-//  Operation
-//    Operation
-//      Operation
-//        Value = 2
-//        Token = LessOrEq
-//        Value = 2
-//      Token = And
-//      Operation
-//        Value = 2
-//        Token = More
-//        Value = 1
-//    Token = And
-//    Operation
-//      Value = 2
-//      Token = MoreOrEq
-//      Value = 2
-//"
-//        );
-//        assert_eq!(
-//            [
-//                Token::Value(1.into()), TokenKind::Equal, Token::Value(1.into()),
-//                TokenKind::And,
-//                Token::Value(2.into()), TokenKind::NotEqual, Token::Value(3.into())
-//            ],
-//            "\
-//Operation
-//  Operation
-//    Value = 1
-//    Token = Equal
-//    Value = 1
-//  Token = And
-//  Operation
-//    Value = 2
-//    Token = NotEqual
-//    Value = 3
-//"
-//        );
-//        assert_eq!(
-//            [
-//                TokenKind::If, Token::Value(false.into()), TokenKind::Then,
-//                    Token::Value(1.into()),
-//                TokenKind::Else,
-//                    TokenKind::If, Token::Value(true.into()), TokenKind::Then,
-//                        Token::Value(2.into()),
-//                    TokenKind::Else,
-//                        Token::Value(3.into())
-//            ],
-//            "\
-//IfElse
-//  Token = If
-//  Value = false
-//  Token = Then
-//  Value = 1
-//  Token = Else
-//  IfElse
-//    Token = If
-//    Value = true
-//    Token = Then
-//    Value = 2
-//    Token = Else
-//    Value = 3
-//"
-//        );
-//    }
-//    #[test]
-//    fn list() {
-//        assert_eq!(
-//            [
-//               TokenKind::SquareBOpen,
-//               Token::Ident("a".into()), Token::Value(2.into()), Token::Value(3.into()),
-//               Token::Value("lol".into()),
-//               TokenKind::SquareBClose
-//            ],
-//            "\
-//List
-//  Token = SquareBOpen
-//  ListItem
-//    Ident = a
-//  ListItem
-//    Value = 2
-//  ListItem
-//    Value = 3
-//  ListItem
-//    Value = \"lol\"
-//  Token = SquareBClose
-//"
-//        );
-//        assert_eq!(
-//            [
-//               TokenKind::SquareBOpen, Token::Value(1.into()), TokenKind::SquareBClose, TokenKind::Concat,
-//               TokenKind::SquareBOpen, Token::Value(2.into()), TokenKind::SquareBClose, TokenKind::Concat,
-//               TokenKind::SquareBOpen, Token::Value(3.into()), TokenKind::SquareBClose
-//            ],
-//            "\
-//Operation
-//  Operation
-//    List
-//      Token = SquareBOpen
-//      ListItem
-//        Value = 1
-//      Token = SquareBClose
-//    Token = Concat
-//    List
-//      Token = SquareBOpen
-//      ListItem
-//        Value = 2
-//      Token = SquareBClose
-//  Token = Concat
-//  List
-//    Token = SquareBOpen
-//    ListItem
-//      Value = 3
-//    Token = SquareBClose
-//"
-//        );
-//    }
-//    #[test]
-//    fn functions() {
-//        assert_eq!(
-//            [
-//               Token::Ident("a".into()), TokenKind::Colon, Token::Ident("b".into()), TokenKind::Colon,
-//               Token::Ident("a".into()), TokenKind::Add, Token::Ident("b".into())
-//            ],
-//            "\
-//Lambda
-//  Ident = a
-//  Token = Colon
-//  Lambda
-//    Ident = b
-//    Token = Colon
-//    Operation
-//      Ident = a
-//      Token = Add
-//      Ident = b
-//"
-//        );
-//        assert_eq!(
-//            [
-//                Token::Ident("a".into()), Token::Value(1.into()), Token::Value(2.into()),
-//                TokenKind::Add,
-//                Token::Value(3.into())
-//            ],
-//            "\
-//Operation
-//  Apply
-//    Apply
-//      Ident = a
-//      Value = 1
-//    Value = 2
-//  Token = Add
-//  Value = 3
-//"
-//        );
-//    }
-//    #[test]
-//    fn patterns() {
-//        assert_eq!(
-//            [TokenKind::CurlyBOpen, TokenKind::Ellipsis, TokenKind::CurlyBClose, TokenKind::Colon, Token::Value(1.into())],
-//            "\
-//Lambda
-//  Pattern
-//    Token = CurlyBOpen
-//    Token = Ellipsis
-//    Token = CurlyBClose
-//  Token = Colon
-//  Value = 1
-//"
-//        );
-//        assert_eq!(
-//            [
-//                TokenKind::CurlyBOpen, TokenKind::CurlyBClose, TokenKind::At, Token::Ident("outer".into()),
-//                TokenKind::Colon, Token::Value(1.into())
-//            ],
-//            "\
-//Lambda
-//  Pattern
-//    Token = CurlyBOpen
-//    Token = CurlyBClose
-//    PatBind
-//      Token = At
-//      Ident = outer
-//  Token = Colon
-//  Value = 1
-//"
-//        );
-//        assert_eq!(
-//            [
-//                TokenKind::CurlyBOpen,
-//                    Token::Ident("a".into()), TokenKind::Comma,
-//                    Token::Ident("b".into()), TokenKind::Question, Token::Value("default".into()),
-//                TokenKind::CurlyBClose,
-//                TokenKind::Colon,
-//                Token::Ident("a".into())
-//            ],
-//            "\
-//Lambda
-//  Pattern
-//    Token = CurlyBOpen
-//    PatEntry
-//      Ident = a
-//      Token = Comma
-//    PatEntry
-//      Ident = b
-//      Token = Question
-//      Value = \"default\"
-//    Token = CurlyBClose
-//  Token = Colon
-//  Ident = a
-//"
-//        );
-//        assert_eq!(
-//            [
-//                TokenKind::CurlyBOpen,
-//                    Token::Ident("a".into()), TokenKind::Comma,
-//                    Token::Ident("b".into()), TokenKind::Question, Token::Value("default".into()), TokenKind::Comma,
-//                    TokenKind::Ellipsis,
-//                TokenKind::CurlyBClose,
-//                TokenKind::At,
-//                Token::Ident("outer".into()),
-//                TokenKind::Colon,
-//                Token::Ident("outer".into())
-//            ],
-//            "\
-//Lambda
-//  Pattern
-//    Token = CurlyBOpen
-//    PatEntry
-//      Ident = a
-//      Token = Comma
-//    PatEntry
-//      Ident = b
-//      Token = Question
-//      Value = \"default\"
-//      Token = Comma
-//    Token = Ellipsis
-//    Token = CurlyBClose
-//    PatBind
-//      Token = At
-//      Ident = outer
-//  Token = Colon
-//  Ident = outer
-//"
-//        );
-//        assert_eq!(
-//            [
-//                Token::Ident("outer".into()), TokenKind::At,
-//                TokenKind::CurlyBOpen, Token::Ident("a".into()), TokenKind::CurlyBClose,
-//                TokenKind::Colon,
-//                Token::Ident("outer".into())
-//            ],
-//            "\
-//Lambda
-//  Pattern
-//    PatBind
-//      Ident = outer
-//      Token = At
-//    Token = CurlyBOpen
-//    PatEntry
-//      Ident = a
-//    Token = CurlyBClose
-//  Token = Colon
-//  Ident = outer
-//"
-//        );
-//        assert_eq!(
-//            [
-//                TokenKind::CurlyBOpen,
-//                    Token::Ident("a".into()), TokenKind::Question, TokenKind::CurlyBOpen, TokenKind::CurlyBClose,
-//                TokenKind::CurlyBClose, TokenKind::Colon, Token::Ident("a".into())
-//            ],
-//            "\
-//Lambda
-//  Pattern
-//    Token = CurlyBOpen
-//    PatEntry
-//      Ident = a
-//      Token = Question
-//      Set
-//        Token = CurlyBOpen
-//        Token = CurlyBClose
-//    Token = CurlyBClose
-//  Token = Colon
-//  Ident = a
-//"
-//        );
-//    }
-//    #[test]
-//    fn dynamic() {
-//        assert_eq!(
-//            [Token::Dynamic(vec![(Meta::default(), Token::Ident("a".into()))], Meta::default())],
-//            "\
-//Dynamic
-//  Token = Dynamic
-//  Ident = a
-//  Token = CurlyBClose
-//"
-//        );
-//    }
+    #[test]
+    fn ifs() {
+        assert_eq!(
+            [
+                (Token::Value, "false"),
+                (Token::Implication, "->"),
+                (Token::Invert, "!"),
+                (Token::Value, "false"),
+
+                (Token::And, "&&"),
+
+                (Token::Value, "false"),
+                (Token::Equal, "=="),
+                (Token::Value, "true"),
+
+                (Token::Or, "||"),
+
+                (Token::Value, "true")
+            ],
+            "\
+Marker(Root)@[0; 32)
+  Marker(Operation)@[0; 32)
+    Token(Value)@[0; 5)
+    Token(Implication)@[5; 7)
+    Marker(Operation)@[7; 32)
+      Marker(Operation)@[7; 26)
+        Marker(Unary)@[7; 13)
+          Token(Invert)@[7; 8)
+          Token(Value)@[8; 13)
+        Token(And)@[13; 15)
+        Marker(Operation)@[15; 26)
+          Token(Value)@[15; 20)
+          Token(Equal)@[20; 22)
+          Token(Value)@[22; 26)
+      Token(Or)@[26; 28)
+      Token(Value)@[28; 32)
+"
+        );
+        assert_eq!(
+            [
+                (Token::Value, "1"),
+                (Token::Less, "<"),
+                (Token::Value, "2"),
+
+                (Token::Or, "||"),
+
+                (Token::Value, "2"),
+                (Token::LessOrEq, "<="),
+                (Token::Value, "2"),
+
+                (Token::And, "&&"),
+
+                (Token::Value, "2"),
+                (Token::More, ">"),
+                (Token::Value, "1"),
+
+                (Token::And, "&&"),
+
+                (Token::Value, "2"),
+                (Token::MoreOrEq, ">="),
+                (Token::Value, "2")
+            ],
+            "\
+Marker(Root)@[0; 20)
+  Marker(Operation)@[0; 20)
+    Marker(Operation)@[0; 3)
+      Token(Value)@[0; 1)
+      Token(Less)@[1; 2)
+      Token(Value)@[2; 3)
+    Token(Or)@[3; 5)
+    Marker(Operation)@[5; 20)
+      Marker(Operation)@[5; 14)
+        Marker(Operation)@[5; 9)
+          Token(Value)@[5; 6)
+          Token(LessOrEq)@[6; 8)
+          Token(Value)@[8; 9)
+        Token(And)@[9; 11)
+        Marker(Operation)@[11; 14)
+          Token(Value)@[11; 12)
+          Token(More)@[12; 13)
+          Token(Value)@[13; 14)
+      Token(And)@[14; 16)
+      Marker(Operation)@[16; 20)
+        Token(Value)@[16; 17)
+        Token(MoreOrEq)@[17; 19)
+        Token(Value)@[19; 20)
+"
+        );
+        assert_eq!(
+            [
+                (Token::Value, "1"),
+                (Token::Equal, "=="),
+                (Token::Value, "1"),
+
+                (Token::And, "&&"),
+
+                (Token::Value, "2"),
+                (Token::NotEqual, "!="),
+                (Token::Value, "3")
+            ],
+            "\
+Marker(Root)@[0; 10)
+  Marker(Operation)@[0; 10)
+    Marker(Operation)@[0; 4)
+      Token(Value)@[0; 1)
+      Token(Equal)@[1; 3)
+      Token(Value)@[3; 4)
+    Token(And)@[4; 6)
+    Marker(Operation)@[6; 10)
+      Token(Value)@[6; 7)
+      Token(NotEqual)@[7; 9)
+      Token(Value)@[9; 10)
+"
+        );
+        assert_eq!(
+            [
+                (Token::If, "if"),
+                (Token::Value, "false"),
+                (Token::Then, "then"),
+                    (Token::Value, "1"),
+                (Token::Else, "else"),
+                    (Token::If, "if"),
+                    (Token::Value, "true"),
+                    (Token::Then, "then"),
+                        (Token::Ident, "two"),
+                    (Token::Else, "else"),
+                        (Token::Value, "3")
+            ],
+            "\
+Marker(Root)@[0; 34)
+  Marker(IfElse)@[0; 34)
+    Token(If)@[0; 2)
+    Token(Value)@[2; 7)
+    Token(Then)@[7; 11)
+    Token(Value)@[11; 12)
+    Token(Else)@[12; 16)
+    Marker(IfElse)@[16; 34)
+      Token(If)@[16; 18)
+      Token(Value)@[18; 22)
+      Token(Then)@[22; 26)
+      Token(Ident)@[26; 29)
+      Token(Else)@[29; 33)
+      Token(Value)@[33; 34)
+"
+        );
+    }
+    #[test]
+    fn list() {
+        assert_eq!(
+            [
+                (Token::SquareBOpen, "["),
+                (Token::Ident, "a"),
+                (Token::Value, "2"),
+                (Token::Value, "3"),
+                (Token::Value, "\"lol\""),
+                (Token::SquareBClose, "]")
+            ],
+            "\
+Marker(Root)@[0; 10)
+  Marker(List)@[0; 10)
+    Token(SquareBOpen)@[0; 1)
+    Marker(ListItem)@[1; 2)
+      Token(Ident)@[1; 2)
+    Marker(ListItem)@[2; 3)
+      Token(Value)@[2; 3)
+    Marker(ListItem)@[3; 4)
+      Token(Value)@[3; 4)
+    Marker(ListItem)@[4; 9)
+      Token(Value)@[4; 9)
+    Token(SquareBClose)@[9; 10)
+"
+        );
+        assert_eq!(
+            [
+                (Token::SquareBOpen, "["), (Token::Value, "1"), (Token::SquareBClose, "]"),
+                (Token::Concat, "++"),
+                (Token::SquareBOpen, "["), (Token::Ident, "two"), (Token::SquareBClose, "]"),
+                (Token::Concat, "++"),
+                (Token::SquareBOpen, "["), (Token::Value, "3"), (Token::SquareBClose, "]")
+            ],
+            "\
+Marker(Root)@[0; 15)
+  Marker(Operation)@[0; 15)
+    Marker(Operation)@[0; 10)
+      Marker(List)@[0; 3)
+        Token(SquareBOpen)@[0; 1)
+        Marker(ListItem)@[1; 2)
+          Token(Value)@[1; 2)
+        Token(SquareBClose)@[2; 3)
+      Token(Concat)@[3; 5)
+      Marker(List)@[5; 10)
+        Token(SquareBOpen)@[5; 6)
+        Marker(ListItem)@[6; 9)
+          Token(Ident)@[6; 9)
+        Token(SquareBClose)@[9; 10)
+    Token(Concat)@[10; 12)
+    Marker(List)@[12; 15)
+      Token(SquareBOpen)@[12; 13)
+      Marker(ListItem)@[13; 14)
+        Token(Value)@[13; 14)
+      Token(SquareBClose)@[14; 15)
+"
+        );
+    }
+    #[test]
+    fn functions() {
+        assert_eq!(
+            [
+                (Token::Ident, "a"),
+                (Token::Colon, ":"),
+                (Token::Whitespace, " "),
+                (Token::Ident, "b"),
+                (Token::Colon, ":"),
+                (Token::Whitespace, " "),
+                (Token::Ident, "a"),
+                (Token::Whitespace, " "),
+                (Token::Add, "+"),
+                (Token::Whitespace, " "),
+                (Token::Ident, "b")
+            ],
+            "\
+Marker(Root)@[0; 11)
+  Marker(Lambda)@[0; 11)
+    Token(Ident)@[0; 1)
+    Token(Colon)@[1; 2)
+    Token(Whitespace)@[2; 3)
+    Marker(Lambda)@[3; 11)
+      Token(Ident)@[3; 4)
+      Token(Colon)@[4; 5)
+      Token(Whitespace)@[5; 6)
+      Marker(Operation)@[6; 11)
+        Token(Ident)@[6; 7)
+        Token(Whitespace)@[7; 8)
+        Token(Add)@[8; 9)
+        Token(Whitespace)@[9; 10)
+        Token(Ident)@[10; 11)
+"
+        );
+        assert_eq!(
+            [
+                (Token::Ident, "a"),
+                (Token::Whitespace, " "),
+                (Token::Value, "1"),
+                (Token::Whitespace, " "),
+                (Token::Value, "2"),
+                (Token::Whitespace, " "),
+                (Token::Add, "+"),
+                (Token::Whitespace, " "),
+                (Token::Value, "3")
+            ],
+            "\
+Marker(Root)@[0; 9)
+  Marker(Operation)@[0; 9)
+    Marker(Apply)@[0; 6)
+      Marker(Apply)@[0; 4)
+        Token(Ident)@[0; 1)
+        Token(Whitespace)@[1; 2)
+        Token(Value)@[2; 3)
+        Token(Whitespace)@[3; 4)
+      Token(Value)@[4; 5)
+      Token(Whitespace)@[5; 6)
+    Token(Add)@[6; 7)
+    Token(Whitespace)@[7; 8)
+    Token(Value)@[8; 9)
+"
+        );
+   }
+    #[test]
+    fn patterns() {
+        assert_eq!(
+            [
+                (Token::CurlyBOpen, "{"),
+                (Token::Whitespace, " "),
+                (Token::Ellipsis, "..."),
+                (Token::Whitespace, " "),
+                (Token::CurlyBClose, "}"),
+                (Token::Colon, ":"),
+                (Token::Whitespace, " "),
+                (Token::Value, "1")
+            ],
+            "\
+Marker(Root)@[0; 10)
+  Marker(Lambda)@[0; 10)
+    Marker(Pattern)@[0; 7)
+      Token(CurlyBOpen)@[0; 1)
+      Token(Whitespace)@[1; 2)
+      Token(Ellipsis)@[2; 5)
+      Token(Whitespace)@[5; 6)
+      Token(CurlyBClose)@[6; 7)
+    Token(Colon)@[7; 8)
+    Token(Whitespace)@[8; 9)
+    Token(Value)@[9; 10)
+"
+        );
+        assert_eq!(
+            [
+                (Token::CurlyBOpen, "{"),
+                (Token::CurlyBClose, "}"),
+                (Token::Whitespace, " "),
+                (Token::At, "@"),
+                (Token::Whitespace, " "),
+                (Token::Ident, "outer"),
+                (Token::Colon, ":"),
+                (Token::Whitespace, " "),
+                (Token::Value, "1")
+            ],
+            "\
+Marker(Root)@[0; 13)
+  Marker(Lambda)@[0; 13)
+    Marker(Pattern)@[0; 10)
+      Token(CurlyBOpen)@[0; 1)
+      Token(CurlyBClose)@[1; 2)
+      Token(Whitespace)@[2; 3)
+      Marker(PatBind)@[3; 10)
+        Token(At)@[3; 4)
+        Token(Whitespace)@[4; 5)
+        Token(Ident)@[5; 10)
+    Token(Colon)@[10; 11)
+    Token(Whitespace)@[11; 12)
+    Token(Value)@[12; 13)
+"
+        );
+        assert_eq!(
+            [
+                (Token::CurlyBOpen, "{"), (Token::Whitespace, " "),
+
+                (Token::Ident, "a"), (Token::Comma, ","), (Token::Whitespace, " "),
+                (Token::Ident, "b"), (Token::Whitespace, " "),
+                    (Token::Question, "?"), (Token::Whitespace, " "),
+                    (Token::Value, "\"default\""),
+
+                (Token::CurlyBClose, "}"),
+                (Token::Colon, ":"),
+                (Token::Whitespace, " "),
+                (Token::Ident, "a")
+            ],
+            "\
+Marker(Root)@[0; 22)
+  Marker(Lambda)@[0; 22)
+    Marker(Pattern)@[0; 19)
+      Token(CurlyBOpen)@[0; 1)
+      Token(Whitespace)@[1; 2)
+      Marker(PatEntry)@[2; 3)
+        Token(Ident)@[2; 3)
+      Token(Comma)@[3; 4)
+      Token(Whitespace)@[4; 5)
+      Marker(PatEntry)@[5; 18)
+        Token(Ident)@[5; 6)
+        Token(Whitespace)@[6; 7)
+        Token(Question)@[7; 8)
+        Token(Whitespace)@[8; 9)
+        Token(Value)@[9; 18)
+      Token(CurlyBClose)@[18; 19)
+    Token(Colon)@[19; 20)
+    Token(Whitespace)@[20; 21)
+    Token(Ident)@[21; 22)
+"
+        );
+        assert_eq!(
+            [
+                (Token::CurlyBOpen, "{"), (Token::Whitespace, " "),
+
+                (Token::Ident, "a"), (Token::Comma, ","), (Token::Whitespace, " "),
+                (Token::Ident, "b"), (Token::Whitespace, " "),
+                    (Token::Question, "?"), (Token::Whitespace, " "),
+                    (Token::Value, "\"default\""), (Token::Comma, ","), (Token::Whitespace, " "),
+                (Token::Ellipsis, "..."), (Token::Whitespace, " "),
+
+                (Token::CurlyBClose, "}"),
+                (Token::Colon, ":"),
+                (Token::Whitespace, " "),
+                (Token::Ident, "a")
+            ],
+            "\
+Marker(Root)@[0; 28)
+  Marker(Lambda)@[0; 28)
+    Marker(Pattern)@[0; 25)
+      Token(CurlyBOpen)@[0; 1)
+      Token(Whitespace)@[1; 2)
+      Marker(PatEntry)@[2; 3)
+        Token(Ident)@[2; 3)
+      Token(Comma)@[3; 4)
+      Token(Whitespace)@[4; 5)
+      Marker(PatEntry)@[5; 18)
+        Token(Ident)@[5; 6)
+        Token(Whitespace)@[6; 7)
+        Token(Question)@[7; 8)
+        Token(Whitespace)@[8; 9)
+        Token(Value)@[9; 18)
+      Token(Comma)@[18; 19)
+      Token(Whitespace)@[19; 20)
+      Token(Ellipsis)@[20; 23)
+      Token(Whitespace)@[23; 24)
+      Token(CurlyBClose)@[24; 25)
+    Token(Colon)@[25; 26)
+    Token(Whitespace)@[26; 27)
+    Token(Ident)@[27; 28)
+"
+        );
+        assert_eq!(
+            [
+                (Token::Ident, "outer"), (Token::Whitespace, " "),
+                (Token::At, "@"), (Token::Whitespace, " "),
+                (Token::CurlyBOpen, "{"), (Token::Whitespace, " "),
+                (Token::Ident, "a"), (Token::Whitespace, " "),
+                (Token::CurlyBClose, "}"),
+                (Token::Colon, ":"), (Token::Whitespace, " "),
+                (Token::Ident, "outer")
+            ],
+            "\
+Marker(Root)@[0; 20)
+  Marker(Lambda)@[0; 20)
+    Marker(Pattern)@[0; 13)
+      Marker(PatBind)@[0; 7)
+        Token(Ident)@[0; 5)
+        Token(Whitespace)@[5; 6)
+        Token(At)@[6; 7)
+      Token(Whitespace)@[7; 8)
+      Token(CurlyBOpen)@[8; 9)
+      Token(Whitespace)@[9; 10)
+      Marker(PatEntry)@[10; 12)
+        Token(Ident)@[10; 11)
+        Token(Whitespace)@[11; 12)
+      Token(CurlyBClose)@[12; 13)
+    Token(Colon)@[13; 14)
+    Token(Whitespace)@[14; 15)
+    Token(Ident)@[15; 20)
+"
+        );
+        assert_eq!(
+            [
+                (Token::CurlyBOpen, "{"),
+                (Token::Ident, "a"),
+                (Token::Question, "?"),
+                (Token::CurlyBOpen, "{"),
+                (Token::CurlyBClose, "}"),
+                (Token::CurlyBClose, "}"),
+                (Token::Colon, ":"),
+                (Token::Ident, "a")
+            ],
+            "\
+Marker(Root)@[0; 8)
+  Marker(Lambda)@[0; 8)
+    Marker(Pattern)@[0; 6)
+      Token(CurlyBOpen)@[0; 1)
+      Marker(PatEntry)@[1; 5)
+        Token(Ident)@[1; 2)
+        Token(Question)@[2; 3)
+        Marker(Set)@[3; 5)
+          Token(CurlyBOpen)@[3; 4)
+          Token(CurlyBClose)@[4; 5)
+      Token(CurlyBClose)@[5; 6)
+    Token(Colon)@[6; 7)
+    Token(Ident)@[7; 8)
+"
+        );
+    }
+    #[test]
+    fn dynamic() {
+        assert_eq!(
+            [
+                (Token::DynamicStart, "${"),
+                    (Token::Ident, "a"),
+                (Token::DynamicEnd, "}")
+            ],
+            "\
+Marker(Root)@[0; 4)
+  Marker(Dynamic)@[0; 4)
+    Token(DynamicStart)@[0; 2)
+    Token(Ident)@[2; 3)
+    Token(DynamicEnd)@[3; 4)
+"
+        );
+    }
 }
