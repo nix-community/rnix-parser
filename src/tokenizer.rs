@@ -397,18 +397,13 @@ impl<'a> Iterator for Tokenizer<'a> {
     }
 }
 
-/// Convenience function for turning a string into an iterator of tokens
-pub fn tokenize<'a>(input: &'a str) -> Tokenizer<'a> {
-    Tokenizer::new(input)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::Token;
+    use super::{Token, Tokenizer};
     use rowan::SmolStr;
 
     fn tokenize(input: &str) -> Vec<(Token, SmolStr)> {
-        super::tokenize(input).collect()
+        Tokenizer::new(input).collect()
     }
 
     macro_rules! tokens {

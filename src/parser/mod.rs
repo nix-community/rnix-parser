@@ -5,9 +5,7 @@ use crate::tokenizer::Token;
 use rowan::{GreenNodeBuilder, SyntaxNode, SmolStr};
 use std::collections::VecDeque;
 
-//pub mod types;
-
-//use self::types::{Error as ErrorNode, TypedNode};
+pub mod types;
 
 const OR: &'static str = "or";
 
@@ -27,7 +25,6 @@ pub enum ASTKind {
     Attribute,
     Dynamic,
     Error,
-    Ident,
     IfElse,
     Import,
     IndexSet,
@@ -50,9 +47,7 @@ pub enum ASTKind {
     Root,
     Set,
     SetEntry,
-    Token,
     Unary,
-    Value,
     With
 }
 /// The type of a node in the AST
@@ -62,6 +57,16 @@ pub enum NodeType {
     Marker(ASTKind),
     /// This type is a single token. Will probably not have any children.
     Token(Token)
+}
+impl From<ASTKind> for NodeType {
+    fn from(kind: ASTKind) -> Self {
+        NodeType::Marker(kind)
+    }
+}
+impl From<Token> for NodeType {
+    fn from(kind: Token) -> Self {
+        NodeType::Token(kind)
+    }
 }
 
 /// Teaches the rowan library about rnix' preferred types
@@ -545,7 +550,7 @@ impl<I> Parser<I>
     }
 }
 
-/// Convenience function for turning an iterator of tokens into an AST
+/// Parse tokens into an AST
 pub fn parse<I>(iter: I) -> Node
     where I: IntoIterator<Item = (Token, SmolStr)>
 {
