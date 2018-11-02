@@ -94,8 +94,8 @@ impl Token {
             _ => false
         }
     }
-    /// This token is a comment, whitespace, or similar, and should be skipped
-    /// over by the parser.
+    /// Returns true if this token is a comment, whitespace, or similar, and
+    /// should be skipped over by the parser.
     pub fn is_trivia(self) -> bool {
         match self {
             Token::Comment | Token::Error | Token::Whitespace => true,

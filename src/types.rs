@@ -1,43 +1,38 @@
 //! Provides a type system for the AST, in some sense
 
-use crate::tokenizer::Token;
-use super::{ASTKind, Node, NodeType, Types};
+use crate::{
+    parser::{ASTKind, Node, NodeType, Types},
+    tokenizer::Token,
+    value::{self, Value as ParsedValue, ValueError}
+};
 
-use rowan::SmolStr;
-use std::marker::PhantomData;
+use rowan::{SmolStr, WalkEvent};
 
 macro_rules! typed {
     ($($kind:expr => $name:ident$(: $trait:ident)*$(: { $($block:tt)* })*),*) => {
         $(
-            pub struct $name<'a, R: rowan::TreeRoot<Types>> {
-                node: Node<R>,
-                _marker: PhantomData<&'a R>
-            }
+            pub struct $name<R: rowan::TreeRoot<Types>>(Node<R>);
 
-            impl<'a, R: rowan::TreeRoot<Types>> TypedNode<R> for $name<'a, R> {
+            impl<R: rowan::TreeRoot<Types>> TypedNode<R> for $name<R> {
                 type Target = Self;
                 fn cast(from: Node<R>) -> Option<Self::Target> {
-                    cast_into(from, $kind.into()).map(|node| Self {
-                        node,
-                        _marker: PhantomData::default()
-                    })
+                    cast_into(from, $kind.into()).map($name)
                 }
                 fn node(&self) -> &Node<R> {
-                    &self.node
+                    &self.0
+                }
+                fn into_node(self) -> Node<R> {
+                    self.0
                 }
             }
-            $(impl<'a, R: rowan::TreeRoot<Types>> $trait<'a, R> for $name<'a, R> {})*
-            $(impl<'a, R: rowan::TreeRoot<Types>> $name<'a, R> { $($block)* })*
+            $(impl<R: rowan::TreeRoot<Types>> $trait<R> for $name<R> {})*
+            $(impl<R: rowan::TreeRoot<Types>> $name<R> { $($block)* })*
         )*
     }
 }
 macro_rules! nth {
     ($self:expr; $index:expr) => {
-        $self.node().children()
-            .filter(|node| match node.kind() {
-                NodeType::Marker(_) => true,
-                NodeType::Token(t) => !t.is_trivia()
-            })
+        $self.children()
             .nth($index)
             .expect("invalid ast")
     };
@@ -111,7 +106,11 @@ impl UnaryOpKind {
     }
 }
 
-// TODO: More functions for types
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum InterpolPart<R: rowan::TreeRoot<Types>> {
+    Literal(String),
+    Ast(Node<R>)
+}
 
 /// A TypedNode is simply a wrapper around an untyped node to provide a type
 /// system in some sense.
@@ -122,23 +121,65 @@ pub trait TypedNode<R: rowan::TreeRoot<Types>> {
     fn cast(from: Node<R>) -> Option<Self::Target>;
     /// Return a reference to the inner untyped node
     fn node(&self) -> &Node<R>;
+    /// Return the inner untyped node
+    fn into_node(self) -> Node<R>;
+    /// Return all non-trivia (so no comments, whitespace, errors) children
+    fn children<'a>(&'a self) -> Box<Iterator<Item = Node<R>> + 'a>
+        where R: 'a
+    {
+        Box::new(
+            self.node()
+                .children()
+                .filter(|node| match node.kind() {
+                    NodeType::Marker(_) => true,
+                    NodeType::Token(t) => !t.is_trivia()
+                })
+        )
+    }
+    /// Return all errors of all children, recursively
+    fn errors<'a>(&'a self) -> Vec<Node<rowan::RefRoot<'a, Types>>>
+        where R: 'a
+    {
+        let mut bucket = Vec::new();
+        for event in self.node().borrowed().preorder() {
+            if let WalkEvent::Enter(node) = event {
+                match node.kind() {
+                    NodeType::Marker(ASTKind::Error)
+                    | NodeType::Token(Token::Error) => bucket.push(node),
+                    _ => ()
+                }
+            }
+        }
+        bucket
+    }
 }
 /// Provides the function `.entries()`
-pub trait HasEntries<'a, R: rowan::TreeRoot<Types>>: TypedNode<R> {
+pub trait EntryHolder<R: rowan::TreeRoot<Types>>: TypedNode<R> {
     /// Return an iterator over all key=value entries
-    fn entries(&'a self) -> Box<Iterator<Item = SetEntry<R>> + 'a> {
+    fn entries<'a>(&'a self) -> Box<Iterator<Item = SetEntry<R>> + 'a>
+        where R: 'a
+    {
         Box::new(self.node().children().filter_map(SetEntry::cast))
     }
     /// Return an iterator over all inherit entries
-    fn inherits(&'a self) -> Box<Iterator<Item = Inherit<R>> + 'a> {
+    fn inherits<'a>(&'a self) -> Box<Iterator<Item = Inherit<R>> + 'a>
+        where R: 'a
+    {
         Box::new(self.node().children().filter_map(Inherit::cast))
     }
 }
-/// Provides the function `.inner()`
-pub trait HasInner<'a, R: rowan::TreeRoot<Types>>: TypedNode<R> {
+/// Provides the function `.inner()` for wrapping types like parenthensis
+pub trait Wrapper<R: rowan::TreeRoot<Types>>: TypedNode<R> {
     /// Return the inner value
     fn inner(&self) -> Node<R> {
         nth!(self; 1)
+    }
+}
+/// Provides the function `.inner()` for transparent wrappers like root
+pub trait LightWrapper<R: rowan::TreeRoot<Types>>: TypedNode<R> {
+    /// Return the inner value
+    fn inner(&self) -> Node<R> {
+        nth!(self; 0)
     }
 }
 
@@ -152,12 +193,22 @@ fn cast_into<R: rowan::TreeRoot<Types>>(from: Node<R>, kind: NodeType) -> Option
 
 typed! [
     Token::Ident => Ident: {
-        /// Return the identifier as string
-        pub fn string(&self) -> &str {
+        /// Return the identifier as a string
+        pub fn as_str(&self) -> &str {
             self.node().borrowed().leaf_text().map(SmolStr::as_str).expect("invalid ast")
         }
     },
-    Token::Value => Value,
+    Token::Value => Value: {
+        /// Return the value as a string
+        pub fn as_str(&self) -> &str {
+            self.node().borrowed().leaf_text().map(SmolStr::as_str).expect("invalid ast")
+        }
+
+        /// Parse the value
+        pub fn to_value(&self) -> Result<ParsedValue, ValueError> {
+            self.as_str().parse()
+        }
+    },
 
     ASTKind::Apply => Apply: {
         /// Return the lambda being applied
@@ -165,7 +216,7 @@ typed! [
             nth!(self; 0)
         }
         /// Return the value which the lambda is being applied with
-        pub fn val(&self) -> Node<R> {
+        pub fn value(&self) -> Node<R> {
             nth!(self; 1)
         }
     },
@@ -181,15 +232,11 @@ typed! [
     },
     ASTKind::Attribute => Attribute: {
         /// Return the path as an iterator of identifiers
-        pub fn path(&self) -> impl Iterator<Item = Node<R>> {
-            self.node().children()
-                .filter(|node| match node.kind() {
-                    NodeType::Marker(_) => true,
-                    NodeType::Token(t) => (!t.is_trivia() && t != Token::Dot)
-                })
+        pub fn path<'a>(&'a self) -> impl Iterator<Item = Node<R>> + 'a {
+            self.children().filter(|node| node.kind() != NodeType::Token(Token::Dot))
         }
     },
-    ASTKind::Dynamic => Dynamic: HasInner,
+    ASTKind::Dynamic => Dynamic: Wrapper,
     ASTKind::Error => Error,
     ASTKind::IfElse => IfElse: {
         /// Return the condition
@@ -207,7 +254,7 @@ typed! [
     },
     ASTKind::Import => Import: {
         /// Return the value being imported
-        pub fn val(&self) -> Node<R> {
+        pub fn value(&self) -> Node<R> {
             nth!(self; 1)
         }
     },
@@ -229,10 +276,96 @@ typed! [
                 .next()
         }
     },
-    ASTKind::InheritFrom => InheritFrom: HasInner,
-    ASTKind::Interpol => Interpol,
-    ASTKind::InterpolAst => InterpolAst,
-    ASTKind::InterpolLiteral => InterpolLiteral,
+    ASTKind::InheritFrom => InheritFrom: Wrapper,
+    ASTKind::Interpol => Interpol: {
+        /// Parse the interpolation into a series of parts
+        pub fn parts(&self) -> Vec<InterpolPart<R>> {
+            let mut parts = Vec::new();
+            let mut literals = 0;
+            let mut common = std::usize::MAX;
+            let mut multiline = false;
+
+            for child in self.node().children() {
+                match child.kind() {
+                    NodeType::Marker(ASTKind::InterpolAst) => {
+                        let ast = InterpolAst::cast(child).unwrap();
+                        parts.push(InterpolPart::Ast(ast.inner()));
+                    },
+                    NodeType::Marker(ASTKind::InterpolLiteral) => {
+                        let literal = InterpolLiteral::cast(child).unwrap();
+                        let token = literal.inner();
+                        let mut text = token.borrowed().leaf_text().map(SmolStr::as_str).unwrap_or_default();
+
+                        let start = token.kind() == NodeType::Token(Token::InterpolStart)
+                            || token.kind() == NodeType::Token(Token::InterpolEndStart);
+                        let end = token.kind() == NodeType::Token(Token::InterpolEnd)
+                            || token.kind() == NodeType::Token(Token::InterpolEndStart);
+
+                        match token.kind() {
+                            NodeType::Token(Token::InterpolStart) => {
+                                multiline = if text.starts_with('"') {
+                                    text = &text[1..];
+                                    false
+                                } else if text.starts_with("''") {
+                                    text = &text[2..];
+                                    true
+                                } else { false };
+                            },
+                            NodeType::Token(Token::InterpolEndStart) => (),
+                            NodeType::Token(Token::InterpolEnd) => {
+                                let len = text.len();
+                                if text.ends_with('"') {
+                                    text = &text[..len-1];
+                                } else if text.ends_with("''") {
+                                    text = &text[..len-2];
+                                }
+                            },
+                            _ => continue
+                        }
+                        if end && text.starts_with("}") {
+                            text = &text[1..];
+                        }
+                        if start && text.ends_with("${") {
+                            let len = text.len();
+                            text = &text[..len-2];
+                        }
+                        let line_count = text.lines().count();
+                        for (i, line) in text.lines().enumerate().skip(if end { 1 } else { 0 }) {
+                            let indent: usize = value::indention(line).count();
+                            if (i != line_count-1 || !start) && indent == line.chars().count() {
+                                // line is empty and not the start of an
+                                // interpolation, ignore indention
+                                continue;
+                            }
+                            common = common.min(indent);
+                        }
+                        parts.push(InterpolPart::Literal(text.to_string()));
+                        literals += 1;
+                    },
+                    _ => ()
+                }
+            }
+
+            let mut i = 0;
+            for part in parts.iter_mut() {
+                if let InterpolPart::Literal(ref mut text) = part {
+                    if multiline {
+                        *text = value::remove_indent(text, i == 0, common);
+                        if i == literals-1 {
+                            // Last index
+                            value::remove_trailing(text);
+                        }
+                    }
+                    *text = value::unescape(text, multiline);
+                    i += 1;
+                }
+            }
+
+            parts
+        }
+    },
+    ASTKind::InterpolAst => InterpolAst: LightWrapper,
+    ASTKind::InterpolLiteral => InterpolLiteral: LightWrapper,
     ASTKind::Lambda => Lambda: {
         /// Return the argument of the lambda
         pub fn arg(&self) -> Node<R> {
@@ -243,34 +376,37 @@ typed! [
             nth!(self; 2)
         }
     },
-    ASTKind::Let => Let: HasEntries,
-    ASTKind::LetIn => LetIn: HasEntries,
+    ASTKind::Let => Let: EntryHolder,
+    ASTKind::LetIn => LetIn: EntryHolder: {
+        /// Return the body
+        pub fn body(&self) -> Node<R> {
+            self.children()
+                .filter(|node| SetEntry::cast(node.borrowed()).is_none())
+                .nth(2)
+                .expect("invalid ast")
+        }
+    },
     ASTKind::List => List: {
         /// Return an iterator over items in the list
         pub fn items(&self) -> impl Iterator<Item = ListItem<R>> {
             self.node().children().filter_map(ListItem::cast)
         }
     },
-    ASTKind::ListItem => ListItem: {
-        /// Return the inner value
-        pub fn inner(&self) -> Node<R> {
-            nth!(self; 0)
-        }
-    },
+    ASTKind::ListItem => ListItem: LightWrapper,
     ASTKind::Operation => Operation: {
         /// Return the first value in the operation
-        pub fn val1(&self) -> Node<R> {
+        pub fn value1(&self) -> Node<R> {
             nth!(self; 0)
         }
         /// Return the operator
-        pub fn op(&self) -> OpKind {
+        pub fn operator(&self) -> OpKind {
             match nth!(self; 1).kind() {
                 NodeType::Token(token) => OpKind::from_token(token).expect("invalid ast"),
                 _ => panic!("invalid ast")
             }
         }
         /// Return the second value in the operation
-        pub fn val2(&self) -> Node<R> {
+        pub fn value2(&self) -> Node<R> {
             nth!(self; 2)
         }
     },
@@ -284,7 +420,7 @@ typed! [
             nth!(self; 2)
         }
     },
-    ASTKind::Paren => Paren: HasInner,
+    ASTKind::Paren => Paren: Wrapper,
     ASTKind::PatBind => PatBind: {
         /// Return the identifier the set is being bound as
         pub fn name(&self) -> Ident<R> {
@@ -316,7 +452,8 @@ typed! [
             self.node().children().any(|node| node.kind() == NodeType::Token(Token::Ellipsis))
         }
     },
-    ASTKind::Set => Set: HasEntries: {
+    ASTKind::Root => Root: LightWrapper,
+    ASTKind::Set => Set: EntryHolder: {
         /// Returns true if this set is recursive
         pub fn recursive(&self) -> bool {
             self.node().children().any(|node| node.kind() == NodeType::Token(Token::Rec))
@@ -328,20 +465,20 @@ typed! [
             nth!(self; (Attribute) 0)
         }
         /// Return this entry's value
-        pub fn val(&self) -> Node<R> {
+        pub fn value(&self) -> Node<R> {
             nth!(self; 2)
         }
     },
     ASTKind::Unary => Unary: {
         /// Return the operator
-        pub fn op(&self) -> UnaryOpKind {
+        pub fn operator(&self) -> UnaryOpKind {
             match nth!(self; 0).kind() {
                 NodeType::Token(token) => UnaryOpKind::from_token(token).expect("invalid ast"),
                 _ => panic!("invalid ast")
             }
         }
         /// Return the value in the operation
-        pub fn val(&self) -> Node<R> {
+        pub fn value(&self) -> Node<R> {
             nth!(self; 1)
         }
     },

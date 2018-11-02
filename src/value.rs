@@ -102,40 +102,61 @@ pub fn unescape(input: &str, multiline: bool) -> String {
     output
 }
 
+pub(crate) fn indention<'a>(s: &'a str) -> impl Iterator<Item = char> + 'a {
+    s.chars().take_while(|&c| c != '\n' && c.is_whitespace())
+}
+
 /// Remove common indention in string
-pub fn remove_common_indent(string: &mut String) {
-    let mut shared = std::usize::MAX;
-    for line in string.lines() {
-        let initial = line.chars().take_while(|c| c.is_whitespace()).map(char::len_utf8).sum();
-        if line.len() == initial {
+pub fn remove_common_indent(input: &str) -> String {
+    let mut common = std::usize::MAX;
+    for line in input.lines() {
+        let indent = indention(line).count();
+        if line.chars().count() == indent {
             // line is empty, ignore indention
             continue;
         }
-        shared = shared.min(initial);
+        common = common.min(indent);
     }
 
-    if shared > 0 {
-        let mut i = 0;
-        loop {
-            let initial: usize = string[i..].chars()
-                .take_while(|&c| c.is_whitespace() && c != '\n')
-                .take(shared)
-                .map(char::len_utf8)
-                .sum();
-
-            string.drain(i..i+initial);
-
-            match string[i..].find('\n') {
-                Some(newline) => i += newline + 1,
-                None => break
-            }
+    remove_indent(input, true, common)
+}
+/// Remove a specified max value of indention from each line in a string after
+/// a specified starting point
+pub fn remove_indent(input: &str, initial: bool, indent: usize) -> String {
+    let mut output = String::new();
+    let mut start = 0;
+    if initial {
+        // If the first line is whitespace, ignore it completely
+        let iter = input.chars().take_while(|&c| c != '\n');
+        if iter.clone().all(char::is_whitespace) {
+            start += iter.map(char::len_utf8).sum::<usize>() + /* newline */ 1;
+        } else {
+            // Otherwise, skip like normal
+            start += indention(input).take(indent).map(char::len_utf8).sum::<usize>();
         }
     }
-
-    let initial = string.chars().take_while(|&c| c.is_whitespace() && c != '\n').map(char::len_utf8).sum();
-    if string.bytes().nth(initial) == Some(b'\n') {
-        string.drain(..=initial);
+    loop {
+        start += indention(&input[start..]).take(indent).map(char::len_utf8).sum::<usize>();
+        let end = input[start..].find('\n').map(|i| start + i + 1);
+        {
+            let end = end.unwrap_or(input.len());
+            output.push_str(&input[start..end]);
+        }
+        start = match end {
+            Some(end) => end,
+            None => break
+        };
     }
+    output
+}
+/// Remove any trailing whitespace from a string
+pub fn remove_trailing(string: &mut String) {
+    let trailing: usize = string.chars().rev()
+        .take_while(|&c| c != '\n' && c.is_whitespace())
+        .map(char::len_utf8)
+        .sum();
+    let len = string.len();
+    string.drain(len-trailing..);
 }
 
 /// An error that occured when parsing a value from a string
@@ -185,8 +206,9 @@ impl std::str::FromStr for Value {
             if len <= 4 || !s.ends_with("''") {
                 return Err(ValueError::UnclosedQuote);
             }
-            let mut content = unescape(&s[2..len-2], true);
-            remove_common_indent(&mut content);
+            let content = unescape(&s[2..len-2], true);
+            let mut content = remove_common_indent(&content);
+            remove_trailing(&mut content);
             return Ok(Value::Str { multiline: true, content });
         }
         if s.starts_with('<') {
@@ -231,12 +253,6 @@ impl std::str::FromStr for Value {
 mod tests {
     use super::*;
 
-    pub fn remove_common_indent<S: Into<String>>(s: S) -> String {
-        let mut s = s.into();
-        super::remove_common_indent(&mut s);
-        s
-    }
-
     #[test]
     fn string_unescapes() {
         assert_eq!(unescape(r#"Hello\n\"World\" :D"#, false), "Hello\n\"World\" :D");
@@ -260,7 +276,7 @@ mod tests {
     #[test]
     fn string_both() {
         assert_eq!(
-            remove_common_indent(unescape(
+            unescape(&remove_common_indent(
                 r#"
                         
                               
@@ -270,9 +286,8 @@ mod tests {
                     ''${ interpolation was escaped }
                     two single quotes: '''
                     three single quotes: ''''
-                "#,
-                true
-            )),
+                "#
+            ), true),
             // Get the below with nix repl
             "    \n          \nThis is a multiline string :D\n  indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\ntwo single quotes: ''\nthree single quotes: '''\n"
         );

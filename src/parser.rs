@@ -1,21 +1,24 @@
 //! The parser: turns a series of tokens into an AST
 
-use crate::tokenizer::Token;
+use crate::{
+    types::{TypedNode, Root},
+    tokenizer::Token
+};
 
 use rowan::{GreenNodeBuilder, SyntaxNode, SmolStr};
 use std::collections::VecDeque;
-
-pub mod types;
 
 const OR: &'static str = "or";
 
 /// An error that occured during parsing
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum ParseError {
+    #[fail(display = "unexpected input")]
+    Unexpected(Node<rowan::OwnedRoot<Types>>),
     #[fail(display = "unexpected eof")]
     UnexpectedEOF,
     #[fail(display = "unexpected eof, wanted {:?}", _0)]
-    UnexpectedEOFWanted(Token)
+    UnexpectedEOFWanted(Token),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -78,6 +81,45 @@ impl rowan::Types for Types {
 }
 
 pub type Node<R = rowan::OwnedRoot<Types>> = rowan::SyntaxNode<Types, R>;
+
+/// The result of a parse
+pub struct AST {
+    node: Node
+}
+impl AST {
+    /// Return the root node
+    pub fn into_node(self) -> Node {
+        self.node
+    }
+    /// Return a reference to the root node
+    pub fn node(&self) -> &Node {
+        &self.node
+    }
+    /// Return a typed root node
+    pub fn root<'a>(&'a self) -> Root<rowan::RefRoot<'a, Types>> {
+        Root::cast(self.node.borrowed()).unwrap()
+    }
+    /// Return all errors in the tree, if any
+    pub fn errors(&self) -> Vec<ParseError> {
+        let mut errors = Vec::new();
+        errors.extend_from_slice(self.node.root_data());
+        errors.extend(
+            self.root().errors().into_iter()
+                .map(|node| ParseError::Unexpected(node.owned()))
+        );
+
+        errors
+    }
+    /// Either return all errors in the tree, or if there are none return self
+    pub fn as_result(self) -> Result<Self, Vec<ParseError>> {
+        let errors = self.errors();
+        if errors.is_empty() {
+            Ok(self)
+        } else {
+            Err(errors)
+        }
+    }
+}
 
 struct Parser<I>
     where I: Iterator<Item = (Token, SmolStr)>
@@ -551,33 +593,53 @@ impl<I> Parser<I>
 }
 
 /// Parse tokens into an AST
-pub fn parse<I>(iter: I) -> Node
+pub fn parse<I>(iter: I) -> AST
     where I: IntoIterator<Item = (Token, SmolStr)>
 {
     let mut parser = Parser::new(iter.into_iter());
     parser.builder.start_internal(NodeType::Marker(ASTKind::Root));
     parser.parse_expr();
+    if parser.peek().is_some() {
+        parser.builder.start_internal(NodeType::Marker(ASTKind::Error));
+        while parser.peek().is_some() {
+            parser.bump();
+        }
+        parser.builder.finish_internal();
+    }
     parser.builder.finish_internal();
-    SyntaxNode::new(parser.builder.finish(), parser.errors)
+    AST {
+        node: SyntaxNode::new(parser.builder.finish(), parser.errors)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use rowan::WalkEvent;
     use std::fmt::Write;
 
-    fn stringify(out: &mut String, indent: usize, node: &Node) {
-        writeln!(out, "{:indent$}{:?}", "", node, indent = indent).unwrap();
-        for child in node.children() {
-            stringify(out, indent+2, &child);
+    fn stringify(node: Node<rowan::RefRoot<Types>>) -> String {
+        let mut out = String::new();
+        let mut indent = 0;
+        for event in node.preorder() {
+            match event {
+                WalkEvent::Enter(node) => {
+                    writeln!(out, "{:indent$}{:?}", "", node, indent = indent).unwrap();
+                    indent += 2;
+                },
+                WalkEvent::Leave(_) =>
+                    indent -= 2
+            }
         }
+        out
     }
 
     macro_rules! assert_eq {
         ([$(($token:expr, $str:expr)),*], $expected:expr) => {
-            let mut actual = String::new();
-            stringify(&mut actual, 0, &parse(vec![$(($token, $str.into())),*]));
+            let parsed = parse(vec![$(($token, $str.into())),*]).as_result().expect("error occured when parsing");
+
+            let actual = stringify(parsed.node().borrowed());
             if actual != $expected {
                 eprintln!("--- Actual ---");
                 eprintln!("{}", actual);
