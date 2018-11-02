@@ -6,9 +6,6 @@ pub mod tokenizer;
 pub mod types;
 pub mod value;
 
-// only `impl`s, no need to expose the module
-//mod display;
-
 use self::{
     parser::AST,
     tokenizer::Tokenizer
@@ -26,6 +23,26 @@ mod tests {
         parse
     };
 
+    fn test(code: &str) {
+        parse(code).as_result().expect("parsing error");
+    }
+
+    #[test]
+    fn all() {
+        test(include_str!("../tests/dynamic-attrs.nix"));
+        //test(include_str!("../tests/error.nix"));
+        test(include_str!("../tests/ifs.nix"));
+        test(include_str!("../tests/inherit.nix"));
+        test(include_str!("../tests/interpolation.nix"));
+        test(include_str!("../tests/isset.nix"));
+        test(include_str!("../tests/lambdas.nix"));
+        test(include_str!("../tests/lists.nix"));
+        test(include_str!("../tests/math.nix"));
+        test(include_str!("../tests/meta.nix"));
+        test(include_str!("../tests/pattern.nix"));
+        test(include_str!("../tests/simple-set.nix"));
+        test(include_str!("../tests/with-import-let-in.nix"));
+    }
     #[test]
     fn interpolation() {
         let ast = parse(include_str!("../tests/interpolation.nix"));
