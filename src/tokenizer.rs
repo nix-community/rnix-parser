@@ -223,12 +223,17 @@ impl<'a> Iterator for Tokenizer<'a> {
             return Some((Token::Comment, self.string_since(start)));
         }
         if self.remaining().starts_with("/*") {
+            self.next().unwrap();
+            self.next().unwrap();
             loop {
                 self.consume(|c| c != '*');
                 self.next(); // consume the '*', if any
-                match self.next() {
+                match self.peek() {
                     None => return Some((Token::Error, self.string_since(start))),
-                    Some('/') => return Some((Token::Comment, self.string_since(start))),
+                    Some('/') => {
+                        self.next().unwrap();
+                        return Some((Token::Comment, self.string_since(start)));
+                    },
                     _ => ()
                 }
             }
@@ -615,6 +620,14 @@ mod tests {
     }
     #[test]
     fn comments() {
+        assert_eq!(
+            tokenize("/**/"),
+            tokens![(Token::Comment, "/**/")]
+        );
+        assert_eq!(
+            tokenize("/***/"),
+            tokens![(Token::Comment, "/***/")]
+        );
         assert_eq!(
             tokenize("{ a = /* multiline * comment */ 123;# single line\n} # single line at the end"),
             tokens![

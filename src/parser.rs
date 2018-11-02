@@ -110,14 +110,15 @@ impl AST {
 
         errors
     }
-    /// Either return all errors in the tree, or if there are none return self
-    pub fn as_result(self) -> Result<Self, Vec<ParseError>> {
-        let errors = self.errors();
-        if errors.is_empty() {
-            Ok(self)
-        } else {
-            Err(errors)
+    /// Either return the first error in the tree, or if there are none return self
+    pub fn as_result(self) -> Result<Self, ParseError> {
+        if let Some(err) = self.node.root_data().first() {
+            return Err(err.clone());
         }
+        if let Some(node) = self.root().errors().first() {
+            return Err(ParseError::Unexpected(node.owned()));
+        }
+        Ok(self)
     }
 }
 
@@ -249,6 +250,10 @@ impl<I> Parser<I>
         } else {
             loop {
                 match self.peek() {
+                    Some(Token::CurlyBClose) => {
+                        self.bump();
+                        break;
+                    },
                     Some(Token::Ellipsis) => {
                         self.bump();
                         self.expect(Token::CurlyBClose);
@@ -1804,6 +1809,28 @@ Marker(Root)@[0; 8)
       Token(CurlyBClose)@[5; 6)
     Token(Colon)@[6; 7)
     Token(Ident)@[7; 8)
+"
+        );
+        assert_eq!(
+            [
+                (Token::CurlyBOpen, "{"),
+                (Token::Ident, "a"),
+                (Token::Comma, ","),
+                (Token::CurlyBClose, "}"),
+                (Token::Colon, ":"),
+                (Token::Ident, "a")
+            ],
+            "\
+Marker(Root)@[0; 6)
+  Marker(Lambda)@[0; 6)
+    Marker(Pattern)@[0; 4)
+      Token(CurlyBOpen)@[0; 1)
+      Marker(PatEntry)@[1; 2)
+        Token(Ident)@[1; 2)
+      Token(Comma)@[2; 3)
+      Token(CurlyBClose)@[3; 4)
+    Token(Colon)@[4; 5)
+    Token(Ident)@[5; 6)
 "
         );
     }
