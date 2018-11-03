@@ -219,7 +219,6 @@ impl<'a> Iterator for Tokenizer<'a> {
 
         if self.peek() == Some('#') {
             self.consume(|c| c != '\n');
-            self.next(); // consume the newline, if any
             return Some((Token::Comment, self.string_since(start)));
         }
         if self.remaining().starts_with("/*") {
@@ -641,7 +640,8 @@ mod tests {
                 (Token::Whitespace, " "),
                 (Token::Value, "123"),
                 (Token::Semicolon, ";"),
-                (Token::Comment, "# single line\n"),
+                (Token::Comment, "# single line"),
+                (Token::Whitespace, "\n"),
                 (Token::CurlyBClose, "}"),
                 (Token::Whitespace, " "),
                 (Token::Comment, "# single line at the end")
