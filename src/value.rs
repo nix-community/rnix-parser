@@ -42,8 +42,8 @@ impl From<String> for Value {
         }
     }
 }
-impl From<&str> for Value {
-    fn from(val: &str) -> Value {
+impl<'a> From<&'a str> for Value {
+    fn from(val: &'a str) -> Value {
         Value::from(String::from(val))
     }
 }

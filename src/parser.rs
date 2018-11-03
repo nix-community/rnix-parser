@@ -451,14 +451,11 @@ impl<I> Parser<I>
             self.next_attr();
             self.builder.finish_internal();
 
-            match self.peek_data() {
-                Some((Token::Ident, s)) if s == OR => {
-                    self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::OrDefault));
-                    self.bump();
-                    self.parse_val();
-                    self.builder.finish_internal();
-                },
-                _ => ()
+            if self.peek_data().map(|&(t, ref s)| t == Token::Ident && s == OR).unwrap_or(false) {
+                self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::OrDefault));
+                self.bump();
+                self.parse_val();
+                self.builder.finish_internal();
             }
         }
     }

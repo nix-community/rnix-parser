@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate failure;
+extern crate rowan;
 
 pub mod parser;
 pub mod tokenizer;

@@ -252,19 +252,21 @@ impl<'a> Iterator for Tokenizer<'a> {
 
         // Check if it's a path
         let store_path = self.peek() == Some('<');
-        let mut lookahead = self.remaining().chars().skip_while(|c| match c {
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' | '+' | '-' => true,
-            '<' | '/' => store_path,
-            _ => false
-        });
-        let kind = match (lookahead.next(), lookahead.next()) {
-            // a//b parses as Merge(a, b)
-            (Some('/'), Some('/')) => None,
-            (Some('/'), Some('*')) => None,
-            (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
-            (Some('>'), _) => Some(IdentType::Store),
-            (Some(':'), Some(c)) if !c.is_whitespace() => Some(IdentType::Uri),
-            _ => None
+        let kind = {
+            let mut lookahead = self.remaining().chars().skip_while(|c| match c {
+                'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' | '+' | '-' => true,
+                '<' | '/' => store_path,
+                _ => false
+            });
+            match (lookahead.next(), lookahead.next()) {
+                // a//b parses as Merge(a, b)
+                (Some('/'), Some('/')) => None,
+                (Some('/'), Some('*')) => None,
+                (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
+                (Some('>'), _) => Some(IdentType::Store),
+                (Some(':'), Some(c)) if !c.is_whitespace() => Some(IdentType::Uri),
+                _ => None
+            }
         };
 
         let c = self.next()?;
@@ -292,9 +294,14 @@ impl<'a> Iterator for Tokenizer<'a> {
                 Some((Token::CurlyBOpen, self.string_since(start)))
             },
             '}' => {
-                if let Some(&mut Context::Interpol { ref mut brackets, string, multiline }) = self.ctx.last_mut() {
+                if let Some(&Context::Interpol { brackets, string, multiline }) = self.ctx.last() {
                     match brackets.checked_sub(1) {
-                        Some(new) => *brackets = new,
+                        // TODO: When NLL comes along (which is soon :D) bind brackets directly above
+                        Some(new) => match self.ctx.last_mut() {
+                            Some(Context::Interpol { ref mut brackets, .. }) =>
+                                *brackets = new,
+                            _ => unreachable!()
+                        }
                         None => {
                             self.ctx.pop().unwrap();
 
