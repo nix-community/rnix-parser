@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate failure;
+extern crate rnix;
+extern crate rowan;
 
 use failure::Error;
 use rnix::{
@@ -24,7 +26,8 @@ fn main() -> Result<(), Error> {
 
     for entry in set.entries() {
         if let Some(lambda) = Lambda::cast(entry.value()) {
-            let ident = entry.key().path().last().and_then(Ident::cast);
+            let attr = entry.key();
+            let ident = attr.path().last().and_then(Ident::cast);
             let s = ident.as_ref().map(Ident::as_str).unwrap_or("error");
             println!("Function name: {}", s);
 

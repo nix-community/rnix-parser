@@ -1,3 +1,6 @@
+extern crate rnix;
+extern crate rowan;
+
 use rowan::WalkEvent;
 use std::{env, fs};
 
