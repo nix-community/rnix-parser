@@ -1,5 +1,7 @@
 //! The types: Such as strings or integers
 
+use crate::tokenizer::Token;
+
 /// An anchor point for a path, such as if it's relative or absolute
 #[derive(Clone, Debug, PartialEq)]
 pub enum Anchor {
@@ -13,10 +15,8 @@ pub enum Anchor {
 /// A value, such as a string or integer
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
-    Bool(bool),
     Float(f64),
     Integer(i64),
-    Null,
     Path(Anchor, String),
     Str {
         multiline: bool,
@@ -24,11 +24,6 @@ pub enum Value {
     }
 }
 
-impl From<bool> for Value {
-    fn from(val: bool) -> Value {
-        Value::Bool(val)
-    }
-}
 impl From<i64> for Value {
     fn from(val: i64) -> Value {
         Value::Integer(val)
@@ -162,90 +157,70 @@ pub fn remove_trailing(string: &mut String) {
 /// An error that occured when parsing a value from a string
 #[derive(Clone, Debug, Fail, PartialEq, Eq)]
 pub enum ValueError {
-    #[fail(display = "parse int error: {}", _0)]
-    ParseFloatError(#[cause] std::num::ParseFloatError),
-    #[fail(display = "parse int error: {}", _0)]
-    ParseIntError(#[cause] std::num::ParseIntError),
-    #[fail(display = "unclosed quote in string")]
-    UnclosedQuote,
-    #[fail(display = "unclosed bracket in store path")]
-    UnclosedStore,
-    #[fail(display = "unknown value")]
+    #[fail(display = "failed to parse float: {}", _0)]
+    Float(#[cause] std::num::ParseFloatError),
+    #[fail(display = "failed to parse int: {}", _0)]
+    Integer(#[cause] std::num::ParseIntError),
+    #[fail(display = "failed to parse string")]
+    String,
+    #[fail(display = "failed to parse store path")]
+    StorePath,
+    #[fail(display = "unknown value kind")]
     Unknown
 }
 impl From<std::num::ParseFloatError> for ValueError {
     fn from(err: std::num::ParseFloatError) -> Self {
-        ValueError::ParseFloatError(err)
+        ValueError::Float(err)
     }
 }
 impl From<std::num::ParseIntError> for ValueError {
     fn from(err: std::num::ParseIntError) -> Self {
-        ValueError::ParseIntError(err)
+        ValueError::Integer(err)
     }
 }
 
-impl std::str::FromStr for Value {
-    type Err = ValueError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "true"  => return Ok(Value::Bool(true)),
-            "false" => return Ok(Value::Bool(false)),
-            "null"  => return Ok(Value::Null),
-            _ => ()
-        }
-        if s.starts_with('"') {
-            let len = s.len();
-            if len <= 2 || !s.ends_with('"') {
-                return Err(ValueError::UnclosedQuote);
-            }
-            let content = unescape(&s[1..len-1], false);
-            return Ok(Value::Str { multiline: false, content });
-        }
-        if s.starts_with("''") {
-            let len = s.len();
-            if len <= 4 || !s.ends_with("''") {
-                return Err(ValueError::UnclosedQuote);
-            }
-            let content = unescape(&s[2..len-2], true);
-            let mut content = remove_common_indent(&content);
-            remove_trailing(&mut content);
-            return Ok(Value::Str { multiline: true, content });
-        }
-        if s.starts_with('<') {
-            let len = s.len();
-            if len < 2 || !s.ends_with('>') {
-                return Err(ValueError::UnclosedStore);
-            }
-            return Ok(Value::Path(Anchor::Store, String::from(&s[1..len-1])))
-        }
-        if s.starts_with("~/") { return Ok(Value::Path(Anchor::Home, String::from(&s[2..]))); }
-        if s.starts_with('/') { return Ok(Value::Path(Anchor::Absolute, String::from(s))); }
-        if s.contains(':') { return Ok(Value::Path(Anchor::Uri, String::from(s))) }
-        if s.contains('/') { return Ok(Value::Path(Anchor::Relative, String::from(s))); }
-
-        let mut num = true;
-        let mut float = false;
-        for c in s.chars() {
-            if c == '.' {
-                if float {
-                    num = false;
-                    break;
+impl Value {
+    /// Parse a token kind and string into a typed value
+    pub fn from_token(token: Token, s: &str) -> Result<Self, ValueError> {
+        match (token, s) {
+            (Token::Float, s) => Ok(Value::Float(s.parse()?)),
+            (Token::Integer, s) => Ok(Value::Integer(s.parse()?)),
+            (Token::Path, s) => if s.starts_with('<') {
+                let len = s.len();
+                if len < 2 || !s.ends_with('>') {
+                    return Err(ValueError::StorePath);
                 }
-                float = true;
-            } else if !c.is_digit(10) {
-                num = false;
-                break;
-            }
-        }
-
-        if num {
-            if float {
-                return Ok(Value::Float(s.parse()?));
+                Ok(Value::Path(Anchor::Store, String::from(&s[1..len-1])))
+            } else if s.starts_with("~/") {
+                Ok(Value::Path(Anchor::Home, String::from(&s[2..])))
+            } else if s.starts_with('/') {
+                Ok(Value::Path(Anchor::Absolute, String::from(s)))
+            } else if s.contains(':') {
+                Ok(Value::Path(Anchor::Uri, String::from(s)))
             } else {
-                return Ok(Value::Integer(s.parse()?));
-            }
+                Ok(Value::Path(Anchor::Relative, String::from(s)))
+            },
+            (Token::String, s) => if s.starts_with('"') {
+                let len = s.len();
+                if len <= 2 || !s.ends_with('"') {
+                    return Err(ValueError::String);
+                }
+                let content = unescape(&s[1..len-1], false);
+                Ok(Value::Str { multiline: false, content })
+            } else if s.starts_with("''") {
+                let len = s.len();
+                if len <= 4 || !s.ends_with("''") {
+                    return Err(ValueError::String);
+                }
+                let content = unescape(&s[2..len-2], true);
+                let mut content = remove_common_indent(&content);
+                remove_trailing(&mut content);
+                Ok(Value::Str { multiline: true, content })
+            } else {
+                Err(ValueError::String)
+            },
+            _ => Err(ValueError::Unknown)
         }
-        Err(ValueError::Unknown)
     }
 }
 
@@ -294,20 +269,16 @@ mod tests {
     }
     #[test]
     fn values() {
-        assert_eq!("false".parse(), Ok(Value::Bool(false)));
-        assert_eq!("true".parse(), Ok(Value::Bool(true)));
-        assert_eq!("null".parse(), Ok(Value::Null));
+        assert_eq!(Value::from_token(Token::String, r#""\"""#), Ok(Value::Str { multiline: false, content: "\"".into() }));
+        assert_eq!(Value::from_token(Token::String, "'''''''"), Ok(Value::Str { multiline: true, content: "''".into() }));
 
-        assert_eq!(r#""\"""#.parse(), Ok(Value::Str { multiline: false, content: "\"".into() }));
-        assert_eq!("'''''''".parse(), Ok(Value::Str { multiline: true, content: "''".into() }));
+        assert_eq!(Value::from_token(Token::Path, "<nixpkgs>"), Ok(Value::Path(Anchor::Store, "nixpkgs".into())));
+        assert_eq!(Value::from_token(Token::Path, "~/path/to/thing"), Ok(Value::Path(Anchor::Home, "path/to/thing".into())));
+        assert_eq!(Value::from_token(Token::Path, "/path/to/thing"), Ok(Value::Path(Anchor::Absolute, "/path/to/thing".into())));
+        assert_eq!(Value::from_token(Token::Path, "path/to/thing"), Ok(Value::Path(Anchor::Relative, "path/to/thing".into())));
+        assert_eq!(Value::from_token(Token::Path, "https:path"), Ok(Value::Path(Anchor::Uri, "https:path".into())));
 
-        assert_eq!("<nixpkgs>".parse(), Ok(Value::Path(Anchor::Store, "nixpkgs".into())));
-        assert_eq!("~/path/to/thing".parse(), Ok(Value::Path(Anchor::Home, "path/to/thing".into())));
-        assert_eq!("/path/to/thing".parse(), Ok(Value::Path(Anchor::Absolute, "/path/to/thing".into())));
-        assert_eq!("path/to/thing".parse(), Ok(Value::Path(Anchor::Relative, "path/to/thing".into())));
-        assert_eq!("https:path".parse(), Ok(Value::Path(Anchor::Uri, "https:path".into())));
-
-        assert_eq!("123".parse(), Ok(Value::Integer(123)));
-        assert_eq!("1.234".parse(), Ok(Value::Float(1.234)));
+        assert_eq!(Value::from_token(Token::Integer, "123"), Ok(Value::Integer(123)));
+        assert_eq!(Value::from_token(Token::Float, "1.234"), Ok(Value::Float(1.234)));
     }
 }

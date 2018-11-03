@@ -21,12 +21,9 @@ pub enum Token {
     Assert,
     Else,
     If,
-    Import,
     In,
     Inherit,
     Let,
-    // or, for some reason, is also a valid identifier
-    // OrDefault,
     Rec,
     Then,
     With,
@@ -70,13 +67,23 @@ pub enum Token {
     // Identifiers and values
     DynamicEnd,
     DynamicStart,
+    Float,
     Ident,
+    Integer,
     InterpolEnd,
     InterpolEndStart,
     InterpolStart,
-    Value
+    Path,
+    String
 }
 impl Token {
+    /// Returns true if this token is a value, such as an integer or a string
+    pub fn is_value(self) -> bool {
+        match self {
+            Token::Float | Token::Integer | Token::Path | Token::String => true,
+            _ => false
+        }
+    }
     /// Returns true if this token should be used as a function argument.
     /// ```ignore
     /// Example:
@@ -90,8 +97,8 @@ impl Token {
     pub fn is_fn_arg(self) -> bool {
         match self {
             Token::Rec | Token::CurlyBOpen | Token::SquareBOpen | Token::ParenOpen
-                | Token::Ident | Token::Value | Token::InterpolStart => true,
-            _ => false
+                | Token::InterpolStart | Token::Ident => true,
+            _ => self.is_value()
         }
     }
     /// Returns true if this token is a comment, whitespace, or similar, and
@@ -174,7 +181,7 @@ impl<'a> Tokenizer<'a> {
         loop {
             match self.next() {
                 None => return Token::Error,
-                Some('"') if !multiline => return Token::Value,
+                Some('"') if !multiline => return Token::String,
                 Some('\\') if !multiline => match self.next() {
                     None => return Token::Error,
                     Some(_) => ()
@@ -184,7 +191,7 @@ impl<'a> Tokenizer<'a> {
                     None => return Token::Error,
                     Some('\'') => match self.peek() {
                         Some('\'') | Some('\\') | Some('$') => { self.next().unwrap(); },
-                        _ => return Token::Value
+                        _ => return Token::String
                     },
                     Some(_) => ()
                 },
@@ -271,7 +278,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             if ident.ends_with('/') {
                 return Some((Token::Error, ident));
             }
-            return Some((Token::Value, ident));
+            return Some((Token::Path, ident));
         }
 
         match c {
@@ -293,7 +300,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 
                             if string {
                                 return Some((match self.next_string(multiline) {
-                                    Token::Value => Token::InterpolEnd,
+                                    Token::String => Token::InterpolEnd,
                                     Token::InterpolStart => Token::InterpolEndStart,
                                     token => unreachable!("unexpected value from next_string: {:?}", token)
                                 }, self.string_since(start)));
@@ -328,7 +335,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 if self.next() != Some('>') {
                     return Some((Token::Error, self.string_since(start)));
                 }
-                Some((Token::Value, self.string_since(start)))
+                Some((Token::Path, self.string_since(start)))
             },
             '&' if self.peek() == Some('&') => { self.next().unwrap(); Some((Token::And, self.string_since(start))) },
             '|' if self.peek() == Some('|') => { self.next().unwrap(); Some((Token::Or, self.string_since(start))) },
@@ -365,19 +372,16 @@ impl<'a> Iterator for Tokenizer<'a> {
                         "assert" => Token::Assert,
                         "else" => Token::Else,
                         "if" => Token::If,
-                        "import" => Token::Import,
                         "in" => Token::In,
                         "inherit" => Token::Inherit,
                         "let" => Token::Let,
                         "rec" => Token::Rec,
                         "then" => Token::Then,
                         "with" => Token::With,
-
-                        "true" | "false" | "null" => Token::Value,
                         _ => Token::Ident,
                     }, ident))
                 } else {
-                    Some((Token::Value, ident))
+                    Some((Token::Path, ident))
                 }
             },
             '"' => Some((self.next_string(false), self.string_since(start))),
@@ -392,9 +396,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                     if self.consume(|c| c >= '0' && c <= '9') == 0 {
                         return Some((Token::Error, self.string_since(start)));
                     }
+                    Some((Token::Float, self.string_since(start)))
+                } else {
+                    Some((Token::Integer, self.string_since(start)))
                 }
-
-                Some((Token::Value, self.string_since(start)))
             },
             _ => Some((Token::Error, self.string_since(start)))
         }
@@ -427,7 +432,7 @@ mod tests {
                (Token::Whitespace, " "),
                (Token::Assign, "="),
                (Token::Whitespace, " "),
-               (Token::Value, "42"),
+               (Token::Integer, "42"),
                (Token::Semicolon, ";"),
                (Token::Whitespace, " "),
                (Token::CurlyBClose, "}")
@@ -445,7 +450,7 @@ mod tests {
                (Token::Whitespace, " "),
                (Token::Assign, "="),
                (Token::Whitespace, " "),
-               (Token::Value, "1.234"),
+               (Token::Float, "1.234"),
                (Token::Semicolon, ";"),
                (Token::Whitespace, " "),
                (Token::CurlyBClose, "}")
@@ -463,7 +468,7 @@ mod tests {
                (Token::Whitespace, " "),
                (Token::Assign, "="),
                (Token::Whitespace, " "),
-               (Token::Value, r#""Hello \"World\"""#),
+               (Token::String, r#""Hello \"World\"""#),
                (Token::Semicolon, ";"),
                (Token::Whitespace, " "),
                (Token::CurlyBClose, "}")
@@ -492,7 +497,7 @@ mod tests {
                (Token::Whitespace, " "),
                (Token::Assign, "="),
                (Token::Whitespace, " "),
-               (Token::Value, r#"''
+               (Token::String, r#"''
             
                   
         This is a multiline string :D
@@ -514,7 +519,7 @@ mod tests {
             tokenize(r#" "$${test}" "#),
             tokens![
                 (Token::Whitespace, " "),
-                (Token::Value, r#""$${test}""#),
+                (Token::String, r#""$${test}""#),
                 (Token::Whitespace, " ")
             ]
         );
@@ -522,7 +527,7 @@ mod tests {
             tokenize(r#" ''$${test}'' "#),
             tokens![
                 (Token::Whitespace, " "),
-                (Token::Value, r#"''$${test}''"#),
+                (Token::String, r#"''$${test}''"#),
                 (Token::Whitespace, " ")
             ]
         );
@@ -541,7 +546,7 @@ mod tests {
                     (Token::Whitespace, " "),
                     (Token::Assign, "="),
                     (Token::Whitespace, " "),
-                    (Token::Value, r#""World""#),
+                    (Token::String, r#""World""#),
                     (Token::Semicolon, ";"),
                     (Token::Whitespace, " "),
                     (Token::CurlyBClose, "}"),
@@ -638,7 +643,7 @@ mod tests {
                 (Token::Whitespace, " "),
                 (Token::Comment, "/* multiline * comment */"),
                 (Token::Whitespace, " "),
-                (Token::Value, "123"),
+                (Token::Integer, "123"),
                 (Token::Semicolon, ";"),
                 (Token::Comment, "# single line"),
                 (Token::Whitespace, "\n"),
@@ -653,31 +658,31 @@ mod tests {
         assert_eq!(
             tokenize("1 + 2 * 3"),
             tokens![
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
                 (Token::Whitespace, " "),
                 (Token::Add, "+"),
                 (Token::Whitespace, " "),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::Whitespace, " "),
                 (Token::Mul, "*"),
                 (Token::Whitespace, " "),
-                (Token::Value, "3")
+                (Token::Integer, "3")
             ]
         );
         assert_eq!(
             tokenize("5 * -(3 - 2)"),
             tokens![
-                (Token::Value, "5"),
+                (Token::Integer, "5"),
                 (Token::Whitespace, " "),
                 (Token::Mul, "*"),
                 (Token::Whitespace, " "),
                 (Token::Sub, "-"),
                 (Token::ParenOpen, "("),
-                (Token::Value, "3"),
+                (Token::Integer, "3"),
                 (Token::Whitespace, " "),
                 (Token::Sub, "-"),
                 (Token::Whitespace, " "),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::ParenClose, ")")
             ]
         );
@@ -687,7 +692,7 @@ mod tests {
                 (Token::Ident, "a"),
                 (Token::Div, "/"),
                 (Token::Whitespace, " "),
-                (Token::Value, "3")
+                (Token::Integer, "3")
             ]
         );
     }
@@ -702,7 +707,7 @@ mod tests {
                 (Token::Whitespace, " "),
                 (Token::Assign, "="),
                 (Token::Whitespace, " "),
-                (Token::Value, "3"),
+                (Token::Integer, "3"),
                 (Token::Semicolon, ";"),
                 (Token::Whitespace, " "),
                 (Token::In, "in"),
@@ -728,7 +733,7 @@ mod tests {
     #[test]
     fn paths() {
         fn path(path: &str) -> Vec<(Token, SmolStr)> {
-            tokens![(Token::Value, path)]
+            tokens![(Token::Path, path)]
         }
         assert_eq!(tokenize("/hello/world"),  path("/hello/world"));
         assert_eq!(tokenize("hello/world"),   path("hello/world"));
@@ -743,17 +748,6 @@ mod tests {
         );
     }
     #[test]
-    fn import() {
-        assert_eq!(
-            tokenize("import <nixpkgs>"),
-            tokens![
-                (Token::Import, "import"),
-                (Token::Whitespace, " "),
-                (Token::Value, "<nixpkgs>")
-            ]
-        );
-    }
-    #[test]
     fn list() {
         assert_eq!(
             tokenize(r#"[a 2 3 "lol"]"#),
@@ -761,11 +755,11 @@ mod tests {
                 (Token::SquareBOpen, "["),
                 (Token::Ident, "a"),
                 (Token::Whitespace, " "),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::Whitespace, " "),
-                (Token::Value, "3"),
+                (Token::Integer, "3"),
                 (Token::Whitespace, " "),
-                (Token::Value, r#""lol""#),
+                (Token::String, r#""lol""#),
                 (Token::SquareBClose, "]")
             ]
         );
@@ -773,25 +767,25 @@ mod tests {
             tokenize("[1] ++ [2] ++ [3]"),
             tokens![
                 (Token::SquareBOpen, "["),
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
                 (Token::SquareBClose, "]"),
                 (Token::Whitespace, " "),
                 (Token::Concat, "++"),
                 (Token::Whitespace, " "),
                 (Token::SquareBOpen, "["),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::SquareBClose, "]"),
                 (Token::Whitespace, " "),
                 (Token::Concat, "++"),
                 (Token::Whitespace, " "),
                 (Token::SquareBOpen, "["),
-                (Token::Value, "3"),
+                (Token::Integer, "3"),
                 (Token::SquareBClose, "]")
             ]
         );
     }
     #[test]
-    fn functions() {
+    fn lambda() {
         assert_eq!(
             tokenize("a: b: a + b"),
             tokens![
@@ -823,7 +817,7 @@ mod tests {
                 (Token::Whitespace, " "),
                 (Token::Question, "?"),
                 (Token::Whitespace, " "),
-                (Token::Value, r#""default""#),
+                (Token::String, r#""default""#),
                 (Token::Comma, ","),
                 (Token::Whitespace, " "),
                 (Token::Ellipsis, "..."),
@@ -852,82 +846,82 @@ mod tests {
         assert_eq!(
             tokenize("false -> !false && false == true || true"),
             tokens![
-                (Token::Value, "false"),
+                (Token::Ident, "false"),
                 (Token::Whitespace, " "),
                 (Token::Implication, "->"),
                 (Token::Whitespace, " "),
                 (Token::Invert, "!"),
-                (Token::Value, "false"),
+                (Token::Ident, "false"),
                 (Token::Whitespace, " "),
                 (Token::And, "&&"),
                 (Token::Whitespace, " "),
-                (Token::Value, "false"),
+                (Token::Ident, "false"),
                 (Token::Whitespace, " "),
                 (Token::Equal, "=="),
                 (Token::Whitespace, " "),
-                (Token::Value, "true"),
+                (Token::Ident, "true"),
                 (Token::Whitespace, " "),
                 (Token::Or, "||"),
                 (Token::Whitespace, " "),
-                (Token::Value, "true")
+                (Token::Ident, "true")
             ]
         );
         assert_eq!(
             tokenize("1 < 2 && 2 <= 2 && 2 > 1 && 2 >= 2"),
             tokens![
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
                 (Token::Whitespace, " "),
                 (Token::Less, "<"),
                 (Token::Whitespace, " "),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
 
                 (Token::Whitespace, " "),
                 (Token::And, "&&"),
                 (Token::Whitespace, " "),
 
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::Whitespace, " "),
                 (Token::LessOrEq, "<="),
                 (Token::Whitespace, " "),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
 
                 (Token::Whitespace, " "),
                 (Token::And, "&&"),
                 (Token::Whitespace, " "),
 
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::Whitespace, " "),
                 (Token::More, ">"),
                 (Token::Whitespace, " "),
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
 
                 (Token::Whitespace, " "),
                 (Token::And, "&&"),
                 (Token::Whitespace, " "),
 
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::Whitespace, " "),
                 (Token::MoreOrEq, ">="),
                 (Token::Whitespace, " "),
-                (Token::Value, "2")
+                (Token::Integer, "2")
             ]
         );
         assert_eq!(
             tokenize("1 == 1 && 2 != 3"),
             tokens![
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
                 (Token::Whitespace, " "),
                 (Token::Equal, "=="),
                 (Token::Whitespace, " "),
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
                 (Token::Whitespace, " "),
                 (Token::And, "&&"),
                 (Token::Whitespace, " "),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::Whitespace, " "),
                 (Token::NotEqual, "!="),
                 (Token::Whitespace, " "),
-                (Token::Value, "3")
+                (Token::Integer, "3")
             ]
         );
         assert_eq!(
@@ -935,25 +929,25 @@ mod tests {
             tokens![
                 (Token::If, "if"),
                 (Token::Whitespace, " "),
-                (Token::Value, "false"),
+                (Token::Ident, "false"),
                 (Token::Whitespace, " "),
                 (Token::Then, "then"),
                     (Token::Whitespace, " "),
-                    (Token::Value, "1"),
+                    (Token::Integer, "1"),
                 (Token::Whitespace, " "),
                 (Token::Else, "else"),
                     (Token::Whitespace, " "),
                     (Token::If, "if"),
                     (Token::Whitespace, " "),
-                    (Token::Value, "true"),
+                    (Token::Ident, "true"),
                     (Token::Whitespace, " "),
                     (Token::Then, "then"),
                         (Token::Whitespace, " "),
-                        (Token::Value, "2"),
+                        (Token::Integer, "2"),
                     (Token::Whitespace, " "),
                     (Token::Else, "else"),
                         (Token::Whitespace, " "),
-                        (Token::Value, "3")
+                        (Token::Integer, "3")
             ]
         );
         assert_eq!(

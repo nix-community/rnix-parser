@@ -8,21 +8,25 @@ use crate::{
 
 use rowan::{SmolStr, WalkEvent};
 
+fn cast_into<R: rowan::TreeRoot<Types>>(from: Node<R>, kind: NodeType) -> Option<Node<R>> {
+    if from.kind() == kind {
+        Some(from)
+    } else {
+        None
+    }
+}
+
 macro_rules! typed {
     ($($kind:expr => $name:ident$(: $trait:ident)*$(: { $($block:tt)* })*),*) => {
         $(
             pub struct $name<R: rowan::TreeRoot<Types>>(Node<R>);
 
             impl<R: rowan::TreeRoot<Types>> TypedNode<R> for $name<R> {
-                type Target = Self;
-                fn cast(from: Node<R>) -> Option<Self::Target> {
+                fn cast(from: Node<R>) -> Option<Self> {
                     cast_into(from, $kind.into()).map($name)
                 }
                 fn node(&self) -> &Node<R> {
                     &self.0
-                }
-                fn into_node(self) -> Node<R> {
-                    self.0
                 }
             }
             $(impl<R: rowan::TreeRoot<Types>> $trait<R> for $name<R> {})*
@@ -114,15 +118,12 @@ pub enum InterpolPart<R: rowan::TreeRoot<Types>> {
 
 /// A TypedNode is simply a wrapper around an untyped node to provide a type
 /// system in some sense.
-pub trait TypedNode<R: rowan::TreeRoot<Types>> {
-    type Target;
+pub trait TypedNode<R: rowan::TreeRoot<Types>> where Self: Sized {
     /// Cast an untyped node into this strongly-typed node. This will return
     /// None if the type was not correct.
-    fn cast(from: Node<R>) -> Option<Self::Target>;
+    fn cast(from: Node<R>) -> Option<Self>;
     /// Return a reference to the inner untyped node
     fn node(&self) -> &Node<R>;
-    /// Return the inner untyped node
-    fn into_node(self) -> Node<R>;
     /// Return all non-trivia (so no comments, whitespace, errors) children
     fn children<'a>(&'a self) -> Box<Iterator<Item = Node<R>> + 'a>
         where R: 'a
@@ -183,11 +184,31 @@ pub trait LightWrapper<R: rowan::TreeRoot<Types>>: TypedNode<R> {
     }
 }
 
-fn cast_into<R: rowan::TreeRoot<Types>>(from: Node<R>, kind: NodeType) -> Option<Node<R>> {
-    if from.kind() == kind {
-        Some(from)
-    } else {
-        None
+pub struct Value<R: rowan::TreeRoot<Types>>(Node<R>);
+impl<R: rowan::TreeRoot<Types>> TypedNode<R> for Value<R> {
+    fn cast(from: Node<R>) -> Option<Self> {
+        match from.kind() {
+            NodeType::Token(t) if t.is_value() => Some(Value(from)),
+            _ => None
+        }
+    }
+    fn node(&self) -> &Node<R> {
+        &self.0
+    }
+}
+impl<R: rowan::TreeRoot<Types>> Value<R> {
+    /// Return the value as a string
+    pub fn as_str(&self) -> &str {
+        self.node().borrowed().leaf_text().map(SmolStr::as_str).expect("invalid ast")
+    }
+
+    /// Parse the value
+    pub fn to_value(&self) -> Result<ParsedValue, ValueError> {
+        let token = match self.0.kind() {
+            NodeType::Token(token) => token,
+            NodeType::Marker(_) => panic!("invalid value somehow constructed")
+        };
+        ParsedValue::from_token(token, self.as_str())
     }
 }
 
@@ -196,17 +217,6 @@ typed! [
         /// Return the identifier as a string
         pub fn as_str(&self) -> &str {
             self.node().borrowed().leaf_text().map(SmolStr::as_str).expect("invalid ast")
-        }
-    },
-    Token::Value => Value: {
-        /// Return the value as a string
-        pub fn as_str(&self) -> &str {
-            self.node().borrowed().leaf_text().map(SmolStr::as_str).expect("invalid ast")
-        }
-
-        /// Parse the value
-        pub fn to_value(&self) -> Result<ParsedValue, ValueError> {
-            self.as_str().parse()
         }
     },
 
@@ -250,12 +260,6 @@ typed! [
         /// Return the else body
         pub fn else_body(&self) -> Node<R> {
             nth!(self; 5)
-        }
-    },
-    ASTKind::Import => Import: {
-        /// Return the value being imported
-        pub fn value(&self) -> Node<R> {
-            nth!(self; 1)
         }
     },
     ASTKind::IndexSet => IndexSet: {

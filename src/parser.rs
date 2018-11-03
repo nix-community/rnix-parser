@@ -29,7 +29,6 @@ pub enum ASTKind {
     Dynamic,
     Error,
     IfElse,
-    Import,
     IndexSet,
     Inherit,
     InheritFrom,
@@ -227,7 +226,7 @@ impl<I> Parser<I>
         match self.peek() {
             Some(Token::DynamicStart) => self.parse_dynamic(),
             Some(Token::InterpolStart) => self.parse_interpol(),
-            Some(Token::Value) => self.bump(),
+            Some(Token::String) => self.bump(),
             _ => self.expect(Token::Ident)
         }
     }
@@ -343,12 +342,6 @@ impl<I> Parser<I>
                 self.bump();
                 self.builder.finish_internal();
             },
-            Some(Token::Import) => {
-                self.builder.start_internal(NodeType::Marker(ASTKind::Import));
-                self.bump();
-                self.parse_val();
-                self.builder.finish_internal();
-            },
             Some(Token::Rec) => {
                 self.builder.start_internal(NodeType::Marker(ASTKind::Set));
                 self.bump();
@@ -415,7 +408,7 @@ impl<I> Parser<I>
             },
             Some(Token::DynamicStart) => self.parse_dynamic(),
             Some(Token::InterpolStart) => self.parse_interpol(),
-            Some(Token::Value) => self.bump(),
+            Some(t) if t.is_value() => self.bump(),
             Some(Token::Ident) => {
                 let checkpoint = self.builder.checkpoint();
                 self.bump();
@@ -667,14 +660,14 @@ mod tests {
                 (Token::Whitespace, " "),
                 (Token::Assign, "="),
                 (Token::Whitespace, " "),
-                (Token::Value, "42"),
+                (Token::Integer, "42"),
                 (Token::Semicolon, ";"),
 
                 (Token::Ident, "H4X0RNUM83R"),
                 (Token::Whitespace, " "),
                 (Token::Assign, "="),
                 (Token::Whitespace, " "),
-                (Token::Value, "1.337"),
+                (Token::Float, "1.337"),
                 (Token::Semicolon, ";"),
 
                 (Token::Whitespace, " "),
@@ -691,7 +684,7 @@ Marker(Root)@[0; 45)
         Token(Whitespace)@[17; 18)
       Token(Assign)@[18; 19)
       Token(Whitespace)@[19; 20)
-      Token(Value)@[20; 22)
+      Token(Integer)@[20; 22)
       Token(Semicolon)@[22; 23)
     Marker(SetEntry)@[23; 43)
       Marker(Attribute)@[23; 35)
@@ -699,7 +692,7 @@ Marker(Root)@[0; 45)
         Token(Whitespace)@[34; 35)
       Token(Assign)@[35; 36)
       Token(Whitespace)@[36; 37)
-      Token(Value)@[37; 42)
+      Token(Float)@[37; 42)
       Token(Semicolon)@[42; 43)
     Token(Whitespace)@[43; 44)
     Token(CurlyBClose)@[44; 45)
@@ -711,7 +704,7 @@ Marker(Root)@[0; 45)
                 (Token::CurlyBOpen, "{"),
                 (Token::Ident, "test"),
                 (Token::Assign, "="),
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
                 (Token::Semicolon, ";"),
                 (Token::CurlyBClose, "}")
             ],
@@ -724,7 +717,7 @@ Marker(Root)@[0; 12)
       Marker(Attribute)@[4; 8)
         Token(Ident)@[4; 8)
       Token(Assign)@[8; 9)
-      Token(Value)@[9; 10)
+      Token(Integer)@[9; 10)
       Token(Semicolon)@[10; 11)
     Token(CurlyBClose)@[11; 12)
 "
@@ -749,7 +742,7 @@ Marker(Root)@[0; 2)
                     (Token::Dot, "."),
                     (Token::Ident, "b"),
                 (Token::Assign, "="),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::Semicolon, ";"),
 
                 (Token::InterpolStart, "\"${"),
@@ -760,7 +753,7 @@ Marker(Root)@[0; 2)
                         (Token::Ident, "d"),
                     (Token::DynamicEnd, "${"),
                 (Token::Assign, "="),
-                (Token::Value, "3"),
+                (Token::Integer, "3"),
                 (Token::Semicolon, ";"),
 
                 (Token::CurlyBClose, "}")
@@ -775,7 +768,7 @@ Marker(Root)@[0; 23)
         Token(Dot)@[2; 3)
         Token(Ident)@[3; 4)
       Token(Assign)@[4; 5)
-      Token(Value)@[5; 6)
+      Token(Integer)@[5; 6)
       Token(Semicolon)@[6; 7)
     Marker(SetEntry)@[7; 22)
       Marker(Attribute)@[7; 19)
@@ -792,7 +785,7 @@ Marker(Root)@[0; 23)
           Token(Ident)@[16; 17)
           Token(DynamicEnd)@[17; 19)
       Token(Assign)@[19; 20)
-      Token(Value)@[20; 21)
+      Token(Integer)@[20; 21)
       Token(Semicolon)@[21; 22)
     Token(CurlyBClose)@[22; 23)
 "
@@ -802,64 +795,64 @@ Marker(Root)@[0; 23)
     fn math() {
         assert_eq!(
             [
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
                 (Token::Whitespace, " "),
                 (Token::Add, "+"),
                 (Token::Whitespace, " "),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::Whitespace, " "),
                 (Token::Add, "+"),
                 (Token::Whitespace, " "),
-                (Token::Value, "3"),
+                (Token::Integer, "3"),
                 (Token::Whitespace, " "),
                 (Token::Mul, "*"),
                 (Token::Whitespace, " "),
-                (Token::Value, "4")
+                (Token::Integer, "4")
             ],
             "\
 Marker(Root)@[0; 13)
   Marker(Operation)@[0; 13)
     Marker(Operation)@[0; 6)
-      Token(Value)@[0; 1)
+      Token(Integer)@[0; 1)
       Token(Whitespace)@[1; 2)
       Token(Add)@[2; 3)
       Token(Whitespace)@[3; 4)
-      Token(Value)@[4; 5)
+      Token(Integer)@[4; 5)
       Token(Whitespace)@[5; 6)
     Token(Add)@[6; 7)
     Marker(Operation)@[7; 13)
       Token(Whitespace)@[7; 8)
-      Token(Value)@[8; 9)
+      Token(Integer)@[8; 9)
       Token(Whitespace)@[9; 10)
       Token(Mul)@[10; 11)
       Token(Whitespace)@[11; 12)
-      Token(Value)@[12; 13)
+      Token(Integer)@[12; 13)
 "
         );
         assert_eq!(
             [
-                (Token::Value, "5"),
+                (Token::Integer, "5"),
                 (Token::Mul, "*"),
                 (Token::Sub, "-"),
                 (Token::ParenOpen, "("),
-                (Token::Value, "3"),
+                (Token::Integer, "3"),
                 (Token::Sub, "-"),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::ParenClose, ")")
             ],
             "\
 Marker(Root)@[0; 8)
   Marker(Operation)@[0; 8)
-    Token(Value)@[0; 1)
+    Token(Integer)@[0; 1)
     Token(Mul)@[1; 2)
     Marker(Unary)@[2; 8)
       Token(Sub)@[2; 3)
       Marker(Paren)@[3; 8)
         Token(ParenOpen)@[3; 4)
         Marker(Operation)@[4; 7)
-          Token(Value)@[4; 5)
+          Token(Integer)@[4; 5)
           Token(Sub)@[5; 6)
-          Token(Value)@[6; 7)
+          Token(Integer)@[6; 7)
         Token(ParenClose)@[7; 8)
 "
         );
@@ -874,7 +867,7 @@ Marker(Root)@[0; 8)
                     (Token::Whitespace, " "),
                     (Token::Assign, "="),
                     (Token::Whitespace, " "),
-                    (Token::Value, "42"),
+                    (Token::Integer, "42"),
                     (Token::Semicolon, ";"),
                 (Token::Whitespace, " "),
                 (Token::In, "in"),
@@ -892,7 +885,7 @@ Marker(Root)@[0; 16)
         Token(Whitespace)@[5; 6)
       Token(Assign)@[6; 7)
       Token(Whitespace)@[7; 8)
-      Token(Value)@[8; 10)
+      Token(Integer)@[8; 10)
       Token(Semicolon)@[10; 11)
     Token(Whitespace)@[11; 12)
     Token(In)@[12; 14)
@@ -909,7 +902,7 @@ Marker(Root)@[0; 16)
                 (Token::CurlyBOpen, "{"),
                     (Token::Ident, "a"),
                         (Token::Assign, "="),
-                        (Token::Value, "42"),
+                        (Token::Integer, "42"),
                         (Token::Semicolon, ";"),
                     (Token::Ident, "body"),
                         (Token::Assign, "="),
@@ -926,7 +919,7 @@ Marker(Root)@[0; 17)
       Marker(Attribute)@[4; 5)
         Token(Ident)@[4; 5)
       Token(Assign)@[5; 6)
-      Token(Value)@[6; 8)
+      Token(Integer)@[6; 8)
       Token(Semicolon)@[8; 9)
     Marker(SetEntry)@[9; 16)
       Marker(Attribute)@[9; 13)
@@ -951,7 +944,7 @@ Marker(Root)@[0; 17)
                     (Token::Whitespace, " "),
                     (Token::Assign, "="),
                     (Token::Whitespace, " "),
-                    (Token::Value, r#""World""#),
+                    (Token::String, r#""World""#),
                     (Token::Semicolon, ";"),
                     (Token::Whitespace, " "),
                     (Token::CurlyBClose, "}"),
@@ -979,7 +972,7 @@ Marker(Root)@[0; 43)
               Token(Whitespace)@[19; 20)
             Token(Assign)@[20; 21)
             Token(Whitespace)@[21; 22)
-            Token(Value)@[22; 29)
+            Token(String)@[22; 29)
             Token(Semicolon)@[29; 30)
           Token(Whitespace)@[30; 31)
           Token(CurlyBClose)@[31; 32)
@@ -1078,7 +1071,7 @@ Marker(Root)@[0; 5)
                         (Token::Dot, "."),
                         (Token::Ident, "c"),
                     (Token::Assign, "="),
-                    (Token::Value, "1"),
+                    (Token::Integer, "1"),
                     (Token::Semicolon, ";"),
                 (Token::CurlyBClose, "}")
             ],
@@ -1094,7 +1087,7 @@ Marker(Root)@[0; 10)
         Token(Dot)@[4; 5)
         Token(Ident)@[5; 6)
       Token(Assign)@[6; 7)
-      Token(Value)@[7; 8)
+      Token(Integer)@[7; 8)
       Token(Semicolon)@[8; 9)
     Token(CurlyBClose)@[9; 10)
 "
@@ -1103,7 +1096,7 @@ Marker(Root)@[0; 10)
             [
                 (Token::Ident, "test"),
                     (Token::Dot, "."),
-                    (Token::Value, "invalid ident"),
+                    (Token::String, "\"invalid ident\""),
                     (Token::Dot, "."),
                     (Token::InterpolStart, "\"${"),
                         (Token::Ident, "hi"),
@@ -1114,26 +1107,26 @@ Marker(Root)@[0; 10)
                     (Token::DynamicEnd, "}")
             ],
             "\
-Marker(Root)@[0; 31)
-  Marker(IndexSet)@[0; 31)
-    Marker(IndexSet)@[0; 26)
-      Marker(IndexSet)@[0; 18)
+Marker(Root)@[0; 33)
+  Marker(IndexSet)@[0; 33)
+    Marker(IndexSet)@[0; 28)
+      Marker(IndexSet)@[0; 20)
         Token(Ident)@[0; 4)
         Token(Dot)@[4; 5)
-        Token(Value)@[5; 18)
-      Token(Dot)@[18; 19)
-      Marker(Interpol)@[19; 26)
-        Marker(InterpolLiteral)@[19; 22)
-          Token(InterpolStart)@[19; 22)
-        Marker(InterpolAst)@[22; 24)
-          Token(Ident)@[22; 24)
-        Marker(InterpolLiteral)@[24; 26)
-          Token(InterpolEnd)@[24; 26)
-    Token(Dot)@[26; 27)
-    Marker(Dynamic)@[27; 31)
-      Token(DynamicStart)@[27; 29)
-      Token(Ident)@[29; 30)
-      Token(DynamicEnd)@[30; 31)
+        Token(String)@[5; 20)
+      Token(Dot)@[20; 21)
+      Marker(Interpol)@[21; 28)
+        Marker(InterpolLiteral)@[21; 24)
+          Token(InterpolStart)@[21; 24)
+        Marker(InterpolAst)@[24; 26)
+          Token(Ident)@[24; 26)
+        Marker(InterpolLiteral)@[26; 28)
+          Token(InterpolEnd)@[26; 28)
+    Token(Dot)@[28; 29)
+    Marker(Dynamic)@[29; 33)
+      Token(DynamicStart)@[29; 31)
+      Token(Ident)@[31; 32)
+      Token(DynamicEnd)@[32; 33)
 "
         );
     }
@@ -1143,9 +1136,9 @@ Marker(Root)@[0; 31)
             [
                 (Token::Ident, "a"),
                 (Token::Question, "?"),
-                (Token::Value, "\"b\""),
+                (Token::String, "\"b\""),
                 (Token::And, "&&"),
-                (Token::Value, "true")
+                (Token::Ident, "true")
             ],
             "\
 Marker(Root)@[0; 11)
@@ -1153,9 +1146,9 @@ Marker(Root)@[0; 11)
     Marker(Operation)@[0; 5)
       Token(Ident)@[0; 1)
       Token(Question)@[1; 2)
-      Token(Value)@[2; 5)
+      Token(String)@[2; 5)
     Token(And)@[5; 7)
-    Token(Value)@[7; 11)
+    Token(Ident)@[7; 11)
 "
         );
         assert_eq!(
@@ -1166,9 +1159,9 @@ Marker(Root)@[0; 11)
                     (Token::Dot, "."),
                     (Token::Ident, "c"),
                 (Token::Ident, OR),
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
                 (Token::Add, "+"),
-                (Token::Value, "1")
+                (Token::Integer, "1")
             ],
             "\
 Marker(Root)@[0; 10)
@@ -1182,9 +1175,9 @@ Marker(Root)@[0; 10)
         Token(Dot)@[3; 4)
         Token(Ident)@[4; 5)
       Token(Ident)@[5; 7)
-      Token(Value)@[7; 8)
+      Token(Integer)@[7; 8)
     Token(Add)@[8; 9)
-    Token(Value)@[9; 10)
+    Token(Integer)@[9; 10)
 "
         );
     }
@@ -1195,14 +1188,14 @@ Marker(Root)@[0; 10)
                 (Token::CurlyBOpen, "{"),
                 (Token::Ident, "a"),
                 (Token::Assign, "="),
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
                 (Token::Semicolon, ";"),
                 (Token::CurlyBClose, "}"),
                 (Token::Merge, "//"),
                 (Token::CurlyBOpen, "{"),
                 (Token::Ident, "b"),
                 (Token::Assign, "="),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::Semicolon, ";"),
                 (Token::CurlyBClose, "}")
             ],
@@ -1215,7 +1208,7 @@ Marker(Root)@[0; 14)
         Marker(Attribute)@[1; 2)
           Token(Ident)@[1; 2)
         Token(Assign)@[2; 3)
-        Token(Value)@[3; 4)
+        Token(Integer)@[3; 4)
         Token(Semicolon)@[4; 5)
       Token(CurlyBClose)@[5; 6)
     Token(Merge)@[6; 8)
@@ -1225,7 +1218,7 @@ Marker(Root)@[0; 14)
         Marker(Attribute)@[9; 10)
           Token(Ident)@[9; 10)
         Token(Assign)@[10; 11)
-        Token(Value)@[11; 12)
+        Token(Integer)@[11; 12)
         Token(Semicolon)@[12; 13)
       Token(CurlyBClose)@[13; 14)
 "
@@ -1251,27 +1244,6 @@ Marker(Root)@[0; 18)
         );
     }
     #[test]
-    fn import() {
-        assert_eq!(
-            [
-                (Token::Import, "import"),
-                (Token::Value, "<nixpkgs>"),
-                (Token::CurlyBOpen, "{"),
-                (Token::CurlyBClose, "}")
-            ],
-            "\
-Marker(Root)@[0; 17)
-  Marker(Apply)@[0; 17)
-    Marker(Import)@[0; 15)
-      Token(Import)@[0; 6)
-      Token(Value)@[6; 15)
-    Marker(Set)@[15; 17)
-      Token(CurlyBOpen)@[15; 16)
-      Token(CurlyBClose)@[16; 17)
-"
-        );
-    }
-    #[test]
     fn assert() {
         assert_eq!(
             [
@@ -1280,7 +1252,7 @@ Marker(Root)@[0; 17)
                 (Token::Equal, "=="),
                 (Token::Ident, "b"),
                 (Token::Semicolon, ";"),
-                (Token::Value, "\"a == b\"")
+                (Token::String, "\"a == b\"")
             ],
             "\
 Marker(Root)@[0; 19)
@@ -1291,7 +1263,7 @@ Marker(Root)@[0; 19)
       Token(Equal)@[7; 9)
       Token(Ident)@[9; 10)
     Token(Semicolon)@[10; 11)
-    Token(Value)@[11; 19)
+    Token(String)@[11; 19)
 "
         );
     }
@@ -1302,7 +1274,7 @@ Marker(Root)@[0; 19)
                 (Token::CurlyBOpen, "{"),
                     (Token::Ident, "a"),
                         (Token::Assign, "="),
-                        (Token::Value, "1"),
+                        (Token::Integer, "1"),
                         (Token::Semicolon, ";"),
                     (Token::Inherit, "inherit"),
                         (Token::Whitespace, " "),
@@ -1330,7 +1302,7 @@ Marker(Root)@[0; 36)
       Marker(Attribute)@[1; 2)
         Token(Ident)@[1; 2)
       Token(Assign)@[2; 3)
-      Token(Value)@[3; 4)
+      Token(Integer)@[3; 4)
       Token(Semicolon)@[4; 5)
     Marker(Inherit)@[5; 17)
       Token(Inherit)@[5; 12)
@@ -1359,145 +1331,145 @@ Marker(Root)@[0; 36)
     fn ifs() {
         assert_eq!(
             [
-                (Token::Value, "false"),
+                (Token::Ident, "false"),
                 (Token::Implication, "->"),
                 (Token::Invert, "!"),
-                (Token::Value, "false"),
+                (Token::Ident, "false"),
 
                 (Token::And, "&&"),
 
-                (Token::Value, "false"),
+                (Token::Ident, "false"),
                 (Token::Equal, "=="),
-                (Token::Value, "true"),
+                (Token::Ident, "true"),
 
                 (Token::Or, "||"),
 
-                (Token::Value, "true")
+                (Token::Ident, "true")
             ],
             "\
 Marker(Root)@[0; 32)
   Marker(Operation)@[0; 32)
-    Token(Value)@[0; 5)
+    Token(Ident)@[0; 5)
     Token(Implication)@[5; 7)
     Marker(Operation)@[7; 32)
       Marker(Operation)@[7; 26)
         Marker(Unary)@[7; 13)
           Token(Invert)@[7; 8)
-          Token(Value)@[8; 13)
+          Token(Ident)@[8; 13)
         Token(And)@[13; 15)
         Marker(Operation)@[15; 26)
-          Token(Value)@[15; 20)
+          Token(Ident)@[15; 20)
           Token(Equal)@[20; 22)
-          Token(Value)@[22; 26)
+          Token(Ident)@[22; 26)
       Token(Or)@[26; 28)
-      Token(Value)@[28; 32)
+      Token(Ident)@[28; 32)
 "
         );
         assert_eq!(
             [
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
                 (Token::Less, "<"),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
 
                 (Token::Or, "||"),
 
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::LessOrEq, "<="),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
 
                 (Token::And, "&&"),
 
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::More, ">"),
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
 
                 (Token::And, "&&"),
 
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::MoreOrEq, ">="),
-                (Token::Value, "2")
+                (Token::Integer, "2")
             ],
             "\
 Marker(Root)@[0; 20)
   Marker(Operation)@[0; 20)
     Marker(Operation)@[0; 3)
-      Token(Value)@[0; 1)
+      Token(Integer)@[0; 1)
       Token(Less)@[1; 2)
-      Token(Value)@[2; 3)
+      Token(Integer)@[2; 3)
     Token(Or)@[3; 5)
     Marker(Operation)@[5; 20)
       Marker(Operation)@[5; 14)
         Marker(Operation)@[5; 9)
-          Token(Value)@[5; 6)
+          Token(Integer)@[5; 6)
           Token(LessOrEq)@[6; 8)
-          Token(Value)@[8; 9)
+          Token(Integer)@[8; 9)
         Token(And)@[9; 11)
         Marker(Operation)@[11; 14)
-          Token(Value)@[11; 12)
+          Token(Integer)@[11; 12)
           Token(More)@[12; 13)
-          Token(Value)@[13; 14)
+          Token(Integer)@[13; 14)
       Token(And)@[14; 16)
       Marker(Operation)@[16; 20)
-        Token(Value)@[16; 17)
+        Token(Integer)@[16; 17)
         Token(MoreOrEq)@[17; 19)
-        Token(Value)@[19; 20)
+        Token(Integer)@[19; 20)
 "
         );
         assert_eq!(
             [
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
                 (Token::Equal, "=="),
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
 
                 (Token::And, "&&"),
 
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::NotEqual, "!="),
-                (Token::Value, "3")
+                (Token::Integer, "3")
             ],
             "\
 Marker(Root)@[0; 10)
   Marker(Operation)@[0; 10)
     Marker(Operation)@[0; 4)
-      Token(Value)@[0; 1)
+      Token(Integer)@[0; 1)
       Token(Equal)@[1; 3)
-      Token(Value)@[3; 4)
+      Token(Integer)@[3; 4)
     Token(And)@[4; 6)
     Marker(Operation)@[6; 10)
-      Token(Value)@[6; 7)
+      Token(Integer)@[6; 7)
       Token(NotEqual)@[7; 9)
-      Token(Value)@[9; 10)
+      Token(Integer)@[9; 10)
 "
         );
         assert_eq!(
             [
                 (Token::If, "if"),
-                (Token::Value, "false"),
+                (Token::Ident, "false"),
                 (Token::Then, "then"),
-                    (Token::Value, "1"),
+                    (Token::Integer, "1"),
                 (Token::Else, "else"),
                     (Token::If, "if"),
-                    (Token::Value, "true"),
+                    (Token::Ident, "true"),
                     (Token::Then, "then"),
                         (Token::Ident, "two"),
                     (Token::Else, "else"),
-                        (Token::Value, "3")
+                        (Token::Integer, "3")
             ],
             "\
 Marker(Root)@[0; 34)
   Marker(IfElse)@[0; 34)
     Token(If)@[0; 2)
-    Token(Value)@[2; 7)
+    Token(Ident)@[2; 7)
     Token(Then)@[7; 11)
-    Token(Value)@[11; 12)
+    Token(Integer)@[11; 12)
     Token(Else)@[12; 16)
     Marker(IfElse)@[16; 34)
       Token(If)@[16; 18)
-      Token(Value)@[18; 22)
+      Token(Ident)@[18; 22)
       Token(Then)@[22; 26)
       Token(Ident)@[26; 29)
       Token(Else)@[29; 33)
-      Token(Value)@[33; 34)
+      Token(Integer)@[33; 34)
 "
         );
     }
@@ -1507,9 +1479,9 @@ Marker(Root)@[0; 34)
             [
                 (Token::SquareBOpen, "["),
                 (Token::Ident, "a"),
-                (Token::Value, "2"),
-                (Token::Value, "3"),
-                (Token::Value, "\"lol\""),
+                (Token::Integer, "2"),
+                (Token::Integer, "3"),
+                (Token::String, "\"lol\""),
                 (Token::SquareBClose, "]")
             ],
             "\
@@ -1519,21 +1491,21 @@ Marker(Root)@[0; 10)
     Marker(ListItem)@[1; 2)
       Token(Ident)@[1; 2)
     Marker(ListItem)@[2; 3)
-      Token(Value)@[2; 3)
+      Token(Integer)@[2; 3)
     Marker(ListItem)@[3; 4)
-      Token(Value)@[3; 4)
+      Token(Integer)@[3; 4)
     Marker(ListItem)@[4; 9)
-      Token(Value)@[4; 9)
+      Token(String)@[4; 9)
     Token(SquareBClose)@[9; 10)
 "
         );
         assert_eq!(
             [
-                (Token::SquareBOpen, "["), (Token::Value, "1"), (Token::SquareBClose, "]"),
+                (Token::SquareBOpen, "["), (Token::Integer, "1"), (Token::SquareBClose, "]"),
                 (Token::Concat, "++"),
                 (Token::SquareBOpen, "["), (Token::Ident, "two"), (Token::SquareBClose, "]"),
                 (Token::Concat, "++"),
-                (Token::SquareBOpen, "["), (Token::Value, "3"), (Token::SquareBClose, "]")
+                (Token::SquareBOpen, "["), (Token::Integer, "3"), (Token::SquareBClose, "]")
             ],
             "\
 Marker(Root)@[0; 15)
@@ -1542,7 +1514,7 @@ Marker(Root)@[0; 15)
       Marker(List)@[0; 3)
         Token(SquareBOpen)@[0; 1)
         Marker(ListItem)@[1; 2)
-          Token(Value)@[1; 2)
+          Token(Integer)@[1; 2)
         Token(SquareBClose)@[2; 3)
       Token(Concat)@[3; 5)
       Marker(List)@[5; 10)
@@ -1554,13 +1526,31 @@ Marker(Root)@[0; 15)
     Marker(List)@[12; 15)
       Token(SquareBOpen)@[12; 13)
       Marker(ListItem)@[13; 14)
-        Token(Value)@[13; 14)
+        Token(Integer)@[13; 14)
       Token(SquareBClose)@[14; 15)
 "
         );
     }
     #[test]
-    fn functions() {
+    fn lambda() {
+        assert_eq!(
+            [
+                (Token::Ident, "import"),
+                (Token::Path, "<nixpkgs>"),
+                (Token::CurlyBOpen, "{"),
+                (Token::CurlyBClose, "}")
+            ],
+            "\
+Marker(Root)@[0; 17)
+  Marker(Apply)@[0; 17)
+    Marker(Apply)@[0; 15)
+      Token(Ident)@[0; 6)
+      Token(Path)@[6; 15)
+    Marker(Set)@[15; 17)
+      Token(CurlyBOpen)@[15; 16)
+      Token(CurlyBClose)@[16; 17)
+"
+        );
         assert_eq!(
             [
                 (Token::Ident, "a"),
@@ -1597,13 +1587,13 @@ Marker(Root)@[0; 11)
             [
                 (Token::Ident, "a"),
                 (Token::Whitespace, " "),
-                (Token::Value, "1"),
+                (Token::Integer, "1"),
                 (Token::Whitespace, " "),
-                (Token::Value, "2"),
+                (Token::Integer, "2"),
                 (Token::Whitespace, " "),
                 (Token::Add, "+"),
                 (Token::Whitespace, " "),
-                (Token::Value, "3")
+                (Token::Integer, "3")
             ],
             "\
 Marker(Root)@[0; 9)
@@ -1612,13 +1602,13 @@ Marker(Root)@[0; 9)
       Marker(Apply)@[0; 4)
         Token(Ident)@[0; 1)
         Token(Whitespace)@[1; 2)
-        Token(Value)@[2; 3)
+        Token(Integer)@[2; 3)
         Token(Whitespace)@[3; 4)
-      Token(Value)@[4; 5)
+      Token(Integer)@[4; 5)
       Token(Whitespace)@[5; 6)
     Token(Add)@[6; 7)
     Token(Whitespace)@[7; 8)
-    Token(Value)@[8; 9)
+    Token(Integer)@[8; 9)
 "
         );
    }
@@ -1633,7 +1623,7 @@ Marker(Root)@[0; 9)
                 (Token::CurlyBClose, "}"),
                 (Token::Colon, ":"),
                 (Token::Whitespace, " "),
-                (Token::Value, "1")
+                (Token::Integer, "1")
             ],
             "\
 Marker(Root)@[0; 10)
@@ -1646,7 +1636,7 @@ Marker(Root)@[0; 10)
       Token(CurlyBClose)@[6; 7)
     Token(Colon)@[7; 8)
     Token(Whitespace)@[8; 9)
-    Token(Value)@[9; 10)
+    Token(Integer)@[9; 10)
 "
         );
         assert_eq!(
@@ -1659,7 +1649,7 @@ Marker(Root)@[0; 10)
                 (Token::Ident, "outer"),
                 (Token::Colon, ":"),
                 (Token::Whitespace, " "),
-                (Token::Value, "1")
+                (Token::Integer, "1")
             ],
             "\
 Marker(Root)@[0; 13)
@@ -1674,7 +1664,7 @@ Marker(Root)@[0; 13)
         Token(Ident)@[5; 10)
     Token(Colon)@[10; 11)
     Token(Whitespace)@[11; 12)
-    Token(Value)@[12; 13)
+    Token(Integer)@[12; 13)
 "
         );
         assert_eq!(
@@ -1684,7 +1674,7 @@ Marker(Root)@[0; 13)
                 (Token::Ident, "a"), (Token::Comma, ","), (Token::Whitespace, " "),
                 (Token::Ident, "b"), (Token::Whitespace, " "),
                     (Token::Question, "?"), (Token::Whitespace, " "),
-                    (Token::Value, "\"default\""),
+                    (Token::String, "\"default\""),
 
                 (Token::CurlyBClose, "}"),
                 (Token::Colon, ":"),
@@ -1706,7 +1696,7 @@ Marker(Root)@[0; 22)
         Token(Whitespace)@[6; 7)
         Token(Question)@[7; 8)
         Token(Whitespace)@[8; 9)
-        Token(Value)@[9; 18)
+        Token(String)@[9; 18)
       Token(CurlyBClose)@[18; 19)
     Token(Colon)@[19; 20)
     Token(Whitespace)@[20; 21)
@@ -1720,7 +1710,7 @@ Marker(Root)@[0; 22)
                 (Token::Ident, "a"), (Token::Comma, ","), (Token::Whitespace, " "),
                 (Token::Ident, "b"), (Token::Whitespace, " "),
                     (Token::Question, "?"), (Token::Whitespace, " "),
-                    (Token::Value, "\"default\""), (Token::Comma, ","), (Token::Whitespace, " "),
+                    (Token::String, "\"default\""), (Token::Comma, ","), (Token::Whitespace, " "),
                 (Token::Ellipsis, "..."), (Token::Whitespace, " "),
 
                 (Token::CurlyBClose, "}"),
@@ -1743,7 +1733,7 @@ Marker(Root)@[0; 28)
         Token(Whitespace)@[6; 7)
         Token(Question)@[7; 8)
         Token(Whitespace)@[8; 9)
-        Token(Value)@[9; 18)
+        Token(String)@[9; 18)
       Token(Comma)@[18; 19)
       Token(Whitespace)@[19; 20)
       Token(Ellipsis)@[20; 23)

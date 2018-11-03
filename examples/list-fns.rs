@@ -45,8 +45,15 @@ fn main() -> Result<(), Error> {
 }
 fn find_comment<R: rowan::TreeRoot<Types>>(mut node: Node<R>) -> Option<String> {
     loop {
-        node = node.prev_sibling()
-            .or_else(|| node.parent().and_then(|p| p.prev_sibling()))?;
+        loop {
+            let new = node.prev_sibling();
+            if let Some(new) = new {
+                node = new;
+                break;
+            } else {
+                node = node.parent()?;
+            }
+        }
 
         match node.kind() {
             NodeType::Token(Token::Comment) =>
