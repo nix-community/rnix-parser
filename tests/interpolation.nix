@@ -2,7 +2,7 @@ let
   world = "World";
 in {
   string = "Hello ${world}!";
-  multiline = ''''\n
+  multiline = ''
     The set's x value is: ${
       {
         x = "1";
