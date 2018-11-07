@@ -1,7 +1,7 @@
 //! Provides a type system for the AST, in some sense
 
 use crate::{
-    parser::{ASTKind, Node, NodeType, Types},
+    parser::{Node, NodeType, Types},
     tokenizer::Token,
     value::{self, Value as ParsedValue, ValueError}
 };
@@ -27,6 +27,9 @@ macro_rules! typed {
                 }
                 fn node(&self) -> &Node<R> {
                     &self.0
+                }
+                fn into_node(self) -> Node<R> {
+                    self.0
                 }
             }
             $(impl<R: rowan::TreeRoot<Types>> $trait<R> for $name<R> {})*
@@ -124,6 +127,8 @@ pub trait TypedNode<R: rowan::TreeRoot<Types>> where Self: Sized {
     fn cast(from: Node<R>) -> Option<Self>;
     /// Return a reference to the inner untyped node
     fn node(&self) -> &Node<R>;
+    /// Return the inner untyped node
+    fn into_node(self) -> Node<R>;
     /// Return all non-trivia (so no comments, whitespace, errors) children
     fn children<'a>(&'a self) -> Box<Iterator<Item = Node<R>> + 'a>
         where R: 'a
@@ -131,10 +136,7 @@ pub trait TypedNode<R: rowan::TreeRoot<Types>> where Self: Sized {
         Box::new(
             self.node()
                 .children()
-                .filter(|node| match node.kind() {
-                    NodeType::Marker(_) => true,
-                    NodeType::Token(t) => !t.is_trivia()
-                })
+                .filter(|node| !node.kind().is_trivia())
         )
     }
     /// Return all errors of all children, recursively
@@ -145,8 +147,7 @@ pub trait TypedNode<R: rowan::TreeRoot<Types>> where Self: Sized {
         for event in self.node().borrowed().preorder() {
             if let WalkEvent::Enter(node) = event {
                 match node.kind() {
-                    NodeType::Marker(ASTKind::Error)
-                    | NodeType::Token(Token::Error) => bucket.push(node),
+                    NodeType::Error | NodeType::Token(Token::Error) => bucket.push(node),
                     _ => ()
                 }
             }
@@ -195,6 +196,9 @@ impl<R: rowan::TreeRoot<Types>> TypedNode<R> for Value<R> {
     fn node(&self) -> &Node<R> {
         &self.0
     }
+    fn into_node(self) -> Node<R> {
+        self.0
+    }
 }
 impl<R: rowan::TreeRoot<Types>> Value<R> {
     /// Return the value as a string
@@ -206,7 +210,7 @@ impl<R: rowan::TreeRoot<Types>> Value<R> {
     pub fn to_value(&self) -> Result<ParsedValue, ValueError> {
         let token = match self.0.kind() {
             NodeType::Token(token) => token,
-            NodeType::Marker(_) => panic!("invalid value somehow constructed")
+            _ => panic!("invalid value somehow constructed")
         };
         ParsedValue::from_token(token, self.as_str())
     }
@@ -220,7 +224,7 @@ typed! [
         }
     },
 
-    ASTKind::Apply => Apply: {
+    NodeType::Apply => Apply: {
         /// Return the lambda being applied
         pub fn lambda(&self) -> Node<R> {
             nth!(self; 0)
@@ -230,7 +234,7 @@ typed! [
             nth!(self; 1)
         }
     },
-    ASTKind::Assert => Assert: {
+    NodeType::Assert => Assert: {
         /// Return the assert condition
         pub fn condition(&self) -> Node<R> {
             nth!(self; 1)
@@ -240,15 +244,15 @@ typed! [
             nth!(self; 3)
         }
     },
-    ASTKind::Attribute => Attribute: {
+    NodeType::Attribute => Attribute: {
         /// Return the path as an iterator of identifiers
         pub fn path<'a>(&'a self) -> impl Iterator<Item = Node<R>> + 'a {
             self.children().filter(|node| node.kind() != NodeType::Token(Token::Dot))
         }
     },
-    ASTKind::Dynamic => Dynamic: Wrapper,
-    ASTKind::Error => Error,
-    ASTKind::IfElse => IfElse: {
+    NodeType::Dynamic => Dynamic: Wrapper,
+    NodeType::Error => Error,
+    NodeType::IfElse => IfElse: {
         /// Return the condition
         pub fn condition(&self) -> Node<R> {
             nth!(self; 1)
@@ -262,7 +266,7 @@ typed! [
             nth!(self; 5)
         }
     },
-    ASTKind::IndexSet => IndexSet: {
+    NodeType::IndexSet => IndexSet: {
         /// Return the set being indexed
         pub fn set(&self) -> Node<R> {
             nth!(self; 0)
@@ -272,7 +276,7 @@ typed! [
             nth!(self; 2)
         }
     },
-    ASTKind::Inherit => Inherit: {
+    NodeType::Inherit => Inherit: {
         /// Return the set where keys are being inherited from, if any
         pub fn from(&self) -> Option<InheritFrom<R>> {
             self.node().children()
@@ -280,8 +284,8 @@ typed! [
                 .next()
         }
     },
-    ASTKind::InheritFrom => InheritFrom: Wrapper,
-    ASTKind::Interpol => Interpol: {
+    NodeType::InheritFrom => InheritFrom: Wrapper,
+    NodeType::Interpol => Interpol: {
         /// Parse the interpolation into a series of parts
         pub fn parts(&self) -> Vec<InterpolPart<R>> {
             let mut parts = Vec::new();
@@ -291,11 +295,11 @@ typed! [
 
             for child in self.node().children() {
                 match child.kind() {
-                    NodeType::Marker(ASTKind::InterpolAst) => {
+                    NodeType::InterpolAst => {
                         let ast = InterpolAst::cast(child).unwrap();
                         parts.push(InterpolPart::Ast(ast.inner()));
                     },
-                    NodeType::Marker(ASTKind::InterpolLiteral) => {
+                    NodeType::InterpolLiteral => {
                         let literal = InterpolLiteral::cast(child).unwrap();
                         let token = literal.inner();
                         let mut text = token.borrowed().leaf_text().map(SmolStr::as_str).unwrap_or_default();
@@ -368,9 +372,9 @@ typed! [
             parts
         }
     },
-    ASTKind::InterpolAst => InterpolAst: LightWrapper,
-    ASTKind::InterpolLiteral => InterpolLiteral: LightWrapper,
-    ASTKind::Lambda => Lambda: {
+    NodeType::InterpolAst => InterpolAst: LightWrapper,
+    NodeType::InterpolLiteral => InterpolLiteral: LightWrapper,
+    NodeType::Lambda => Lambda: {
         /// Return the argument of the lambda
         pub fn arg(&self) -> Node<R> {
             nth!(self; 0)
@@ -380,8 +384,8 @@ typed! [
             nth!(self; 2)
         }
     },
-    ASTKind::Let => Let: EntryHolder,
-    ASTKind::LetIn => LetIn: EntryHolder: {
+    NodeType::Let => Let: EntryHolder,
+    NodeType::LetIn => LetIn: EntryHolder: {
         /// Return the body
         pub fn body(&self) -> Node<R> {
             self.children()
@@ -390,14 +394,14 @@ typed! [
                 .expect("invalid ast")
         }
     },
-    ASTKind::List => List: {
+    NodeType::List => List: {
         /// Return an iterator over items in the list
         pub fn items(&self) -> impl Iterator<Item = ListItem<R>> {
             self.node().children().filter_map(ListItem::cast)
         }
     },
-    ASTKind::ListItem => ListItem: LightWrapper,
-    ASTKind::Operation => Operation: {
+    NodeType::ListItem => ListItem: LightWrapper,
+    NodeType::Operation => Operation: {
         /// Return the first value in the operation
         pub fn value1(&self) -> Node<R> {
             nth!(self; 0)
@@ -414,7 +418,7 @@ typed! [
             nth!(self; 2)
         }
     },
-    ASTKind::OrDefault => OrDefault: {
+    NodeType::OrDefault => OrDefault: {
         /// Return the indexing operation
         pub fn index(&self) -> IndexSet<R> {
             nth!(self; (IndexSet) 0)
@@ -424,14 +428,14 @@ typed! [
             nth!(self; 2)
         }
     },
-    ASTKind::Paren => Paren: Wrapper,
-    ASTKind::PatBind => PatBind: {
+    NodeType::Paren => Paren: Wrapper,
+    NodeType::PatBind => PatBind: {
         /// Return the identifier the set is being bound as
         pub fn name(&self) -> Ident<R> {
             self.node().children().filter_map(Ident::cast).next().expect("invalid ast")
         }
     },
-    ASTKind::PatEntry => PatEntry: {
+    NodeType::PatEntry => PatEntry: {
         /// Return the identifier the argument is being bound as
         pub fn name(&self) -> Ident<R> {
             nth!(self; (Ident) 0)
@@ -439,14 +443,11 @@ typed! [
         /// Return the default value, if any
         pub fn default(&self) -> Option<Node<R>> {
             self.node().children()
-                .filter(|node| match node.kind() {
-                    NodeType::Marker(_) => true,
-                    NodeType::Token(token) => !token.is_trivia()
-                })
+                .filter(|node| node.kind().is_trivia())
                 .nth(2)
         }
     },
-    ASTKind::Pattern => Pattern: {
+    NodeType::Pattern => Pattern: {
         /// Return an iterator over all pattern entries
         pub fn entries(&self) -> impl Iterator<Item = PatEntry<R>> {
             self.node().children().filter_map(PatEntry::cast)
@@ -455,15 +456,136 @@ typed! [
         pub fn ellipsis(&self) -> bool {
             self.node().children().any(|node| node.kind() == NodeType::Token(Token::Ellipsis))
         }
+        /// Returns a clone of the tree root but without entries where the
+        /// callback function returns false
+        /// { a, b, c } without b is { a, c }
+        pub fn filter_entries<F>(&self, mut callback: F) -> Root<rowan::OwnedRoot<Types>>
+            where F: FnMut(PatEntry<rowan::RefRoot<Types>>) -> bool
+        {
+            // Filter entries
+            let mut next_entry = None;
+            let mut last_entry = true;
+            let mut children: Vec<_> = self.node().borrowed().children()
+                .filter(|node| {
+                    if let Some(entry) = PatEntry::cast(*node) {
+                        last_entry = match next_entry.take() {
+                            Some(keep) => keep,
+                            None => callback(entry)
+                        };
+                        last_entry
+                    } else if node.kind() == NodeType::Token(Token::Comment) {
+                        if let Some(keep) = next_entry {
+                            keep
+                        } else {
+                            // Peek ahead
+                            let mut next = Some(*node);
+                            loop {
+                                next = next.unwrap().next_sibling();
+                                match next.map(|node| node.kind()) {
+                                    Some(NodeType::Token(t)) if t.is_trivia() => (),
+                                    Some(NodeType::PatEntry) => {
+                                        let entry = PatEntry::cast(next.unwrap()).unwrap();
+                                        last_entry = callback(entry);
+                                        next_entry = Some(last_entry);
+                                        break last_entry;
+                                    },
+                                    _ => break true
+                                }
+                            }
+                        }
+                    } else if node.kind() == NodeType::Token(Token::Comma) {
+                        last_entry
+                    } else if node.kind() == NodeType::Token(Token::Whitespace) {
+                        last_entry
+                    } else {
+                        last_entry = true;
+                        next_entry = None;
+                        true
+                    }
+                })
+                .map(|node| node.green().clone())
+                .collect();
+
+            // Remove trailing comma, if any
+            let mut i = children.len();
+            while i > 0 {
+                i -= 1;
+                match children.get(i).map(|node| node.kind()) {
+                    Some(NodeType::Token(Token::CurlyBClose)) => (),
+                    Some(NodeType::Token(t)) if t.is_trivia() => (),
+                    _ => break
+                }
+            }
+            if children.get(i).map(|node| node.kind()) == Some(NodeType::Token(Token::Comma)) {
+                children.remove(i);
+            }
+
+            Root::cast(Node::new(
+                self.node().with_children(children.into_boxed_slice()),
+                Vec::new()
+            )).unwrap()
+        }
     },
-    ASTKind::Root => Root: LightWrapper,
-    ASTKind::Set => Set: EntryHolder: {
+    NodeType::Root => Root: LightWrapper,
+    NodeType::Set => Set: EntryHolder: {
         /// Returns true if this set is recursive
         pub fn recursive(&self) -> bool {
             self.node().children().any(|node| node.kind() == NodeType::Token(Token::Rec))
         }
+        /// Returns a clone of the tree root but without entries where the
+        /// callback function returns false
+        /// { a = 2; b = 3; } without 0 is { b = 3; }
+        pub fn filter_entries<F>(&self, mut callback: F) -> Root<rowan::OwnedRoot<Types>>
+            where F: FnMut(SetEntry<rowan::RefRoot<Types>>) -> bool
+        {
+            let mut next_entry = None;
+            let mut last_entry = true;
+            let children: Vec<_> = self.node().borrowed().children()
+                .filter(|node| {
+                    if let Some(entry) = SetEntry::cast(*node) {
+                        if let Some(keep) = next_entry.take() {
+                            keep
+                        } else {
+                            last_entry = callback(entry);
+                            last_entry
+                        }
+                    } else if node.kind() == NodeType::Token(Token::Comment) {
+                        if let Some(keep) = next_entry {
+                            keep
+                        } else {
+                            // Peek ahead
+                            let mut next = Some(*node);
+                            loop {
+                                next = next.unwrap().next_sibling();
+                                match next.map(|node| node.kind()) {
+                                    Some(NodeType::Token(t)) if t.is_trivia() => (),
+                                    Some(NodeType::SetEntry) => {
+                                        let entry = SetEntry::cast(next.unwrap()).unwrap();
+                                        last_entry = callback(entry);
+                                        next_entry = Some(last_entry);
+                                        break last_entry;
+                                    },
+                                    _ => break true
+                                }
+                            }
+                        }
+                    } else if node.kind() == NodeType::Token(Token::Whitespace) {
+                        last_entry
+                    } else {
+                        last_entry = true;
+                        true
+                    }
+                })
+                .map(|node| node.green().clone())
+                .collect();
+
+            Root::cast(Node::new(
+                self.node().with_children(children.into_boxed_slice()),
+                Vec::new()
+            )).unwrap()
+        }
     },
-    ASTKind::SetEntry => SetEntry: {
+    NodeType::SetEntry => SetEntry: {
         /// Return this entry's key
         pub fn key(&self) -> Attribute<R> {
             nth!(self; (Attribute) 0)
@@ -473,7 +595,7 @@ typed! [
             nth!(self; 2)
         }
     },
-    ASTKind::Unary => Unary: {
+    NodeType::Unary => Unary: {
         /// Return the operator
         pub fn operator(&self) -> UnaryOpKind {
             match nth!(self; 0).kind() {
@@ -486,7 +608,7 @@ typed! [
             nth!(self; 1)
         }
     },
-    ASTKind::With => With: {
+    NodeType::With => With: {
         /// Return the namespace
         pub fn namespace(&self) -> Node<R> {
             nth!(self; 1)

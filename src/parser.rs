@@ -21,8 +21,9 @@ pub enum ParseError {
     UnexpectedEOFWanted(Token),
 }
 
+/// The type of a node in the AST
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ASTKind {
+pub enum NodeType {
     Apply,
     Assert,
     Attribute,
@@ -49,20 +50,17 @@ pub enum ASTKind {
     Root,
     Set,
     SetEntry,
+    Token(Token),
     Unary,
-    With
+    With,
 }
-/// The type of a node in the AST
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum NodeType {
-    /// This node contains the elements to make up this kind, such as a set
-    Marker(ASTKind),
-    /// This type is a single token. Will probably not have any children.
-    Token(Token)
-}
-impl From<ASTKind> for NodeType {
-    fn from(kind: ASTKind) -> Self {
-        NodeType::Marker(kind)
+impl NodeType {
+    /// Returns true if this token is trivia, see `Token::is_trivia`
+    pub fn is_trivia(self) -> bool {
+        match self {
+            NodeType::Token(t) => t.is_trivia(),
+            _ => false
+        }
     }
 }
 impl From<Token> for NodeType {
@@ -170,7 +168,7 @@ impl<I> Parser<I>
     fn expect(&mut self, expected: Token) {
         if let Some(actual) = self.peek() {
             if actual != expected {
-                self.builder.start_internal(NodeType::Marker(ASTKind::Error));
+                self.builder.start_internal(NodeType::Error);
                 while { self.bump(); self.peek().map(|actual| actual != expected).unwrap_or(false) } {}
                 self.builder.finish_internal();
             }
@@ -181,7 +179,7 @@ impl<I> Parser<I>
     }
 
     fn parse_dynamic(&mut self) {
-        self.builder.start_internal(NodeType::Marker(ASTKind::Dynamic));
+        self.builder.start_internal(NodeType::Dynamic);
         self.bump();
         while self.peek().map(|t| t != Token::DynamicEnd).unwrap_or(false) {
             self.parse_expr();
@@ -190,19 +188,19 @@ impl<I> Parser<I>
         self.builder.finish_internal();
     }
     fn parse_interpol(&mut self) {
-        self.builder.start_internal(NodeType::Marker(ASTKind::Interpol));
+        self.builder.start_internal(NodeType::Interpol);
 
-        self.builder.start_internal(NodeType::Marker(ASTKind::InterpolLiteral));
+        self.builder.start_internal(NodeType::InterpolLiteral);
         self.bump();
         self.builder.finish_internal();
 
-        self.builder.start_internal(NodeType::Marker(ASTKind::InterpolAst));
+        self.builder.start_internal(NodeType::InterpolAst);
         loop {
             match self.peek() {
                 None | Some(Token::InterpolEnd) => {
                     self.builder.finish_internal();
 
-                    self.builder.start_internal(NodeType::Marker(ASTKind::InterpolLiteral));
+                    self.builder.start_internal(NodeType::InterpolLiteral);
                     self.bump();
                     self.builder.finish_internal();
                     break;
@@ -210,11 +208,11 @@ impl<I> Parser<I>
                 Some(Token::InterpolEndStart) => {
                     self.builder.finish_internal();
 
-                    self.builder.start_internal(NodeType::Marker(ASTKind::InterpolLiteral));
+                    self.builder.start_internal(NodeType::InterpolLiteral);
                     self.bump();
                     self.builder.finish_internal();
 
-                    self.builder.start_internal(NodeType::Marker(ASTKind::InterpolAst));
+                    self.builder.start_internal(NodeType::InterpolAst);
                 },
                 Some(_) => self.parse_expr()
             }
@@ -231,7 +229,7 @@ impl<I> Parser<I>
         }
     }
     fn parse_attr(&mut self) {
-        self.builder.start_internal(NodeType::Marker(ASTKind::Attribute));
+        self.builder.start_internal(NodeType::Attribute);
         loop {
             self.next_attr();
 
@@ -259,7 +257,7 @@ impl<I> Parser<I>
                         break;
                     },
                     Some(Token::Ident) => {
-                        self.builder.start_internal(NodeType::Marker(ASTKind::PatEntry));
+                        self.builder.start_internal(NodeType::PatEntry);
                         self.bump();
                         if let Some(Token::Question) = self.peek() {
                             self.bump();
@@ -280,7 +278,7 @@ impl<I> Parser<I>
                         break;
                     },
                     Some(_) => {
-                        self.builder.start_internal(NodeType::Marker(ASTKind::Error));
+                        self.builder.start_internal(NodeType::Error);
                         self.bump();
                         self.builder.finish_internal();
                     }
@@ -289,8 +287,8 @@ impl<I> Parser<I>
         }
 
         if self.peek() == Some(Token::At) {
-            let kind = if bound { ASTKind::Error } else { ASTKind::PatBind };
-            self.builder.start_internal(NodeType::Marker(kind));
+            let kind = if bound { NodeType::Error } else { NodeType::PatBind };
+            self.builder.start_internal(kind);
             self.bump();
             self.expect(Token::Ident);
             self.builder.finish_internal();
@@ -302,11 +300,11 @@ impl<I> Parser<I>
                 None => break,
                 token if token == Some(until) => break,
                 Some(Token::Inherit) => {
-                    self.builder.start_internal(NodeType::Marker(ASTKind::Inherit));
+                    self.builder.start_internal(NodeType::Inherit);
                     self.bump();
 
                     if self.peek() == Some(Token::ParenOpen) {
-                        self.builder.start_internal(NodeType::Marker(ASTKind::InheritFrom));
+                        self.builder.start_internal(NodeType::InheritFrom);
                         self.bump();
                         self.parse_expr();
                         self.expect(Token::ParenClose);
@@ -321,7 +319,7 @@ impl<I> Parser<I>
                     self.builder.finish_internal();
                 },
                 Some(_) => {
-                    self.builder.start_internal(NodeType::Marker(ASTKind::SetEntry));
+                    self.builder.start_internal(NodeType::SetEntry);
                     self.parse_attr();
                     self.expect(Token::Assign);
                     self.parse_expr();
@@ -336,14 +334,14 @@ impl<I> Parser<I>
         let checkpoint = self.builder.checkpoint();
         match self.peek() {
             Some(Token::ParenOpen) => {
-                self.builder.start_internal(NodeType::Marker(ASTKind::Paren));
+                self.builder.start_internal(NodeType::Paren);
                 self.bump();
                 self.parse_expr();
                 self.bump();
                 self.builder.finish_internal();
             },
             Some(Token::Rec) => {
-                self.builder.start_internal(NodeType::Marker(ASTKind::Set));
+                self.builder.start_internal(NodeType::Set);
                 self.bump();
                 self.expect(Token::CurlyBOpen);
                 self.parse_set(Token::CurlyBClose);
@@ -374,9 +372,9 @@ impl<I> Parser<I>
                     | [Some(Token::CurlyBClose), Some(Token::Colon)]
                     | [Some(Token::CurlyBClose), Some(Token::At)] => {
                         // This looks like a pattern
-                        self.builder.start_internal(NodeType::Marker(ASTKind::Lambda));
+                        self.builder.start_internal(NodeType::Lambda);
 
-                        self.builder.start_internal(NodeType::Marker(ASTKind::Pattern));
+                        self.builder.start_internal(NodeType::Pattern);
                         self.bump();
                         self.parse_pattern(false);
                         self.builder.finish_internal();
@@ -388,7 +386,7 @@ impl<I> Parser<I>
                     },
                     _ => {
                         // This looks like a set
-                        self.builder.start_internal(NodeType::Marker(ASTKind::Set));
+                        self.builder.start_internal(NodeType::Set);
                         self.bump();
                         self.parse_set(Token::CurlyBClose);
                         self.builder.finish_internal();
@@ -396,10 +394,10 @@ impl<I> Parser<I>
                 }
             },
             Some(Token::SquareBOpen) => {
-                self.builder.start_internal(NodeType::Marker(ASTKind::List));
+                self.builder.start_internal(NodeType::List);
                 self.bump();
                 while self.peek().map(|t| t != Token::SquareBClose).unwrap_or(false) {
-                    self.builder.start_internal(NodeType::Marker(ASTKind::ListItem));
+                    self.builder.start_internal(NodeType::ListItem);
                     self.parse_val();
                     self.builder.finish_internal();
                 }
@@ -415,15 +413,15 @@ impl<I> Parser<I>
 
                 match self.peek() {
                     Some(Token::Colon) => {
-                        self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::Lambda));
+                        self.builder.start_internal_at(checkpoint, NodeType::Lambda);
                         self.bump();
                         self.parse_expr();
                         self.builder.finish_internal();
                     },
                     Some(Token::At) => {
-                        self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::Lambda));
-                        self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::Pattern));
-                        self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::PatBind));
+                        self.builder.start_internal_at(checkpoint, NodeType::Lambda);
+                        self.builder.start_internal_at(checkpoint, NodeType::Pattern);
+                        self.builder.start_internal_at(checkpoint, NodeType::PatBind);
                         self.bump();
                         self.builder.finish_internal(); // PatBind
 
@@ -439,20 +437,20 @@ impl<I> Parser<I>
                 }
             },
             _ => {
-                self.builder.start_internal(NodeType::Marker(ASTKind::Error));
+                self.builder.start_internal(NodeType::Error);
                 self.bump();
                 self.builder.finish_internal();
             }
         }
 
         while self.peek() == Some(Token::Dot) {
-            self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::IndexSet));
+            self.builder.start_internal_at(checkpoint, NodeType::IndexSet);
             self.bump();
             self.next_attr();
             self.builder.finish_internal();
 
             if self.peek_data().map(|&(t, ref s)| t == Token::Ident && s == OR).unwrap_or(false) {
-                self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::OrDefault));
+                self.builder.start_internal_at(checkpoint, NodeType::OrDefault);
                 self.bump();
                 self.parse_val();
                 self.builder.finish_internal();
@@ -464,14 +462,14 @@ impl<I> Parser<I>
         self.parse_val();
 
         while self.peek().map(|t| t.is_fn_arg()).unwrap_or(false) {
-            self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::Apply));
+            self.builder.start_internal_at(checkpoint, NodeType::Apply);
             self.parse_val();
             self.builder.finish_internal();
         }
     }
     fn parse_negate(&mut self) {
         if self.peek() == Some(Token::Sub) {
-            self.builder.start_internal(NodeType::Marker(ASTKind::Unary));
+            self.builder.start_internal(NodeType::Unary);
             self.bump();
             self.parse_negate();
             self.builder.finish_internal();
@@ -483,7 +481,7 @@ impl<I> Parser<I>
         let checkpoint = self.builder.checkpoint();
         next(self);
         while self.peek().map(|t| ops.contains(&t)).unwrap_or(false) {
-            self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::Operation));
+            self.builder.start_internal_at(checkpoint, NodeType::Operation);
             self.bump();
             next(self);
             self.builder.finish_internal();
@@ -506,7 +504,7 @@ impl<I> Parser<I>
     }
     fn parse_invert(&mut self) {
         if self.peek() == Some(Token::Invert) {
-            self.builder.start_internal(NodeType::Marker(ASTKind::Unary));
+            self.builder.start_internal(NodeType::Unary);
             self.bump();
             self.parse_invert();
             self.builder.finish_internal();
@@ -545,19 +543,19 @@ impl<I> Parser<I>
                 self.bump();
 
                 if self.peek() == Some(Token::CurlyBOpen) {
-                    self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::Let));
+                    self.builder.start_internal_at(checkpoint, NodeType::Let);
                     self.bump();
                     self.parse_set(Token::CurlyBClose);
                     self.builder.finish_internal();
                 } else {
-                    self.builder.start_internal_at(checkpoint, NodeType::Marker(ASTKind::LetIn));
+                    self.builder.start_internal_at(checkpoint, NodeType::LetIn);
                     self.parse_set(Token::In);
                     self.parse_expr();
                     self.builder.finish_internal();
                 }
             },
             Some(Token::With) => {
-                self.builder.start_internal(NodeType::Marker(ASTKind::With));
+                self.builder.start_internal(NodeType::With);
                 self.bump();
                 self.parse_expr();
                 self.expect(Token::Semicolon);
@@ -565,7 +563,7 @@ impl<I> Parser<I>
                 self.builder.finish_internal();
             },
             Some(Token::If) => {
-                self.builder.start_internal(NodeType::Marker(ASTKind::IfElse));
+                self.builder.start_internal(NodeType::IfElse);
                 self.bump();
                 self.parse_expr();
                 self.expect(Token::Then);
@@ -575,7 +573,7 @@ impl<I> Parser<I>
                 self.builder.finish_internal();
             },
             Some(Token::Assert) => {
-                self.builder.start_internal(NodeType::Marker(ASTKind::Assert));
+                self.builder.start_internal(NodeType::Assert);
                 self.bump();
                 self.parse_expr();
                 self.expect(Token::Semicolon);
@@ -592,10 +590,10 @@ pub fn parse<I>(iter: I) -> AST
     where I: IntoIterator<Item = (Token, SmolStr)>
 {
     let mut parser = Parser::new(iter.into_iter());
-    parser.builder.start_internal(NodeType::Marker(ASTKind::Root));
+    parser.builder.start_internal(NodeType::Root);
     parser.parse_expr();
     if parser.peek().is_some() {
-        parser.builder.start_internal(NodeType::Marker(ASTKind::Error));
+        parser.builder.start_internal(NodeType::Error);
         while parser.peek().is_some() {
             parser.bump();
         }
@@ -671,20 +669,20 @@ mod tests {
                 (Token::CurlyBClose, "}")
             ],
             "\
-Marker(Root)@[0; 45)
-  Marker(Set)@[0; 45)
+Root@[0; 45)
+  Set@[0; 45)
     Token(CurlyBOpen)@[0; 1)
     Token(Whitespace)@[1; 2)
-    Marker(SetEntry)@[2; 23)
-      Marker(Attribute)@[2; 18)
+    SetEntry@[2; 23)
+      Attribute@[2; 18)
         Token(Ident)@[2; 17)
         Token(Whitespace)@[17; 18)
       Token(Assign)@[18; 19)
       Token(Whitespace)@[19; 20)
       Token(Integer)@[20; 22)
       Token(Semicolon)@[22; 23)
-    Marker(SetEntry)@[23; 43)
-      Marker(Attribute)@[23; 35)
+    SetEntry@[23; 43)
+      Attribute@[23; 35)
         Token(Ident)@[23; 34)
         Token(Whitespace)@[34; 35)
       Token(Assign)@[35; 36)
@@ -706,12 +704,12 @@ Marker(Root)@[0; 45)
                 (Token::CurlyBClose, "}")
             ],
             "\
-Marker(Root)@[0; 12)
-  Marker(Set)@[0; 12)
+Root@[0; 12)
+  Set@[0; 12)
     Token(Rec)@[0; 3)
     Token(CurlyBOpen)@[3; 4)
-    Marker(SetEntry)@[4; 11)
-      Marker(Attribute)@[4; 8)
+    SetEntry@[4; 11)
+      Attribute@[4; 8)
         Token(Ident)@[4; 8)
       Token(Assign)@[8; 9)
       Token(Integer)@[9; 10)
@@ -725,8 +723,8 @@ Marker(Root)@[0; 12)
                 (Token::CurlyBClose, "}")
             ],
             "\
-Marker(Root)@[0; 2)
-  Marker(Set)@[0; 2)
+Root@[0; 2)
+  Set@[0; 2)
     Token(CurlyBOpen)@[0; 1)
     Token(CurlyBClose)@[1; 2)
 "
@@ -756,28 +754,28 @@ Marker(Root)@[0; 2)
                 (Token::CurlyBClose, "}")
             ],
             "\
-Marker(Root)@[0; 23)
-  Marker(Set)@[0; 23)
+Root@[0; 23)
+  Set@[0; 23)
     Token(CurlyBOpen)@[0; 1)
-    Marker(SetEntry)@[1; 7)
-      Marker(Attribute)@[1; 4)
+    SetEntry@[1; 7)
+      Attribute@[1; 4)
         Token(Ident)@[1; 2)
         Token(Dot)@[2; 3)
         Token(Ident)@[3; 4)
       Token(Assign)@[4; 5)
       Token(Integer)@[5; 6)
       Token(Semicolon)@[6; 7)
-    Marker(SetEntry)@[7; 22)
-      Marker(Attribute)@[7; 19)
-        Marker(Interpol)@[7; 13)
-          Marker(InterpolLiteral)@[7; 10)
+    SetEntry@[7; 22)
+      Attribute@[7; 19)
+        Interpol@[7; 13)
+          InterpolLiteral@[7; 10)
             Token(InterpolStart)@[7; 10)
-          Marker(InterpolAst)@[10; 11)
+          InterpolAst@[10; 11)
             Token(Ident)@[10; 11)
-          Marker(InterpolLiteral)@[11; 13)
+          InterpolLiteral@[11; 13)
             Token(InterpolEnd)@[11; 13)
         Token(Dot)@[13; 14)
-        Marker(Dynamic)@[14; 19)
+        Dynamic@[14; 19)
           Token(DynamicStart)@[14; 16)
           Token(Ident)@[16; 17)
           Token(DynamicEnd)@[17; 19)
@@ -807,9 +805,9 @@ Marker(Root)@[0; 23)
                 (Token::Integer, "4")
             ],
             "\
-Marker(Root)@[0; 13)
-  Marker(Operation)@[0; 13)
-    Marker(Operation)@[0; 6)
+Root@[0; 13)
+  Operation@[0; 13)
+    Operation@[0; 6)
       Token(Integer)@[0; 1)
       Token(Whitespace)@[1; 2)
       Token(Add)@[2; 3)
@@ -817,7 +815,7 @@ Marker(Root)@[0; 13)
       Token(Integer)@[4; 5)
       Token(Whitespace)@[5; 6)
     Token(Add)@[6; 7)
-    Marker(Operation)@[7; 13)
+    Operation@[7; 13)
       Token(Whitespace)@[7; 8)
       Token(Integer)@[8; 9)
       Token(Whitespace)@[9; 10)
@@ -838,15 +836,15 @@ Marker(Root)@[0; 13)
                 (Token::ParenClose, ")")
             ],
             "\
-Marker(Root)@[0; 8)
-  Marker(Operation)@[0; 8)
+Root@[0; 8)
+  Operation@[0; 8)
     Token(Integer)@[0; 1)
     Token(Mul)@[1; 2)
-    Marker(Unary)@[2; 8)
+    Unary@[2; 8)
       Token(Sub)@[2; 3)
-      Marker(Paren)@[3; 8)
+      Paren@[3; 8)
         Token(ParenOpen)@[3; 4)
-        Marker(Operation)@[4; 7)
+        Operation@[4; 7)
           Token(Integer)@[4; 5)
           Token(Sub)@[5; 6)
           Token(Integer)@[6; 7)
@@ -872,12 +870,12 @@ Marker(Root)@[0; 8)
                     (Token::Ident, "a")
             ],
             "\
-Marker(Root)@[0; 16)
-  Marker(LetIn)@[0; 16)
+Root@[0; 16)
+  LetIn@[0; 16)
     Token(Let)@[0; 3)
     Token(Whitespace)@[3; 4)
-    Marker(SetEntry)@[4; 11)
-      Marker(Attribute)@[4; 6)
+    SetEntry@[4; 11)
+      Attribute@[4; 6)
         Token(Ident)@[4; 5)
         Token(Whitespace)@[5; 6)
       Token(Assign)@[6; 7)
@@ -908,18 +906,18 @@ Marker(Root)@[0; 16)
                 (Token::CurlyBClose, "}")
             ],
             "\
-Marker(Root)@[0; 17)
-  Marker(Let)@[0; 17)
+Root@[0; 17)
+  Let@[0; 17)
     Token(Let)@[0; 3)
     Token(CurlyBOpen)@[3; 4)
-    Marker(SetEntry)@[4; 9)
-      Marker(Attribute)@[4; 5)
+    SetEntry@[4; 9)
+      Attribute@[4; 5)
         Token(Ident)@[4; 5)
       Token(Assign)@[5; 6)
       Token(Integer)@[6; 8)
       Token(Semicolon)@[8; 9)
-    Marker(SetEntry)@[9; 16)
-      Marker(Attribute)@[9; 13)
+    SetEntry@[9; 16)
+      Attribute@[9; 13)
         Token(Ident)@[9; 13)
       Token(Assign)@[13; 14)
       Token(Ident)@[14; 15)
@@ -952,19 +950,19 @@ Marker(Root)@[0; 17)
                 (Token::Whitespace, " ")
             ],
             "\
-Marker(Root)@[0; 43)
+Root@[0; 43)
   Token(Whitespace)@[0; 1)
-  Marker(Interpol)@[1; 42)
-    Marker(InterpolLiteral)@[1; 11)
+  Interpol@[1; 42)
+    InterpolLiteral@[1; 11)
       Token(InterpolStart)@[1; 11)
-    Marker(InterpolAst)@[11; 39)
+    InterpolAst@[11; 39)
       Token(Whitespace)@[11; 12)
-      Marker(IndexSet)@[12; 38)
-        Marker(Set)@[12; 32)
+      IndexSet@[12; 38)
+        Set@[12; 32)
           Token(CurlyBOpen)@[12; 13)
           Token(Whitespace)@[13; 14)
-          Marker(SetEntry)@[14; 30)
-            Marker(Attribute)@[14; 20)
+          SetEntry@[14; 30)
+            Attribute@[14; 20)
               Token(Ident)@[14; 19)
               Token(Whitespace)@[19; 20)
             Token(Assign)@[20; 21)
@@ -976,7 +974,7 @@ Marker(Root)@[0; 43)
         Token(Dot)@[32; 33)
         Token(Ident)@[33; 38)
       Token(Whitespace)@[38; 39)
-    Marker(InterpolLiteral)@[39; 42)
+    InterpolLiteral@[39; 42)
       Token(InterpolEnd)@[39; 42)
   Token(Whitespace)@[42; 43)
 "
@@ -992,18 +990,18 @@ Marker(Root)@[0; 43)
                 (Token::Whitespace, " ")
           ],
           "\
-Marker(Root)@[0; 21)
+Root@[0; 21)
   Token(Whitespace)@[0; 1)
-  Marker(Interpol)@[1; 20)
-    Marker(InterpolLiteral)@[1; 4)
+  Interpol@[1; 20)
+    InterpolLiteral@[1; 4)
       Token(InterpolStart)@[1; 4)
-    Marker(InterpolAst)@[4; 9)
+    InterpolAst@[4; 9)
       Token(Ident)@[4; 9)
-    Marker(InterpolLiteral)@[9; 13)
+    InterpolLiteral@[9; 13)
       Token(InterpolEndStart)@[9; 13)
-    Marker(InterpolAst)@[13; 18)
+    InterpolAst@[13; 18)
       Token(Ident)@[13; 18)
-    Marker(InterpolLiteral)@[18; 20)
+    InterpolLiteral@[18; 20)
       Token(InterpolEnd)@[18; 20)
   Token(Whitespace)@[20; 21)
 "
@@ -1019,20 +1017,20 @@ Marker(Root)@[0; 21)
                 (Token::Whitespace, " ")
           ],
           "\
-Marker(Root)@[0; 17)
+Root@[0; 17)
   Token(Whitespace)@[0; 1)
-  Marker(Interpol)@[1; 16)
-    Marker(InterpolLiteral)@[1; 5)
+  Interpol@[1; 16)
+    InterpolLiteral@[1; 5)
       Token(InterpolStart)@[1; 5)
-    Marker(InterpolAst)@[5; 13)
-      Marker(Interpol)@[5; 13)
-        Marker(InterpolLiteral)@[5; 8)
+    InterpolAst@[5; 13)
+      Interpol@[5; 13)
+        InterpolLiteral@[5; 8)
           Token(InterpolStart)@[5; 8)
-        Marker(InterpolAst)@[8; 11)
+        InterpolAst@[8; 11)
           Token(Ident)@[8; 11)
-        Marker(InterpolLiteral)@[11; 13)
+        InterpolLiteral@[11; 13)
           Token(InterpolEnd)@[11; 13)
-    Marker(InterpolLiteral)@[13; 16)
+    InterpolLiteral@[13; 16)
       Token(InterpolEnd)@[13; 16)
   Token(Whitespace)@[16; 17)
 "
@@ -1049,9 +1047,9 @@ Marker(Root)@[0; 17)
                 (Token::Ident, "c")
             ],
             "\
-Marker(Root)@[0; 5)
-  Marker(IndexSet)@[0; 5)
-    Marker(IndexSet)@[0; 3)
+Root@[0; 5)
+  IndexSet@[0; 5)
+    IndexSet@[0; 3)
       Token(Ident)@[0; 1)
       Token(Dot)@[1; 2)
       Token(Ident)@[2; 3)
@@ -1073,11 +1071,11 @@ Marker(Root)@[0; 5)
                 (Token::CurlyBClose, "}")
             ],
             "\
-Marker(Root)@[0; 10)
-  Marker(Set)@[0; 10)
+Root@[0; 10)
+  Set@[0; 10)
     Token(CurlyBOpen)@[0; 1)
-    Marker(SetEntry)@[1; 9)
-      Marker(Attribute)@[1; 6)
+    SetEntry@[1; 9)
+      Attribute@[1; 6)
         Token(Ident)@[1; 2)
         Token(Dot)@[2; 3)
         Token(Ident)@[3; 4)
@@ -1104,23 +1102,23 @@ Marker(Root)@[0; 10)
                     (Token::DynamicEnd, "}")
             ],
             "\
-Marker(Root)@[0; 33)
-  Marker(IndexSet)@[0; 33)
-    Marker(IndexSet)@[0; 28)
-      Marker(IndexSet)@[0; 20)
+Root@[0; 33)
+  IndexSet@[0; 33)
+    IndexSet@[0; 28)
+      IndexSet@[0; 20)
         Token(Ident)@[0; 4)
         Token(Dot)@[4; 5)
         Token(String)@[5; 20)
       Token(Dot)@[20; 21)
-      Marker(Interpol)@[21; 28)
-        Marker(InterpolLiteral)@[21; 24)
+      Interpol@[21; 28)
+        InterpolLiteral@[21; 24)
           Token(InterpolStart)@[21; 24)
-        Marker(InterpolAst)@[24; 26)
+        InterpolAst@[24; 26)
           Token(Ident)@[24; 26)
-        Marker(InterpolLiteral)@[26; 28)
+        InterpolLiteral@[26; 28)
           Token(InterpolEnd)@[26; 28)
     Token(Dot)@[28; 29)
-    Marker(Dynamic)@[29; 33)
+    Dynamic@[29; 33)
       Token(DynamicStart)@[29; 31)
       Token(Ident)@[31; 32)
       Token(DynamicEnd)@[32; 33)
@@ -1138,9 +1136,9 @@ Marker(Root)@[0; 33)
                 (Token::Ident, "true")
             ],
             "\
-Marker(Root)@[0; 11)
-  Marker(Operation)@[0; 11)
-    Marker(Operation)@[0; 5)
+Root@[0; 11)
+  Operation@[0; 11)
+    Operation@[0; 5)
       Token(Ident)@[0; 1)
       Token(Question)@[1; 2)
       Token(String)@[2; 5)
@@ -1161,11 +1159,11 @@ Marker(Root)@[0; 11)
                 (Token::Integer, "1")
             ],
             "\
-Marker(Root)@[0; 10)
-  Marker(Operation)@[0; 10)
-    Marker(OrDefault)@[0; 8)
-      Marker(IndexSet)@[0; 5)
-        Marker(IndexSet)@[0; 3)
+Root@[0; 10)
+  Operation@[0; 10)
+    OrDefault@[0; 8)
+      IndexSet@[0; 5)
+        IndexSet@[0; 3)
           Token(Ident)@[0; 1)
           Token(Dot)@[1; 2)
           Token(Ident)@[2; 3)
@@ -1197,22 +1195,22 @@ Marker(Root)@[0; 10)
                 (Token::CurlyBClose, "}")
             ],
             "\
-Marker(Root)@[0; 14)
-  Marker(Operation)@[0; 14)
-    Marker(Set)@[0; 6)
+Root@[0; 14)
+  Operation@[0; 14)
+    Set@[0; 6)
       Token(CurlyBOpen)@[0; 1)
-      Marker(SetEntry)@[1; 5)
-        Marker(Attribute)@[1; 2)
+      SetEntry@[1; 5)
+        Attribute@[1; 2)
           Token(Ident)@[1; 2)
         Token(Assign)@[2; 3)
         Token(Integer)@[3; 4)
         Token(Semicolon)@[4; 5)
       Token(CurlyBClose)@[5; 6)
     Token(Merge)@[6; 8)
-    Marker(Set)@[8; 14)
+    Set@[8; 14)
       Token(CurlyBOpen)@[8; 9)
-      Marker(SetEntry)@[9; 13)
-        Marker(Attribute)@[9; 10)
+      SetEntry@[9; 13)
+        Attribute@[9; 10)
           Token(Ident)@[9; 10)
         Token(Assign)@[10; 11)
         Token(Integer)@[11; 12)
@@ -1231,8 +1229,8 @@ Marker(Root)@[0; 14)
                 (Token::Ident, "expr")
             ],
             "\
-Marker(Root)@[0; 18)
-  Marker(With)@[0; 18)
+Root@[0; 18)
+  With@[0; 18)
     Token(With)@[0; 4)
     Token(Ident)@[4; 13)
     Token(Semicolon)@[13; 14)
@@ -1252,10 +1250,10 @@ Marker(Root)@[0; 18)
                 (Token::String, "\"a == b\"")
             ],
             "\
-Marker(Root)@[0; 19)
-  Marker(Assert)@[0; 19)
+Root@[0; 19)
+  Assert@[0; 19)
     Token(Assert)@[0; 6)
-    Marker(Operation)@[6; 10)
+    Operation@[6; 10)
       Token(Ident)@[6; 7)
       Token(Equal)@[7; 9)
       Token(Ident)@[9; 10)
@@ -1292,26 +1290,26 @@ Marker(Root)@[0; 19)
                 (Token::CurlyBClose, "}")
             ],
             "\
-Marker(Root)@[0; 36)
-  Marker(Set)@[0; 36)
+Root@[0; 36)
+  Set@[0; 36)
     Token(CurlyBOpen)@[0; 1)
-    Marker(SetEntry)@[1; 5)
-      Marker(Attribute)@[1; 2)
+    SetEntry@[1; 5)
+      Attribute@[1; 2)
         Token(Ident)@[1; 2)
       Token(Assign)@[2; 3)
       Token(Integer)@[3; 4)
       Token(Semicolon)@[4; 5)
-    Marker(Inherit)@[5; 17)
+    Inherit@[5; 17)
       Token(Inherit)@[5; 12)
       Token(Whitespace)@[12; 13)
       Token(Ident)@[13; 14)
       Token(Whitespace)@[14; 15)
       Token(Ident)@[15; 16)
       Token(Semicolon)@[16; 17)
-    Marker(Inherit)@[17; 35)
+    Inherit@[17; 35)
       Token(Inherit)@[17; 24)
       Token(Whitespace)@[24; 25)
-      Marker(InheritFrom)@[25; 30)
+      InheritFrom@[25; 30)
         Token(ParenOpen)@[25; 26)
         Token(Ident)@[26; 29)
         Token(ParenClose)@[29; 30)
@@ -1344,17 +1342,17 @@ Marker(Root)@[0; 36)
                 (Token::Ident, "true")
             ],
             "\
-Marker(Root)@[0; 32)
-  Marker(Operation)@[0; 32)
+Root@[0; 32)
+  Operation@[0; 32)
     Token(Ident)@[0; 5)
     Token(Implication)@[5; 7)
-    Marker(Operation)@[7; 32)
-      Marker(Operation)@[7; 26)
-        Marker(Unary)@[7; 13)
+    Operation@[7; 32)
+      Operation@[7; 26)
+        Unary@[7; 13)
           Token(Invert)@[7; 8)
           Token(Ident)@[8; 13)
         Token(And)@[13; 15)
-        Marker(Operation)@[15; 26)
+        Operation@[15; 26)
           Token(Ident)@[15; 20)
           Token(Equal)@[20; 22)
           Token(Ident)@[22; 26)
@@ -1387,26 +1385,26 @@ Marker(Root)@[0; 32)
                 (Token::Integer, "2")
             ],
             "\
-Marker(Root)@[0; 20)
-  Marker(Operation)@[0; 20)
-    Marker(Operation)@[0; 3)
+Root@[0; 20)
+  Operation@[0; 20)
+    Operation@[0; 3)
       Token(Integer)@[0; 1)
       Token(Less)@[1; 2)
       Token(Integer)@[2; 3)
     Token(Or)@[3; 5)
-    Marker(Operation)@[5; 20)
-      Marker(Operation)@[5; 14)
-        Marker(Operation)@[5; 9)
+    Operation@[5; 20)
+      Operation@[5; 14)
+        Operation@[5; 9)
           Token(Integer)@[5; 6)
           Token(LessOrEq)@[6; 8)
           Token(Integer)@[8; 9)
         Token(And)@[9; 11)
-        Marker(Operation)@[11; 14)
+        Operation@[11; 14)
           Token(Integer)@[11; 12)
           Token(More)@[12; 13)
           Token(Integer)@[13; 14)
       Token(And)@[14; 16)
-      Marker(Operation)@[16; 20)
+      Operation@[16; 20)
         Token(Integer)@[16; 17)
         Token(MoreOrEq)@[17; 19)
         Token(Integer)@[19; 20)
@@ -1425,14 +1423,14 @@ Marker(Root)@[0; 20)
                 (Token::Integer, "3")
             ],
             "\
-Marker(Root)@[0; 10)
-  Marker(Operation)@[0; 10)
-    Marker(Operation)@[0; 4)
+Root@[0; 10)
+  Operation@[0; 10)
+    Operation@[0; 4)
       Token(Integer)@[0; 1)
       Token(Equal)@[1; 3)
       Token(Integer)@[3; 4)
     Token(And)@[4; 6)
-    Marker(Operation)@[6; 10)
+    Operation@[6; 10)
       Token(Integer)@[6; 7)
       Token(NotEqual)@[7; 9)
       Token(Integer)@[9; 10)
@@ -1453,14 +1451,14 @@ Marker(Root)@[0; 10)
                         (Token::Integer, "3")
             ],
             "\
-Marker(Root)@[0; 34)
-  Marker(IfElse)@[0; 34)
+Root@[0; 34)
+  IfElse@[0; 34)
     Token(If)@[0; 2)
     Token(Ident)@[2; 7)
     Token(Then)@[7; 11)
     Token(Integer)@[11; 12)
     Token(Else)@[12; 16)
-    Marker(IfElse)@[16; 34)
+    IfElse@[16; 34)
       Token(If)@[16; 18)
       Token(Ident)@[18; 22)
       Token(Then)@[22; 26)
@@ -1482,16 +1480,16 @@ Marker(Root)@[0; 34)
                 (Token::SquareBClose, "]")
             ],
             "\
-Marker(Root)@[0; 10)
-  Marker(List)@[0; 10)
+Root@[0; 10)
+  List@[0; 10)
     Token(SquareBOpen)@[0; 1)
-    Marker(ListItem)@[1; 2)
+    ListItem@[1; 2)
       Token(Ident)@[1; 2)
-    Marker(ListItem)@[2; 3)
+    ListItem@[2; 3)
       Token(Integer)@[2; 3)
-    Marker(ListItem)@[3; 4)
+    ListItem@[3; 4)
       Token(Integer)@[3; 4)
-    Marker(ListItem)@[4; 9)
+    ListItem@[4; 9)
       Token(String)@[4; 9)
     Token(SquareBClose)@[9; 10)
 "
@@ -1505,24 +1503,24 @@ Marker(Root)@[0; 10)
                 (Token::SquareBOpen, "["), (Token::Integer, "3"), (Token::SquareBClose, "]")
             ],
             "\
-Marker(Root)@[0; 15)
-  Marker(Operation)@[0; 15)
-    Marker(Operation)@[0; 10)
-      Marker(List)@[0; 3)
+Root@[0; 15)
+  Operation@[0; 15)
+    Operation@[0; 10)
+      List@[0; 3)
         Token(SquareBOpen)@[0; 1)
-        Marker(ListItem)@[1; 2)
+        ListItem@[1; 2)
           Token(Integer)@[1; 2)
         Token(SquareBClose)@[2; 3)
       Token(Concat)@[3; 5)
-      Marker(List)@[5; 10)
+      List@[5; 10)
         Token(SquareBOpen)@[5; 6)
-        Marker(ListItem)@[6; 9)
+        ListItem@[6; 9)
           Token(Ident)@[6; 9)
         Token(SquareBClose)@[9; 10)
     Token(Concat)@[10; 12)
-    Marker(List)@[12; 15)
+    List@[12; 15)
       Token(SquareBOpen)@[12; 13)
-      Marker(ListItem)@[13; 14)
+      ListItem@[13; 14)
         Token(Integer)@[13; 14)
       Token(SquareBClose)@[14; 15)
 "
@@ -1538,12 +1536,12 @@ Marker(Root)@[0; 15)
                 (Token::CurlyBClose, "}")
             ],
             "\
-Marker(Root)@[0; 17)
-  Marker(Apply)@[0; 17)
-    Marker(Apply)@[0; 15)
+Root@[0; 17)
+  Apply@[0; 17)
+    Apply@[0; 15)
       Token(Ident)@[0; 6)
       Token(Path)@[6; 15)
-    Marker(Set)@[15; 17)
+    Set@[15; 17)
       Token(CurlyBOpen)@[15; 16)
       Token(CurlyBClose)@[16; 17)
 "
@@ -1563,16 +1561,16 @@ Marker(Root)@[0; 17)
                 (Token::Ident, "b")
             ],
             "\
-Marker(Root)@[0; 11)
-  Marker(Lambda)@[0; 11)
+Root@[0; 11)
+  Lambda@[0; 11)
     Token(Ident)@[0; 1)
     Token(Colon)@[1; 2)
     Token(Whitespace)@[2; 3)
-    Marker(Lambda)@[3; 11)
+    Lambda@[3; 11)
       Token(Ident)@[3; 4)
       Token(Colon)@[4; 5)
       Token(Whitespace)@[5; 6)
-      Marker(Operation)@[6; 11)
+      Operation@[6; 11)
         Token(Ident)@[6; 7)
         Token(Whitespace)@[7; 8)
         Token(Add)@[8; 9)
@@ -1593,10 +1591,10 @@ Marker(Root)@[0; 11)
                 (Token::Integer, "3")
             ],
             "\
-Marker(Root)@[0; 9)
-  Marker(Operation)@[0; 9)
-    Marker(Apply)@[0; 6)
-      Marker(Apply)@[0; 4)
+Root@[0; 9)
+  Operation@[0; 9)
+    Apply@[0; 6)
+      Apply@[0; 4)
         Token(Ident)@[0; 1)
         Token(Whitespace)@[1; 2)
         Token(Integer)@[2; 3)
@@ -1623,9 +1621,9 @@ Marker(Root)@[0; 9)
                 (Token::Integer, "1")
             ],
             "\
-Marker(Root)@[0; 10)
-  Marker(Lambda)@[0; 10)
-    Marker(Pattern)@[0; 7)
+Root@[0; 10)
+  Lambda@[0; 10)
+    Pattern@[0; 7)
       Token(CurlyBOpen)@[0; 1)
       Token(Whitespace)@[1; 2)
       Token(Ellipsis)@[2; 5)
@@ -1649,13 +1647,13 @@ Marker(Root)@[0; 10)
                 (Token::Integer, "1")
             ],
             "\
-Marker(Root)@[0; 13)
-  Marker(Lambda)@[0; 13)
-    Marker(Pattern)@[0; 10)
+Root@[0; 13)
+  Lambda@[0; 13)
+    Pattern@[0; 10)
       Token(CurlyBOpen)@[0; 1)
       Token(CurlyBClose)@[1; 2)
       Token(Whitespace)@[2; 3)
-      Marker(PatBind)@[3; 10)
+      PatBind@[3; 10)
         Token(At)@[3; 4)
         Token(Whitespace)@[4; 5)
         Token(Ident)@[5; 10)
@@ -1679,16 +1677,16 @@ Marker(Root)@[0; 13)
                 (Token::Ident, "a")
             ],
             "\
-Marker(Root)@[0; 22)
-  Marker(Lambda)@[0; 22)
-    Marker(Pattern)@[0; 19)
+Root@[0; 22)
+  Lambda@[0; 22)
+    Pattern@[0; 19)
       Token(CurlyBOpen)@[0; 1)
       Token(Whitespace)@[1; 2)
-      Marker(PatEntry)@[2; 3)
+      PatEntry@[2; 3)
         Token(Ident)@[2; 3)
       Token(Comma)@[3; 4)
       Token(Whitespace)@[4; 5)
-      Marker(PatEntry)@[5; 18)
+      PatEntry@[5; 18)
         Token(Ident)@[5; 6)
         Token(Whitespace)@[6; 7)
         Token(Question)@[7; 8)
@@ -1716,16 +1714,16 @@ Marker(Root)@[0; 22)
                 (Token::Ident, "a")
             ],
             "\
-Marker(Root)@[0; 28)
-  Marker(Lambda)@[0; 28)
-    Marker(Pattern)@[0; 25)
+Root@[0; 28)
+  Lambda@[0; 28)
+    Pattern@[0; 25)
       Token(CurlyBOpen)@[0; 1)
       Token(Whitespace)@[1; 2)
-      Marker(PatEntry)@[2; 3)
+      PatEntry@[2; 3)
         Token(Ident)@[2; 3)
       Token(Comma)@[3; 4)
       Token(Whitespace)@[4; 5)
-      Marker(PatEntry)@[5; 18)
+      PatEntry@[5; 18)
         Token(Ident)@[5; 6)
         Token(Whitespace)@[6; 7)
         Token(Question)@[7; 8)
@@ -1752,17 +1750,17 @@ Marker(Root)@[0; 28)
                 (Token::Ident, "outer")
             ],
             "\
-Marker(Root)@[0; 20)
-  Marker(Lambda)@[0; 20)
-    Marker(Pattern)@[0; 13)
-      Marker(PatBind)@[0; 7)
+Root@[0; 20)
+  Lambda@[0; 20)
+    Pattern@[0; 13)
+      PatBind@[0; 7)
         Token(Ident)@[0; 5)
         Token(Whitespace)@[5; 6)
         Token(At)@[6; 7)
       Token(Whitespace)@[7; 8)
       Token(CurlyBOpen)@[8; 9)
       Token(Whitespace)@[9; 10)
-      Marker(PatEntry)@[10; 12)
+      PatEntry@[10; 12)
         Token(Ident)@[10; 11)
         Token(Whitespace)@[11; 12)
       Token(CurlyBClose)@[12; 13)
@@ -1783,14 +1781,14 @@ Marker(Root)@[0; 20)
                 (Token::Ident, "a")
             ],
             "\
-Marker(Root)@[0; 8)
-  Marker(Lambda)@[0; 8)
-    Marker(Pattern)@[0; 6)
+Root@[0; 8)
+  Lambda@[0; 8)
+    Pattern@[0; 6)
       Token(CurlyBOpen)@[0; 1)
-      Marker(PatEntry)@[1; 5)
+      PatEntry@[1; 5)
         Token(Ident)@[1; 2)
         Token(Question)@[2; 3)
-        Marker(Set)@[3; 5)
+        Set@[3; 5)
           Token(CurlyBOpen)@[3; 4)
           Token(CurlyBClose)@[4; 5)
       Token(CurlyBClose)@[5; 6)
@@ -1808,11 +1806,11 @@ Marker(Root)@[0; 8)
                 (Token::Ident, "a")
             ],
             "\
-Marker(Root)@[0; 6)
-  Marker(Lambda)@[0; 6)
-    Marker(Pattern)@[0; 4)
+Root@[0; 6)
+  Lambda@[0; 6)
+    Pattern@[0; 4)
       Token(CurlyBOpen)@[0; 1)
-      Marker(PatEntry)@[1; 2)
+      PatEntry@[1; 2)
         Token(Ident)@[1; 2)
       Token(Comma)@[2; 3)
       Token(CurlyBClose)@[3; 4)
@@ -1830,8 +1828,8 @@ Marker(Root)@[0; 6)
                 (Token::DynamicEnd, "}")
             ],
             "\
-Marker(Root)@[0; 4)
-  Marker(Dynamic)@[0; 4)
+Root@[0; 4)
+  Dynamic@[0; 4)
     Token(DynamicStart)@[0; 2)
     Token(Ident)@[2; 3)
     Token(DynamicEnd)@[3; 4)

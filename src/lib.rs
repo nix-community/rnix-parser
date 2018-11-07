@@ -67,4 +67,35 @@ mod tests {
             parts => panic!("did not match: {:#?}", parts)
         }
     }
+    #[test]
+    fn remove_pattern_entry() {
+        let ast = parse("{\n  /* 1 */ a,\n  /* 2 */ b,\n  /* 3 */ c\n}:\na").as_result().unwrap();
+        let lambda = Lambda::cast(ast.root().inner()).unwrap();
+        let pattern = Pattern::cast(lambda.arg()).unwrap();
+
+        let only_b = pattern.filter_entries(|entry| entry.name().as_str() == "b");
+        assert_eq!(only_b.node().to_string(), "{\n  /* 2 */ b\n  }:\na");
+
+        let without_b = pattern.filter_entries(|entry| entry.name().as_str() != "b");
+        assert_eq!(without_b.node().to_string(), "{\n  /* 1 */ a,\n  /* 3 */ c\n}:\na");
+    }
+    #[test]
+    fn remove_set_entry() {
+        let ast = parse("{\n  /* 1 */ a = 3;\n  /* 2 */ b = 2;\n  /* 3 */ c = 3;\n}").as_result().unwrap();
+        let set = Set::cast(ast.root().inner()).unwrap();
+
+        let only_b = set.filter_entries(|entry| {
+            let key = entry.key();
+            let mut path = key.path();
+            Ident::cast(path.next().unwrap()).unwrap().as_str() == "b"
+        });
+        assert_eq!(only_b.node().to_string(), "{\n  /* 2 */ b = 2;\n  }");
+
+        let without_b = set.filter_entries(|entry| {
+            let key = entry.key();
+            let mut path = key.path();
+            Ident::cast(path.next().unwrap()).unwrap().as_str() != "b"
+        });
+        assert_eq!(without_b.node().to_string(), "{\n  /* 1 */ a = 3;\n  /* 3 */ c = 3;\n}");
+    }
 }
