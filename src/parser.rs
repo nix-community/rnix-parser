@@ -92,9 +92,13 @@ impl AST {
     pub fn node(&self) -> &Node {
         &self.node
     }
-    /// Return a typed root node
+    /// Return a borrowed typed root node
     pub fn root<'a>(&'a self) -> Root<rowan::RefRoot<'a, Types>> {
         Root::cast(self.node.borrowed()).unwrap()
+    }
+    /// Return an owned typed root node
+    pub fn into_root(self) -> Root<rowan::OwnedRoot<Types>> {
+        Root::cast(self.node).unwrap()
     }
     /// Return all errors in the tree, if any
     pub fn errors(&self) -> Vec<ParseError> {
