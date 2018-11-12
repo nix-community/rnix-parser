@@ -10,3 +10,10 @@ version = "0.5.0"
 [dependencies]
 failure = "0.1.2"
 rowan = { git = "https://github.com/matklad/rowan" }
+
+[dev-dependencies]
+criterion = "0.2.5"
+
+[[bench]]
+name = "all-packages"
+harness = false
