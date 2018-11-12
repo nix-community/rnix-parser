@@ -9,5 +9,10 @@ in {
         y = "2";
       }.x
     }
+
+    This line shall have no indention
+      This line shall be indented by 2
+    ''\n
+    ${ "hi" }
   '';
 }

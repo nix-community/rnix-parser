@@ -1,10 +1,10 @@
-use rnix::Error as NixError;
-use std::{env, fs, io::{self, Write}};
+extern crate rnix;
+extern crate rowan;
+
+use rnix::parser::ParseError;
+use std::{env, fs};
 
 fn main() {
-    let stdout = io::stdout();
-    let mut stdout = stdout.lock();
-
     let file = match env::args().skip(1).next() {
         Some(file) => file,
         None => {
@@ -19,65 +19,45 @@ fn main() {
             return;
         }
     };
-    let errors = match rnix::parse(&content) {
-        Ok(ast) => {
-            ast.errors()
-                .map(|node| {
-                    let (span, err) = node.error();
-                    (*span, err.to_string())
-                })
-                .collect()
-        },
-        Err(err) => match err {
-            NixError::TokenizeError(span, err) => vec![(Some(span), err.to_string())],
-            NixError::ParseError(span, err) => vec![(span, err.to_string())],
-        }
-    };
-
-    for (i, (span, err)) in errors.iter().enumerate() {
-        if i > 0 {
-            writeln!(stdout).unwrap();
-        }
-        writeln!(stdout, "error: {}", err).unwrap();
-
-        let span = match span {
-            Some(span) => span,
-            None => continue
-        };
-
-        let start = span.start as usize;
-        let end = span.end.map(|i| i as usize).unwrap_or(start+1);
-
-        let prev_line_end = content[..start].rfind('\n');
-        let prev_line = content[..prev_line_end.unwrap_or(0)].rfind('\n').map(|n| n+1).unwrap_or(0);
-        let next_line = content[end..].find('\n').map(|n| n + 1 + end).unwrap_or(content.len());
-        let next_line_end = content[next_line..].find('\n').map(|n| n + next_line).unwrap_or(content.len());
-
-        let line = content[..start].chars().filter(|c| *c == '\n').count() + 1;
-        let col = start - prev_line_end.map(|n| n+1).unwrap_or(0) + 1;
-
-        writeln!(stdout, "At {}:{}:{}", file, line, col);
-        writeln!(stdout).unwrap();
-
-        let mut pos = prev_line;
-        loop {
-            let line = content[pos..].find('\n').map(|n| n + pos).unwrap_or(content.len() - 1);
-
-            writeln!(stdout, "{}", &content[pos..line]).unwrap();
-            if pos >= prev_line_end.map(|n| n + 1).unwrap_or(0) && line < next_line {
-                for i in pos..line {
-                    if i >= start && i < end {
-                        stdout.write_all(&[b'^']).unwrap();
-                    } else {
-                        stdout.write_all(&[b' ']).unwrap();
-                    }
-                }
-                writeln!(stdout).unwrap();
+    let ast = rnix::parse(&content);
+    for error in ast.errors() {
+        let range = match error {
+            ParseError::Unexpected(node) => node.range(),
+            err => {
+                eprintln!("error: {}", err);
+                continue;
             }
+        };
+        let start = range.start().to_usize();
+        let start_row = content[..start].lines().count();
+        let start_line = content[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let start_col = content[start_line..start].chars().count();
+        let end = range.start().to_usize();
+        let end_row = content[..end].lines().count();
+        let end_line = content[..end].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let end_col = content[end_line..end].chars().count();
 
-            pos = line+1;
-            if pos >= next_line_end {
-                break;
+        let mut line_len = 1;
+        let mut line = end_row;
+        while line >= 10 {
+            line /= 10;
+            line_len += 1;
+        }
+
+        let i = start_row.saturating_sub(1);
+        for (i, line) in content.lines().enumerate().skip(i).take(end_row - i + 1) {
+            println!("{:line_len$} {}", i+1, line, line_len = line_len);
+            if i >= start_row || i <= end_row {
+                print!("{:line_len$} ", "", line_len = line_len);
+                let mut end_col = if i == end_row { end_col } else { line.chars().count() };
+                if i == start_row {
+                    print!("{:indent$}", "", indent = start_col);
+                    end_col -= start_col;
+                }
+                for _ in 0..end_col {
+                    print!("^");
+                }
+                println!();
             }
         }
     }

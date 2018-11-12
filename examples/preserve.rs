@@ -1,3 +1,6 @@
+extern crate rnix;
+extern crate rowan;
+
 use std::{env, fs};
 
 fn main() {
@@ -14,9 +17,6 @@ fn main() {
                 return;
             }
         };
-        match rnix::parse(&content) {
-            Ok(ast) => print!("{}", ast),
-            Err(err) => eprintln!("error: {:?}", err)
-        }
+        print!("{}", rnix::parse(&content).node());
     }
 }

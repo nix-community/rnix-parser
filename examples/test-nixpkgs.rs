@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate failure;
+extern crate rnix;
+extern crate rowan;
 
 use failure::Error;
 use std::{env, fs, path::Path};
@@ -21,7 +23,7 @@ fn recurse(path: &Path) -> Result<(), Error> {
         }
         println!("Checking {}", path.display());
         let original = fs::read_to_string(path)?;
-        let parsed = rnix::parse(&original)?.to_string();
+        let parsed = rnix::parse(&original).as_result()?.node().to_string();
         if original != parsed {
             eprintln!("Original input does not match parsed output!");
             println!("Input:");

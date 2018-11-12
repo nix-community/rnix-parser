@@ -1,19 +1,12 @@
 [package]
 authors = ["jD91mZM2 <me@krake.one>"]
 description = "A Nix parser written in Rust"
-edition = "2018"
 license-file = "LICENSE"
 name = "rnix"
 readme = "README.md"
 repository = "https://gitlab.com/jD91mZM2/rnix"
-version = "0.4.1"
+version = "0.5.0"
 
 [dependencies]
-arenatree = "0.1.1"
-arrayvec = "0.4.7"
 failure = "0.1.2"
-
-smol_str = { version = "0.1.2", optional = true }
-
-[features]
-default = ["smol_str"]
+rowan = { git = "https://github.com/matklad/rowan" }

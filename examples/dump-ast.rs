@@ -1,3 +1,7 @@
+extern crate rnix;
+extern crate rowan;
+
+use rowan::WalkEvent;
 use std::{env, fs};
 
 fn main() {
@@ -14,11 +18,23 @@ fn main() {
                 return;
             }
         };
-        match rnix::parse(&content) {
-            Ok(ast) => {
-                println!("{:#?}", ast)
-            },
-            Err(err) => eprintln!("error: {:?}", err)
+        let ast = rnix::parse(&content);
+        let node = ast.node().borrowed();
+
+        for error in node.root_data() {
+            println!("error: {}", error);
+        }
+
+        let mut indent = 0;
+        for event in node.preorder() {
+            match event {
+                WalkEvent::Enter(node) => {
+                    println!("{:indent$}{:?} {:?}", "", node, node.leaf_text(), indent = indent);
+                    indent += 2;
+                },
+                WalkEvent::Leave(_) =>
+                    indent -= 2
+            }
         }
     }
 }
