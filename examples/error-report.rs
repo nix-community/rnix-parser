@@ -28,12 +28,13 @@ fn main() {
                 continue;
             }
         };
+        eprintln!("----- ERROR -----");
         let start = range.start().to_usize();
-        let start_row = content[..start].lines().count();
+        let start_row = content[..start].lines().count() - 1;
         let start_line = content[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
         let start_col = content[start_line..start].chars().count();
-        let end = range.start().to_usize();
-        let end_row = content[..end].lines().count();
+        let end = range.end().to_usize();
+        let end_row = content[..end].lines().count() - 1;
         let end_line = content[..end].rfind('\n').map(|i| i + 1).unwrap_or(0);
         let end_col = content[end_line..end].chars().count();
 
@@ -47,7 +48,7 @@ fn main() {
         let i = start_row.saturating_sub(1);
         for (i, line) in content.lines().enumerate().skip(i).take(end_row - i + 1) {
             println!("{:line_len$} {}", i+1, line, line_len = line_len);
-            if i >= start_row || i <= end_row {
+            if i >= start_row && i <= end_row {
                 print!("{:line_len$} ", "", line_len = line_len);
                 let mut end_col = if i == end_row { end_col } else { line.chars().count() };
                 if i == start_row {

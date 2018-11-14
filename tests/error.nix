@@ -1,4 +1,5 @@
 {
+  hello "Hello Ùnicödə" = 1;
   test = {
     valid = "entry";
     invalid "entry";
