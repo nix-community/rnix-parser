@@ -125,6 +125,10 @@ pub fn remove_indent(input: &str, initial: bool, indent: usize) -> String {
         let iter = input.chars().take_while(|&c| c != '\n');
         if iter.clone().all(char::is_whitespace) {
             start += iter.map(char::len_utf8).sum::<usize>() + /* newline */ 1;
+            if start >= input.len() {
+                // There's nothing after this whitespace line
+                return output;
+            }
         } else {
             // Otherwise, skip like normal
             start += indention(input).take(indent).map(char::len_utf8).sum::<usize>();
@@ -202,14 +206,14 @@ impl Value {
             },
             (Token::String, s) => if s.starts_with('"') {
                 let len = s.len();
-                if len <= 2 || !s.ends_with('"') {
+                if len < 2 || !s.ends_with('"') {
                     return Err(ValueError::String);
                 }
                 let content = unescape(&s[1..len-1], false);
                 Ok(Value::Str { multiline: false, content })
             } else if s.starts_with("''") {
                 let len = s.len();
-                if len <= 4 || !s.ends_with("''") {
+                if len < 4 || !s.ends_with("''") {
                     return Err(ValueError::String);
                 }
                 let content = unescape(&s[2..len-2], true);
@@ -269,6 +273,8 @@ mod tests {
     }
     #[test]
     fn values() {
+        assert_eq!(Value::from_token(Token::String, r#""""#), Ok(Value::Str { multiline: false, content: "".into() }));
+        assert_eq!(Value::from_token(Token::String, r#"''''"#), Ok(Value::Str { multiline: true, content: "".into() }));
         assert_eq!(Value::from_token(Token::String, r#""\"""#), Ok(Value::Str { multiline: false, content: "\"".into() }));
         assert_eq!(Value::from_token(Token::String, "'''''''"), Ok(Value::Str { multiline: true, content: "''".into() }));
 
