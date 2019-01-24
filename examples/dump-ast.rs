@@ -1,6 +1,3 @@
-extern crate rnix;
-extern crate rowan;
-
 use rowan::WalkEvent;
 use std::{env, fs};
 
@@ -19,7 +16,7 @@ fn main() {
             }
         };
         let ast = rnix::parse(&content);
-        let node = ast.node().borrowed();
+        let node = ast.node();
 
         for error in node.root_data() {
             println!("error: {}", error);

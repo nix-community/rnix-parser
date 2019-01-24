@@ -5,7 +5,7 @@ use crate::{
     tokenizer::Token
 };
 
-use rowan::{GreenNodeBuilder, SyntaxNode, SmolStr};
+use rowan::{GreenNodeBuilder, SyntaxNode, SmolStr, TreeArc};
 use std::collections::VecDeque;
 
 const OR: &'static str = "or";
@@ -14,7 +14,7 @@ const OR: &'static str = "or";
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum ParseError {
     #[fail(display = "unexpected input")]
-    Unexpected(Node<rowan::OwnedRoot<Types>>),
+    Unexpected(TreeArc<Types, Node>),
     #[fail(display = "unexpected eof")]
     UnexpectedEOF,
     #[fail(display = "unexpected eof, wanted {:?}", _0)]
@@ -77,15 +77,16 @@ impl rowan::Types for Types {
     type RootData = Vec<ParseError>;
 }
 
-pub type Node<R = rowan::OwnedRoot<Types>> = rowan::SyntaxNode<Types, R>;
+pub type Node = rowan::SyntaxNode<Types>;
 
 /// The result of a parse
+#[derive(Clone)]
 pub struct AST {
-    node: Node
+    node: TreeArc<Types, Node>
 }
 impl AST {
     /// Return the root node
-    pub fn into_node(self) -> Node {
+    pub fn into_node(self) -> TreeArc<Types, Node> {
         self.node
     }
     /// Return a reference to the root node
@@ -93,12 +94,12 @@ impl AST {
         &self.node
     }
     /// Return a borrowed typed root node
-    pub fn root<'a>(&'a self) -> Root<rowan::RefRoot<'a, Types>> {
-        Root::cast(self.node.borrowed()).unwrap()
+    pub fn root(&self) -> &Root {
+        Root::cast(&self.node).unwrap()
     }
     /// Return an owned typed root node
-    pub fn into_root(self) -> Root<rowan::OwnedRoot<Types>> {
-        Root::cast(self.node).unwrap()
+    pub fn into_root(self) -> TreeArc<Types, Root> {
+        TreeArc::cast(self.node)
     }
     /// Return all errors in the tree, if any
     pub fn errors(&self) -> Vec<ParseError> {
@@ -106,7 +107,7 @@ impl AST {
         errors.extend_from_slice(self.node.root_data());
         errors.extend(
             self.root().errors().into_iter()
-                .map(|node| ParseError::Unexpected(node.owned()))
+                .map(|node| ParseError::Unexpected(node.to_owned()))
         );
 
         errors
@@ -117,7 +118,7 @@ impl AST {
             return Err(err.clone());
         }
         if let Some(node) = self.root().errors().first() {
-            return Err(ParseError::Unexpected(node.owned()));
+            return Err(ParseError::Unexpected((*node).to_owned()));
         }
         Ok(self)
     }
@@ -616,7 +617,7 @@ mod tests {
     use rowan::WalkEvent;
     use std::fmt::Write;
 
-    fn stringify(node: Node<rowan::RefRoot<Types>>) -> String {
+    fn stringify(node: &Node) -> String {
         let mut out = String::new();
         let mut indent = 0;
         for event in node.preorder() {
@@ -636,7 +637,7 @@ mod tests {
         ([$(($token:expr, $str:expr)),*], $expected:expr) => {
             let parsed = parse(vec![$(($token, $str.into())),*]).as_result().expect("error occured when parsing");
 
-            let actual = stringify(parsed.node().borrowed());
+            let actual = stringify(parsed.node());
             if actual != $expected {
                 eprintln!("--- Actual ---");
                 eprintln!("{}", actual);

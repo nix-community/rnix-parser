@@ -1,6 +1,3 @@
-extern crate rnix;
-extern crate rowan;
-
 use std::{env, fs};
 
 fn main() {

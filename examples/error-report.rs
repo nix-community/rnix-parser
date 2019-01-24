@@ -1,6 +1,3 @@
-extern crate rnix;
-extern crate rowan;
-
 use rnix::parser::ParseError;
 use std::{env, fs};
 

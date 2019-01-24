@@ -1,11 +1,9 @@
 #[macro_use]
 extern crate failure;
-extern crate rnix;
-extern crate rowan;
 
 use failure::Error;
 use rnix::{
-    parser::{Node, NodeType, Types},
+    parser::{Node, NodeType},
     tokenizer::Token,
     types::*,
 };
@@ -28,13 +26,13 @@ fn main() -> Result<(), Error> {
         if let Some(lambda) = Lambda::cast(entry.value()) {
             let attr = entry.key();
             let ident = attr.path().last().and_then(Ident::cast);
-            let s = ident.as_ref().map(Ident::as_str).unwrap_or("error");
+            let s = ident.map(Ident::as_str).unwrap_or("error");
             println!("Function name: {}", s);
 
             let mut value = Some(lambda);
             while let Some(lambda) = value {
                 let ident = Ident::cast(lambda.arg());
-                let s = ident.as_ref().map(Ident::as_str).unwrap_or("error");
+                let s = ident.map(Ident::as_str).unwrap_or("error");
                 println!("Arg: {}", s);
                 if let Some(comment) = find_comment(lambda.arg()) {
                     println!("Doc: {}", comment);
@@ -46,7 +44,7 @@ fn main() -> Result<(), Error> {
 
     Ok(())
 }
-fn find_comment<R: rowan::TreeRoot<Types>>(mut node: Node<R>) -> Option<String> {
+fn find_comment(mut node: &Node) -> Option<String> {
     loop {
         loop {
             let new = node.prev_sibling();
@@ -60,7 +58,7 @@ fn find_comment<R: rowan::TreeRoot<Types>>(mut node: Node<R>) -> Option<String> 
 
         match node.kind() {
             NodeType::Token(Token::Comment) =>
-                return node.borrowed().leaf_text().map(SmolStr::as_str).map(String::from),
+                return node.leaf_text().map(SmolStr::as_str).map(String::from),
             NodeType::Token(t) if t.is_trivia() => (),
             _ => return None
         }
