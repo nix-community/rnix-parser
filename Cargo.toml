@@ -14,7 +14,7 @@ name = "all-packages"
 
 [dependencies]
 failure = "0.1.5"
-rowan = "0.3.2"
+rowan = "0.3.3"
 
 [dev-dependencies]
 criterion = "0.2.8"

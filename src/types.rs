@@ -8,16 +8,6 @@ use crate::{
 
 use rowan::{SmolStr, TransparentNewType, TreeArc, WalkEvent};
 
-fn cast_into<T>(from: &Node, kind: NodeType) -> Option<&T>
-    where T: TransparentNewType<Repr = Node>
-{
-    if from.kind() == kind {
-        Some(T::from_repr(from.into_repr()))
-    } else {
-        None
-    }
-}
-
 macro_rules! typed {
     ($($kind:expr => $name:ident$(: $trait:ident)*$(: { $($block:tt)* })*),*) => {
         $(
@@ -27,10 +17,19 @@ macro_rules! typed {
             unsafe impl TransparentNewType for $name {
                 type Repr = Node;
             }
-
+            impl ToOwned for $name {
+                type Owned = TreeArc<Types, Self>;
+                fn to_owned(&self) -> Self::Owned {
+                    TreeArc::cast(self.node().to_owned())
+                }
+            }
             impl TypedNode for $name {
                 fn cast(from: &Node) -> Option<&Self> {
-                    cast_into(from, $kind.into())
+                    if from.kind() == $kind.into() {
+                        Some(Self::from_repr(from.into_repr()))
+                    } else {
+                        None
+                    }
                 }
                 fn node(&self) -> &Node {
                     &self.0
@@ -125,7 +124,7 @@ pub enum InterpolPart<'a> {
 
 /// A TypedNode is simply a wrapper around an untyped node to provide a type
 /// system in some sense.
-pub trait TypedNode: TransparentNewType + Sized {
+pub trait TypedNode: TransparentNewType<Repr = Node> + ToOwned + Sized {
     /// Cast an untyped node into this strongly-typed node. This will return
     /// None if the type was not correct.
     fn cast(from: &Node) -> Option<&Self>;
@@ -179,9 +178,16 @@ pub trait LightWrapper: TypedNode {
     }
 }
 
+#[repr(transparent)]
 pub struct Value(Node);
 unsafe impl TransparentNewType for Value {
     type Repr = Node;
+}
+impl ToOwned for Value {
+    type Owned = TreeArc<Types, Self>;
+    fn to_owned(&self) -> Self::Owned {
+        TreeArc::cast(self.node().to_owned())
+    }
 }
 impl TypedNode for Value {
     fn cast(from: &Node) -> Option<&Self> {
