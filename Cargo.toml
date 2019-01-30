@@ -6,7 +6,7 @@ license-file = "LICENSE"
 name = "rnix"
 readme = "README.md"
 repository = "https://gitlab.com/jD91mZM2/rnix"
-version = "0.5.1"
+version = "0.5.2"
 
 [[bench]]
 harness = false
