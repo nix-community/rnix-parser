@@ -68,6 +68,21 @@ mod tests {
         }
     }
     #[test]
+    fn inherit() {
+        let ast = parse(include_str!("../tests/inherit.nix"));
+
+        let let_in = LetIn::cast(ast.root().inner()).unwrap();
+        let set = Set::cast(let_in.body()).unwrap();
+        let inherit = set.inherits().nth(1).unwrap();
+
+        let from = Ident::cast(inherit.from().unwrap().inner()).unwrap();
+        assert_eq!(from.as_str(), "set");
+        let mut children = inherit.idents();
+        assert_eq!(children.next().unwrap().as_str(), "z");
+        assert_eq!(children.next().unwrap().as_str(), "a");
+        assert!(children.next().is_none());
+    }
+    #[test]
     fn remove_pattern_entry() {
         let ast = parse("{\n  /* 1 */ a,\n  /* 2 */ b,\n  /* 3 */ c\n}:\na").as_result().unwrap();
         let lambda = Lambda::cast(ast.root().inner()).unwrap();

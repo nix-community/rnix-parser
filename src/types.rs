@@ -283,6 +283,10 @@ typed! [
                 .filter_map(InheritFrom::cast)
                 .next()
         }
+        /// Return all the identifiers being inherited
+        pub fn idents(&self) -> impl Iterator<Item = &Ident> {
+            self.node().children().filter_map(Ident::cast)
+        }
     },
     NodeType::InheritFrom => InheritFrom: Wrapper,
     NodeType::Interpol => Interpol: {
