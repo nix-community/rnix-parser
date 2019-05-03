@@ -1,6 +1,7 @@
 //! The types: Such as strings or integers
 
-use crate::tokenizer::Token;
+use crate::tokenizer::tokens::*;
+use rowan::SyntaxKind;
 
 /// An anchor point for a path, such as if it's relative or absolute
 #[derive(Clone, Debug, PartialEq)]
@@ -185,11 +186,11 @@ impl From<std::num::ParseIntError> for ValueError {
 
 impl Value {
     /// Parse a token kind and string into a typed value
-    pub fn from_token(token: Token, s: &str) -> Result<Self, ValueError> {
+    pub fn from_token(token: SyntaxKind, s: &str) -> Result<Self, ValueError> {
         match (token, s) {
-            (Token::Float, s) => Ok(Value::Float(s.parse()?)),
-            (Token::Integer, s) => Ok(Value::Integer(s.parse()?)),
-            (Token::Path, s) => if s.starts_with('<') {
+            (TOKEN_FLOAT, s) => Ok(Value::Float(s.parse()?)),
+            (TOKEN_INTEGER, s) => Ok(Value::Integer(s.parse()?)),
+            (TOKEN_PATH, s) => if s.starts_with('<') {
                 let len = s.len();
                 if len < 2 || !s.ends_with('>') {
                     return Err(ValueError::StorePath);
@@ -204,7 +205,7 @@ impl Value {
             } else {
                 Ok(Value::Path(Anchor::Relative, String::from(s)))
             },
-            (Token::String, s) => if s.starts_with('"') {
+            (TOKEN_STRING, s) => if s.starts_with('"') {
                 let len = s.len();
                 if len < 2 || !s.ends_with('"') {
                     return Err(ValueError::String);
@@ -273,18 +274,18 @@ mod tests {
     }
     #[test]
     fn values() {
-        assert_eq!(Value::from_token(Token::String, r#""""#), Ok(Value::Str { multiline: false, content: "".into() }));
-        assert_eq!(Value::from_token(Token::String, r#"''''"#), Ok(Value::Str { multiline: true, content: "".into() }));
-        assert_eq!(Value::from_token(Token::String, r#""\"""#), Ok(Value::Str { multiline: false, content: "\"".into() }));
-        assert_eq!(Value::from_token(Token::String, "'''''''"), Ok(Value::Str { multiline: true, content: "''".into() }));
+        assert_eq!(Value::from_token(TOKEN_STRING, r#""""#), Ok(Value::Str { multiline: false, content: "".into() }));
+        assert_eq!(Value::from_token(TOKEN_STRING, r#"''''"#), Ok(Value::Str { multiline: true, content: "".into() }));
+        assert_eq!(Value::from_token(TOKEN_STRING, r#""\"""#), Ok(Value::Str { multiline: false, content: "\"".into() }));
+        assert_eq!(Value::from_token(TOKEN_STRING, "'''''''"), Ok(Value::Str { multiline: true, content: "''".into() }));
 
-        assert_eq!(Value::from_token(Token::Path, "<nixpkgs>"), Ok(Value::Path(Anchor::Store, "nixpkgs".into())));
-        assert_eq!(Value::from_token(Token::Path, "~/path/to/thing"), Ok(Value::Path(Anchor::Home, "path/to/thing".into())));
-        assert_eq!(Value::from_token(Token::Path, "/path/to/thing"), Ok(Value::Path(Anchor::Absolute, "/path/to/thing".into())));
-        assert_eq!(Value::from_token(Token::Path, "path/to/thing"), Ok(Value::Path(Anchor::Relative, "path/to/thing".into())));
-        assert_eq!(Value::from_token(Token::Path, "https:path"), Ok(Value::Path(Anchor::Uri, "https:path".into())));
+        assert_eq!(Value::from_token(TOKEN_PATH, "<nixpkgs>"), Ok(Value::Path(Anchor::Store, "nixpkgs".into())));
+        assert_eq!(Value::from_token(TOKEN_PATH, "~/path/to/thing"), Ok(Value::Path(Anchor::Home, "path/to/thing".into())));
+        assert_eq!(Value::from_token(TOKEN_PATH, "/path/to/thing"), Ok(Value::Path(Anchor::Absolute, "/path/to/thing".into())));
+        assert_eq!(Value::from_token(TOKEN_PATH, "path/to/thing"), Ok(Value::Path(Anchor::Relative, "path/to/thing".into())));
+        assert_eq!(Value::from_token(TOKEN_PATH, "https:path"), Ok(Value::Path(Anchor::Uri, "https:path".into())));
 
-        assert_eq!(Value::from_token(Token::Integer, "123"), Ok(Value::Integer(123)));
-        assert_eq!(Value::from_token(Token::Float, "1.234"), Ok(Value::Float(1.234)));
+        assert_eq!(Value::from_token(TOKEN_INTEGER, "123"), Ok(Value::Integer(123)));
+        assert_eq!(Value::from_token(TOKEN_FLOAT, "1.234"), Ok(Value::Float(1.234)));
     }
 }

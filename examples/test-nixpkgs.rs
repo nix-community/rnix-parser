@@ -19,8 +19,13 @@ fn recurse(path: &Path) -> Result<(), Error> {
         if path.extension().and_then(|s| s.to_str()) != Some("nix") {
             return Ok(());
         }
+
         println!("Checking {}", path.display());
         let original = fs::read_to_string(path)?;
+        if original.trim().is_empty() {
+            return Ok(());
+        }
+
         let parsed = rnix::parse(&original).as_result()?.node().to_string();
         if original != parsed {
             eprintln!("Original input does not match parsed output!");

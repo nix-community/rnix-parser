@@ -19,7 +19,7 @@ fn main() {
     let ast = rnix::parse(&content);
     for error in ast.errors() {
         let range = match error {
-            ParseError::Unexpected(node) => node.range(),
+            ParseError::Unexpected(range) => range,
             err => {
                 eprintln!("error: {}", err);
                 continue;

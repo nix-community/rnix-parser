@@ -1,4 +1,4 @@
-use rowan::WalkEvent;
+use rowan::{SyntaxElement, WalkEvent};
 use std::{env, fs};
 
 fn main() {
@@ -16,17 +16,19 @@ fn main() {
             }
         };
         let ast = rnix::parse(&content);
-        let node = ast.node();
 
-        for error in node.root_data() {
+        for error in ast.root_errors() {
             println!("error: {}", error);
         }
 
         let mut indent = 0;
-        for event in node.preorder() {
+        for event in ast.node().preorder_with_tokens() {
             match event {
                 WalkEvent::Enter(node) => {
-                    println!("{:indent$}{:?} {:?}", "", node, node.leaf_text(), indent = indent);
+                    match node {
+                        SyntaxElement::Node(node) => println!("{:indent$}{:?}", "", node, indent = indent),
+                        SyntaxElement::Token(token) => println!("{:indent$}{:?} {:?}", "", token, token.text(), indent = indent)
+                    }
                     indent += 2;
                 },
                 WalkEvent::Leave(_) =>

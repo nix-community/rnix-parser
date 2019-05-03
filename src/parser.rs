@@ -1,11 +1,8 @@
 //! The parser: turns a series of tokens into an AST
 
-use crate::{
-    types::{TypedNode, Root},
-    tokenizer::Token
-};
+use crate::types::{TypedNode, Root};
 
-use rowan::{GreenNodeBuilder, SyntaxNode, SmolStr, TreeArc};
+use rowan::{GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TreeArc};
 use std::collections::VecDeque;
 
 const OR: &'static str = "or";
@@ -14,83 +11,64 @@ const OR: &'static str = "or";
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum ParseError {
     #[fail(display = "unexpected input")]
-    Unexpected(TreeArc<Types, Node>),
+    Unexpected(TextRange),
     #[fail(display = "unexpected eof")]
     UnexpectedEOF,
     #[fail(display = "unexpected eof, wanted {:?}", _0)]
-    UnexpectedEOFWanted(Token),
+    UnexpectedEOFWanted(SyntaxKind),
 }
 
 /// The type of a node in the AST
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum NodeType {
-    Apply,
-    Assert,
-    Attribute,
-    Dynamic,
-    Error,
-    IfElse,
-    IndexSet,
-    Inherit,
-    InheritFrom,
-    Interpol,
-    InterpolAst,
-    InterpolLiteral,
-    Lambda,
-    Let,
-    LetIn,
-    List,
-    ListItem,
-    Operation,
-    OrDefault,
-    Paren,
-    PatBind,
-    PatEntry,
-    Pattern,
-    Root,
-    Set,
-    SetEntry,
-    Token(Token),
-    Unary,
-    With,
-}
-impl NodeType {
-    /// Returns true if this token is trivia, see `Token::is_trivia`
-    pub fn is_trivia(self) -> bool {
-        match self {
-            NodeType::Token(t) => t.is_trivia(),
-            _ => false
-        }
-    }
-}
-impl From<Token> for NodeType {
-    fn from(kind: Token) -> Self {
-        NodeType::Token(kind)
-    }
-}
+pub mod nodes {
+    pub use crate::tokenizer::tokens::*;
+    use rowan::SyntaxKind;
 
-/// Teaches the rowan library about rnix' preferred types
-#[derive(Debug)]
-pub struct Types;
-impl rowan::Types for Types {
-    type Kind = NodeType;
-    type RootData = Vec<ParseError>;
+    // TODO BEFORE COMMITTING DON'T FORGET PLZ
+    // recreate the numbers
+    pub const NODE_APPLY: SyntaxKind = SyntaxKind(100);
+    pub const NODE_ASSERT: SyntaxKind = SyntaxKind(101);
+    pub const NODE_ATTRIBUTE: SyntaxKind = SyntaxKind(102);
+    pub const NODE_DYNAMIC: SyntaxKind = SyntaxKind(103);
+    pub const NODE_ERROR: SyntaxKind = SyntaxKind(104);
+    pub const NODE_IDENT: SyntaxKind = SyntaxKind(105);
+    pub const NODE_IF_ELSE: SyntaxKind = SyntaxKind(106);
+    pub const NODE_INDEX_SET: SyntaxKind = SyntaxKind(107);
+    pub const NODE_INHERIT: SyntaxKind = SyntaxKind(108);
+    pub const NODE_INHERIT_FROM: SyntaxKind = SyntaxKind(109);
+    pub const NODE_INTERPOL: SyntaxKind = SyntaxKind(110);
+    pub const NODE_INTERPOL_LITERAL: SyntaxKind = SyntaxKind(111);
+    pub const NODE_LAMBDA: SyntaxKind = SyntaxKind(112);
+    pub const NODE_LET: SyntaxKind = SyntaxKind(113);
+    pub const NODE_LET_IN: SyntaxKind = SyntaxKind(114);
+    pub const NODE_LIST: SyntaxKind = SyntaxKind(115);
+    pub const NODE_OPERATION: SyntaxKind = SyntaxKind(116);
+    pub const NODE_OR_DEFAULT: SyntaxKind = SyntaxKind(117);
+    pub const NODE_PAREN: SyntaxKind = SyntaxKind(118);
+    pub const NODE_PATTERN: SyntaxKind = SyntaxKind(119);
+    pub const NODE_PAT_BIND: SyntaxKind = SyntaxKind(120);
+    pub const NODE_PAT_ENTRY: SyntaxKind = SyntaxKind(121);
+    pub const NODE_ROOT: SyntaxKind = SyntaxKind(122);
+    pub const NODE_SET: SyntaxKind = SyntaxKind(123);
+    pub const NODE_SET_ENTRY: SyntaxKind = SyntaxKind(124);
+    pub const NODE_UNARY: SyntaxKind = SyntaxKind(125);
+    pub const NODE_VALUE: SyntaxKind = SyntaxKind(126);
+    pub const NODE_WITH: SyntaxKind = SyntaxKind(127);
 }
-
-pub type Node = rowan::SyntaxNode<Types>;
+use self::nodes::*;
 
 /// The result of a parse
 #[derive(Clone)]
 pub struct AST {
-    node: TreeArc<Types, Node>
+    node: TreeArc<SyntaxNode>,
+    errors: Vec<ParseError>
 }
 impl AST {
     /// Return the root node
-    pub fn into_node(self) -> TreeArc<Types, Node> {
+    pub fn into_node(self) -> TreeArc<SyntaxNode> {
         self.node
     }
     /// Return a reference to the root node
-    pub fn node(&self) -> &Node {
+    pub fn node(&self) -> &SyntaxNode {
         &self.node
     }
     /// Return a borrowed typed root node
@@ -98,43 +76,45 @@ impl AST {
         Root::cast(&self.node).unwrap()
     }
     /// Return an owned typed root node
-    pub fn into_root(self) -> TreeArc<Types, Root> {
+    pub fn into_root(self) -> TreeArc<Root> {
         TreeArc::cast(self.node)
+    }
+    pub fn root_errors(&self) -> &[ParseError] {
+        &self.errors
     }
     /// Return all errors in the tree, if any
     pub fn errors(&self) -> Vec<ParseError> {
-        let mut errors = Vec::new();
-        errors.extend_from_slice(self.node.root_data());
+        let mut errors = self.errors.clone();
         errors.extend(
             self.root().errors().into_iter()
-                .map(|node| ParseError::Unexpected(node.to_owned()))
+                .map(|node| ParseError::Unexpected(node.range()))
         );
 
         errors
     }
     /// Either return the first error in the tree, or if there are none return self
     pub fn as_result(self) -> Result<Self, ParseError> {
-        if let Some(err) = self.node.root_data().first() {
+        if let Some(err) = self.errors.first() {
             return Err(err.clone());
         }
         if let Some(node) = self.root().errors().first() {
-            return Err(ParseError::Unexpected((*node).to_owned()));
+            return Err(ParseError::Unexpected(node.range()));
         }
         Ok(self)
     }
 }
 
 struct Parser<I>
-    where I: Iterator<Item = (Token, SmolStr)>
+    where I: Iterator<Item = (SyntaxKind, SmolStr)>
 {
-    builder: GreenNodeBuilder<Types>,
+    builder: GreenNodeBuilder,
     errors: Vec<ParseError>,
 
     buffer: VecDeque<I::Item>,
     iter: I
 }
 impl<I> Parser<I>
-    where I: Iterator<Item = (Token, SmolStr)>
+    where I: Iterator<Item = (SyntaxKind, SmolStr)>
 {
     fn new(iter: I) -> Self {
         Self {
@@ -146,7 +126,7 @@ impl<I> Parser<I>
         }
     }
 
-    fn peek_raw(&mut self) -> Option<&(Token, SmolStr)> {
+    fn peek_raw(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
         if self.buffer.is_empty() {
             if let Some(token) = self.iter.next() {
                 self.buffer.push_back(token);
@@ -157,179 +137,189 @@ impl<I> Parser<I>
     fn bump(&mut self) {
         let next = self.buffer.pop_front().or_else(|| self.iter.next());
         match next {
-            Some((token, s)) => self.builder.leaf(NodeType::Token(token), s),
+            Some((token, s)) => self.builder.token(token, s),
             None => self.errors.push(ParseError::UnexpectedEOF)
         }
     }
-    fn peek_data(&mut self) -> Option<&(Token, SmolStr)> {
-        while self.peek_raw().map(|(t, _)| t.is_trivia()).unwrap_or(false) {
+    fn peek_data(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
+        while self.peek_raw().map(|&(t, _)| token_helpers::is_trivia(t)).unwrap_or(false) {
             self.bump();
         }
         self.peek_raw()
     }
-    fn peek(&mut self) -> Option<Token> {
+    fn peek(&mut self) -> Option<SyntaxKind> {
         self.peek_data().map(|&(t, _)| t)
     }
-    fn expect(&mut self, expected: Token) {
+    fn expect(&mut self, expected: SyntaxKind) {
         if let Some(actual) = self.peek() {
             if actual != expected {
-                self.builder.start_internal(NodeType::Error);
+                self.builder.start_node(NODE_ERROR);
                 while { self.bump(); self.peek().map(|actual| actual != expected).unwrap_or(false) } {}
-                self.builder.finish_internal();
+                self.builder.finish_node();
+            } else {
+                self.bump();
             }
-            self.bump();
         } else {
             self.errors.push(ParseError::UnexpectedEOFWanted(expected));
         }
     }
 
     fn parse_dynamic(&mut self) {
-        self.builder.start_internal(NodeType::Dynamic);
+        self.builder.start_node(NODE_DYNAMIC);
         self.bump();
-        while self.peek().map(|t| t != Token::DynamicEnd).unwrap_or(false) {
+        while self.peek().map(|t| t != TOKEN_DYNAMIC_END).unwrap_or(false) {
             self.parse_expr();
         }
         self.bump();
-        self.builder.finish_internal();
+        self.builder.finish_node();
     }
     fn parse_interpol(&mut self) {
-        self.builder.start_internal(NodeType::Interpol);
+        self.builder.start_node(NODE_INTERPOL);
 
-        self.builder.start_internal(NodeType::InterpolLiteral);
+        self.builder.start_node(NODE_INTERPOL_LITERAL);
         self.bump();
-        self.builder.finish_internal();
+        self.builder.finish_node();
 
-        self.builder.start_internal(NodeType::InterpolAst);
         loop {
             match self.peek() {
-                None | Some(Token::InterpolEnd) => {
-                    self.builder.finish_internal();
-
-                    self.builder.start_internal(NodeType::InterpolLiteral);
+                None | Some(TOKEN_INTERPOL_END) => {
+                    self.builder.start_node(NODE_INTERPOL_LITERAL);
                     self.bump();
-                    self.builder.finish_internal();
+                    self.builder.finish_node();
                     break;
                 },
-                Some(Token::InterpolEndStart) => {
-                    self.builder.finish_internal();
-
-                    self.builder.start_internal(NodeType::InterpolLiteral);
+                Some(TOKEN_INTERPOL_END_START) => {
+                    self.builder.start_node(NODE_INTERPOL_LITERAL);
                     self.bump();
-                    self.builder.finish_internal();
-
-                    self.builder.start_internal(NodeType::InterpolAst);
+                    self.builder.finish_node();
                 },
                 Some(_) => self.parse_expr()
             }
         }
 
-        self.builder.finish_internal();
+        self.builder.finish_node();
     }
     fn next_attr(&mut self) {
         match self.peek() {
-            Some(Token::DynamicStart) => self.parse_dynamic(),
-            Some(Token::InterpolStart) => self.parse_interpol(),
-            Some(Token::String) => self.bump(),
-            _ => self.expect(Token::Ident)
+            Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
+            Some(TOKEN_INTERPOL_START) => self.parse_interpol(),
+            Some(TOKEN_STRING) => {
+                self.builder.start_node(NODE_VALUE);
+                self.bump();
+                self.builder.finish_node();
+            },
+            _ => {
+                self.builder.start_node(NODE_IDENT);
+                self.expect(TOKEN_IDENT);
+                self.builder.finish_node();
+            }
         }
     }
     fn parse_attr(&mut self) {
-        self.builder.start_internal(NodeType::Attribute);
+        self.builder.start_node(NODE_ATTRIBUTE);
         loop {
             self.next_attr();
 
-            if self.peek() == Some(Token::Dot) {
+            if self.peek() == Some(TOKEN_DOT) {
                 self.bump();
             } else {
                 break;
             }
         }
-        self.builder.finish_internal();
+        self.builder.finish_node();
     }
     fn parse_pattern(&mut self, bound: bool) {
-        if self.peek().map(|t| t == Token::CurlyBClose).unwrap_or(true) {
+        if self.peek().map(|t| t == TOKEN_CURLY_B_CLOSE).unwrap_or(true) {
             self.bump();
         } else {
             loop {
                 match self.peek() {
-                    Some(Token::CurlyBClose) => {
+                    Some(TOKEN_CURLY_B_CLOSE) => {
                         self.bump();
                         break;
                     },
-                    Some(Token::Ellipsis) => {
+                    Some(TOKEN_ELLIPSIS) => {
                         self.bump();
-                        self.expect(Token::CurlyBClose);
+                        self.expect(TOKEN_CURLY_B_CLOSE);
                         break;
                     },
-                    Some(Token::Ident) => {
-                        self.builder.start_internal(NodeType::PatEntry);
+                    Some(TOKEN_IDENT) => {
+                        self.builder.start_node(NODE_PAT_ENTRY);
+
+                        self.builder.start_node(NODE_IDENT);
                         self.bump();
-                        if let Some(Token::Question) = self.peek() {
+                        self.builder.finish_node();
+
+                        if let Some(TOKEN_QUESTION) = self.peek() {
                             self.bump();
                             self.parse_expr();
                         }
-                        self.builder.finish_internal();
+                        self.builder.finish_node();
 
                         match self.peek() {
-                            Some(Token::Comma) => self.bump(),
+                            Some(TOKEN_COMMA) => self.bump(),
                             _ => {
-                                self.expect(Token::CurlyBClose);
+                                self.expect(TOKEN_CURLY_B_CLOSE);
                                 break;
                             },
                         }
                     },
                     None => {
-                        self.errors.push(ParseError::UnexpectedEOFWanted(Token::Ident));
+                        self.errors.push(ParseError::UnexpectedEOFWanted(TOKEN_IDENT));
                         break;
                     },
                     Some(_) => {
-                        self.builder.start_internal(NodeType::Error);
+                        self.builder.start_node(NODE_ERROR);
                         self.bump();
-                        self.builder.finish_internal();
+                        self.builder.finish_node();
                     }
                 }
             }
         }
 
-        if self.peek() == Some(Token::At) {
-            let kind = if bound { NodeType::Error } else { NodeType::PatBind };
-            self.builder.start_internal(kind);
+        if self.peek() == Some(TOKEN_AT) {
+            let kind = if bound { NODE_ERROR } else { NODE_PAT_BIND };
+            self.builder.start_node(kind);
             self.bump();
-            self.expect(Token::Ident);
-            self.builder.finish_internal();
+            self.builder.start_node(NODE_IDENT);
+            self.expect(TOKEN_IDENT);
+            self.builder.finish_node();
+            self.builder.finish_node();
         }
     }
-    fn parse_set(&mut self, until: Token) {
+    fn parse_set(&mut self, until: SyntaxKind) {
         loop {
             match self.peek() {
                 None => break,
                 token if token == Some(until) => break,
-                Some(Token::Inherit) => {
-                    self.builder.start_internal(NodeType::Inherit);
+                Some(TOKEN_INHERIT) => {
+                    self.builder.start_node(NODE_INHERIT);
                     self.bump();
 
-                    if self.peek() == Some(Token::ParenOpen) {
-                        self.builder.start_internal(NodeType::InheritFrom);
+                    if self.peek() == Some(TOKEN_PAREN_OPEN) {
+                        self.builder.start_node(NODE_INHERIT_FROM);
                         self.bump();
                         self.parse_expr();
-                        self.expect(Token::ParenClose);
-                        self.builder.finish_internal();
+                        self.expect(TOKEN_PAREN_CLOSE);
+                        self.builder.finish_node();
                     }
 
-                    while let Some(Token::Ident) = self.peek() {
+                    while let Some(TOKEN_IDENT) = self.peek() {
+                        self.builder.start_node(NODE_IDENT);
                         self.bump();
+                        self.builder.finish_node();
                     }
 
-                    self.expect(Token::Semicolon);
-                    self.builder.finish_internal();
+                    self.expect(TOKEN_SEMICOLON);
+                    self.builder.finish_node();
                 },
                 Some(_) => {
-                    self.builder.start_internal(NodeType::SetEntry);
+                    self.builder.start_node(NODE_SET_ENTRY);
                     self.parse_attr();
-                    self.expect(Token::Assign);
+                    self.expect(TOKEN_ASSIGN);
                     self.parse_expr();
-                    self.expect(Token::Semicolon);
-                    self.builder.finish_internal();
+                    self.expect(TOKEN_SEMICOLON);
+                    self.builder.finish_node();
                 }
             }
         }
@@ -338,21 +328,21 @@ impl<I> Parser<I>
     fn parse_val(&mut self) {
         let checkpoint = self.builder.checkpoint();
         match self.peek() {
-            Some(Token::ParenOpen) => {
-                self.builder.start_internal(NodeType::Paren);
+            Some(TOKEN_PAREN_OPEN) => {
+                self.builder.start_node(NODE_PAREN);
                 self.bump();
                 self.parse_expr();
                 self.bump();
-                self.builder.finish_internal();
+                self.builder.finish_node();
             },
-            Some(Token::Rec) => {
-                self.builder.start_internal(NodeType::Set);
+            Some(TOKEN_REC) => {
+                self.builder.start_node(NODE_SET);
                 self.bump();
-                self.expect(Token::CurlyBOpen);
-                self.parse_set(Token::CurlyBClose);
-                self.builder.finish_internal();
+                self.expect(TOKEN_CURLY_B_OPEN);
+                self.parse_set(TOKEN_CURLY_B_CLOSE);
+                self.builder.finish_node();
             },
-            Some(Token::CurlyBOpen) => {
+            Some(TOKEN_CURLY_B_OPEN) => {
                 // Do a lookahead:
                 let mut peek = [None, None];
                 for i in 0..2 {
@@ -363,177 +353,180 @@ impl<I> Parser<I>
                         if let Some(token) = token {
                             self.buffer.push_back(token);
                         }
-                        if kind.map(|t| !t.is_trivia()).unwrap_or(true) {
+                        if kind.map(|t| !token_helpers::is_trivia(t)).unwrap_or(true) {
                             break kind;
                         }
                     };
                 }
 
                 match peek {
-                    [Some(Token::Ident), Some(Token::Comma)]
-                    | [Some(Token::Ident), Some(Token::Question)]
-                    | [Some(Token::Ident), Some(Token::CurlyBClose)]
-                    | [Some(Token::Ellipsis), Some(Token::CurlyBClose)]
-                    | [Some(Token::CurlyBClose), Some(Token::Colon)]
-                    | [Some(Token::CurlyBClose), Some(Token::At)] => {
+                    [Some(TOKEN_IDENT), Some(TOKEN_COMMA)]
+                    | [Some(TOKEN_IDENT), Some(TOKEN_QUESTION)]
+                    | [Some(TOKEN_IDENT), Some(TOKEN_CURLY_B_CLOSE)]
+                    | [Some(TOKEN_ELLIPSIS), Some(TOKEN_CURLY_B_CLOSE)]
+                    | [Some(TOKEN_CURLY_B_CLOSE), Some(TOKEN_COLON)]
+                    | [Some(TOKEN_CURLY_B_CLOSE), Some(TOKEN_AT)] => {
                         // This looks like a pattern
-                        self.builder.start_internal(NodeType::Lambda);
+                        self.builder.start_node(NODE_LAMBDA);
 
-                        self.builder.start_internal(NodeType::Pattern);
+                        self.builder.start_node(NODE_PATTERN);
                         self.bump();
                         self.parse_pattern(false);
-                        self.builder.finish_internal();
+                        self.builder.finish_node();
 
-                        self.expect(Token::Colon);
+                        self.expect(TOKEN_COLON);
                         self.parse_expr();
 
-                        self.builder.finish_internal();
+                        self.builder.finish_node();
                     },
                     _ => {
                         // This looks like a set
-                        self.builder.start_internal(NodeType::Set);
+                        self.builder.start_node(NODE_SET);
                         self.bump();
-                        self.parse_set(Token::CurlyBClose);
-                        self.builder.finish_internal();
+                        self.parse_set(TOKEN_CURLY_B_CLOSE);
+                        self.builder.finish_node();
                     }
                 }
             },
-            Some(Token::SquareBOpen) => {
-                self.builder.start_internal(NodeType::List);
+            Some(TOKEN_SQUARE_B_OPEN) => {
+                self.builder.start_node(NODE_LIST);
                 self.bump();
-                while self.peek().map(|t| t != Token::SquareBClose).unwrap_or(false) {
-                    self.builder.start_internal(NodeType::ListItem);
+                while self.peek().map(|t| t != TOKEN_SQUARE_B_CLOSE).unwrap_or(false) {
                     self.parse_val();
-                    self.builder.finish_internal();
                 }
                 self.bump();
-                self.builder.finish_internal();
+                self.builder.finish_node();
             },
-            Some(Token::DynamicStart) => self.parse_dynamic(),
-            Some(Token::InterpolStart) => self.parse_interpol(),
-            Some(t) if t.is_value() => self.bump(),
-            Some(Token::Ident) => {
-                let checkpoint = self.builder.checkpoint();
+            Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
+            Some(TOKEN_INTERPOL_START) => self.parse_interpol(),
+            Some(t) if token_helpers::is_value(t) => {
+                self.builder.start_node(NODE_VALUE);
                 self.bump();
+                self.builder.finish_node();
+            },
+            Some(TOKEN_IDENT) => {
+                let checkpoint = self.builder.checkpoint();
+                self.builder.start_node(NODE_IDENT);
+                self.bump();
+                self.builder.finish_node();
 
                 match self.peek() {
-                    Some(Token::Colon) => {
-                        self.builder.start_internal_at(checkpoint, NodeType::Lambda);
+                    Some(TOKEN_COLON) => {
+                        self.builder.start_node_at(checkpoint, NODE_LAMBDA);
                         self.bump();
                         self.parse_expr();
-                        self.builder.finish_internal();
+                        self.builder.finish_node();
                     },
-                    Some(Token::At) => {
-                        self.builder.start_internal_at(checkpoint, NodeType::Lambda);
-                        self.builder.start_internal_at(checkpoint, NodeType::Pattern);
-                        self.builder.start_internal_at(checkpoint, NodeType::PatBind);
+                    Some(TOKEN_AT) => {
+                        self.builder.start_node_at(checkpoint, NODE_LAMBDA);
+                        self.builder.start_node_at(checkpoint, NODE_PATTERN);
+                        self.builder.start_node_at(checkpoint, NODE_PAT_BIND);
                         self.bump();
-                        self.builder.finish_internal(); // PatBind
+                        self.builder.finish_node(); // PatBind
 
-                        self.expect(Token::CurlyBOpen);
+                        self.expect(TOKEN_CURLY_B_OPEN);
                         self.parse_pattern(true);
-                        self.builder.finish_internal(); // Pattern
+                        self.builder.finish_node(); // Pattern
 
-                        self.expect(Token::Colon);
+                        self.expect(TOKEN_COLON);
                         self.parse_expr();
-                        self.builder.finish_internal(); // Lambda
+                        self.builder.finish_node(); // Lambda
                     },
                     _ => ()
                 }
             },
             _ => {
-                self.builder.start_internal(NodeType::Error);
+                self.builder.start_node(NODE_ERROR);
                 self.bump();
-                self.builder.finish_internal();
+                self.builder.finish_node();
             }
         }
 
-        while self.peek() == Some(Token::Dot) {
-            self.builder.start_internal_at(checkpoint, NodeType::IndexSet);
+        while self.peek() == Some(TOKEN_DOT) {
+            self.builder.start_node_at(checkpoint, NODE_INDEX_SET);
             self.bump();
             self.next_attr();
-            self.builder.finish_internal();
-
-            if self.peek_data().map(|&(t, ref s)| t == Token::Ident && s == OR).unwrap_or(false) {
-                self.builder.start_internal_at(checkpoint, NodeType::OrDefault);
-                self.bump();
-                self.parse_val();
-                self.builder.finish_internal();
-            }
+            self.builder.finish_node();
+        }
+        if self.peek_data().map(|&(t, ref s)| t == TOKEN_IDENT && s == OR).unwrap_or(false) {
+            self.builder.start_node_at(checkpoint, NODE_OR_DEFAULT);
+            self.bump();
+            self.parse_val();
+            self.builder.finish_node();
         }
     }
     fn parse_fn(&mut self) {
         let checkpoint = self.builder.checkpoint();
         self.parse_val();
 
-        while self.peek().map(|t| t.is_fn_arg()).unwrap_or(false) {
-            self.builder.start_internal_at(checkpoint, NodeType::Apply);
+        while self.peek().map(|t| token_helpers::is_fn_arg(t)).unwrap_or(false) {
+            self.builder.start_node_at(checkpoint, NODE_APPLY);
             self.parse_val();
-            self.builder.finish_internal();
+            self.builder.finish_node();
         }
     }
     fn parse_negate(&mut self) {
-        if self.peek() == Some(Token::Sub) {
-            self.builder.start_internal(NodeType::Unary);
+        if self.peek() == Some(TOKEN_SUB) {
+            self.builder.start_node(NODE_UNARY);
             self.bump();
             self.parse_negate();
-            self.builder.finish_internal();
+            self.builder.finish_node();
         } else {
             self.parse_fn()
         }
     }
-    fn handle_operation(&mut self, once: bool, next: fn(&mut Self), ops: &[Token]) {
+    fn handle_operation(&mut self, once: bool, next: fn(&mut Self), ops: &[SyntaxKind]) {
         let checkpoint = self.builder.checkpoint();
         next(self);
         while self.peek().map(|t| ops.contains(&t)).unwrap_or(false) {
-            self.builder.start_internal_at(checkpoint, NodeType::Operation);
+            self.builder.start_node_at(checkpoint, NODE_OPERATION);
             self.bump();
             next(self);
-            self.builder.finish_internal();
+            self.builder.finish_node();
             if once {
                 break;
             }
         }
     }
     fn parse_isset(&mut self) {
-        self.handle_operation(false, Self::parse_negate, &[Token::Question])
+        self.handle_operation(false, Self::parse_negate, &[TOKEN_QUESTION])
     }
     fn parse_concat(&mut self) {
-        self.handle_operation(false, Self::parse_isset, &[Token::Concat])
+        self.handle_operation(false, Self::parse_isset, &[TOKEN_CONCAT])
     }
     fn parse_mul(&mut self) {
-        self.handle_operation(false, Self::parse_concat, &[Token::Mul, Token::Div])
+        self.handle_operation(false, Self::parse_concat, &[TOKEN_MUL, TOKEN_DIV])
     }
     fn parse_add(&mut self) {
-        self.handle_operation(false, Self::parse_mul, &[Token::Add, Token::Sub])
+        self.handle_operation(false, Self::parse_mul, &[TOKEN_ADD, TOKEN_SUB])
     }
     fn parse_invert(&mut self) {
-        if self.peek() == Some(Token::Invert) {
-            self.builder.start_internal(NodeType::Unary);
+        if self.peek() == Some(TOKEN_INVERT) {
+            self.builder.start_node(NODE_UNARY);
             self.bump();
             self.parse_invert();
-            self.builder.finish_internal();
+            self.builder.finish_node();
         } else {
             self.parse_add()
         }
     }
     fn parse_merge(&mut self) {
-        self.handle_operation(false, Self::parse_invert, &[Token::Merge])
+        self.handle_operation(false, Self::parse_invert, &[TOKEN_MERGE])
     }
     fn parse_compare(&mut self) {
-        self.handle_operation(true, Self::parse_merge, &[Token::Less, Token::LessOrEq, Token::More, Token::MoreOrEq])
+        self.handle_operation(true, Self::parse_merge, &[TOKEN_LESS, TOKEN_LESS_OR_EQ, TOKEN_MORE, TOKEN_MORE_OR_EQ])
     }
     fn parse_equal(&mut self) {
-        self.handle_operation(true, Self::parse_compare, &[Token::Equal, Token::NotEqual])
+        self.handle_operation(true, Self::parse_compare, &[TOKEN_EQUAL, TOKEN_NOT_EQUAL])
     }
     fn parse_and(&mut self) {
-        self.handle_operation(false, Self::parse_equal, &[Token::And])
+        self.handle_operation(false, Self::parse_equal, &[TOKEN_AND])
     }
     fn parse_or(&mut self) {
-        self.handle_operation(false, Self::parse_and, &[Token::Or])
+        self.handle_operation(false, Self::parse_and, &[TOKEN_OR])
     }
     fn parse_implication(&mut self) {
-        self.handle_operation(false, Self::parse_or, &[Token::Implication])
+        self.handle_operation(false, Self::parse_or, &[TOKEN_IMPLICATION])
     }
     #[inline(always)]
     fn parse_math(&mut self) {
@@ -543,47 +536,47 @@ impl<I> Parser<I>
     /// Parse Nix code into an AST
     pub fn parse_expr(&mut self) {
         match self.peek() {
-            Some(Token::Let) => {
+            Some(TOKEN_LET) => {
                 let checkpoint = self.builder.checkpoint();
                 self.bump();
 
-                if self.peek() == Some(Token::CurlyBOpen) {
-                    self.builder.start_internal_at(checkpoint, NodeType::Let);
+                if self.peek() == Some(TOKEN_CURLY_B_OPEN) {
+                    self.builder.start_node_at(checkpoint, NODE_LET);
                     self.bump();
-                    self.parse_set(Token::CurlyBClose);
-                    self.builder.finish_internal();
+                    self.parse_set(TOKEN_CURLY_B_CLOSE);
+                    self.builder.finish_node();
                 } else {
-                    self.builder.start_internal_at(checkpoint, NodeType::LetIn);
-                    self.parse_set(Token::In);
+                    self.builder.start_node_at(checkpoint, NODE_LET_IN);
+                    self.parse_set(TOKEN_IN);
                     self.parse_expr();
-                    self.builder.finish_internal();
+                    self.builder.finish_node();
                 }
             },
-            Some(Token::With) => {
-                self.builder.start_internal(NodeType::With);
+            Some(TOKEN_WITH) => {
+                self.builder.start_node(NODE_WITH);
                 self.bump();
                 self.parse_expr();
-                self.expect(Token::Semicolon);
+                self.expect(TOKEN_SEMICOLON);
                 self.parse_expr();
-                self.builder.finish_internal();
+                self.builder.finish_node();
             },
-            Some(Token::If) => {
-                self.builder.start_internal(NodeType::IfElse);
+            Some(TOKEN_IF) => {
+                self.builder.start_node(NODE_IF_ELSE);
                 self.bump();
                 self.parse_expr();
-                self.expect(Token::Then);
+                self.expect(TOKEN_THEN);
                 self.parse_expr();
-                self.expect(Token::Else);
+                self.expect(TOKEN_ELSE);
                 self.parse_expr();
-                self.builder.finish_internal();
+                self.builder.finish_node();
             },
-            Some(Token::Assert) => {
-                self.builder.start_internal(NodeType::Assert);
+            Some(TOKEN_ASSERT) => {
+                self.builder.start_node(NODE_ASSERT);
                 self.bump();
                 self.parse_expr();
-                self.expect(Token::Semicolon);
+                self.expect(TOKEN_SEMICOLON);
                 self.parse_expr();
-                self.builder.finish_internal();
+                self.builder.finish_node();
             },
             _ => self.parse_math()
         }
@@ -592,21 +585,22 @@ impl<I> Parser<I>
 
 /// Parse tokens into an AST
 pub fn parse<I>(iter: I) -> AST
-    where I: IntoIterator<Item = (Token, SmolStr)>
+    where I: IntoIterator<Item = (SyntaxKind, SmolStr)>
 {
     let mut parser = Parser::new(iter.into_iter());
-    parser.builder.start_internal(NodeType::Root);
+    parser.builder.start_node(NODE_ROOT);
     parser.parse_expr();
     if parser.peek().is_some() {
-        parser.builder.start_internal(NodeType::Error);
+        parser.builder.start_node(NODE_ERROR);
         while parser.peek().is_some() {
             parser.bump();
         }
-        parser.builder.finish_internal();
+        parser.builder.finish_node();
     }
-    parser.builder.finish_internal();
+    parser.builder.finish_node();
     AST {
-        node: SyntaxNode::new(parser.builder.finish(), parser.errors)
+        node: SyntaxNode::new(parser.builder.finish(), None),
+        errors: parser.errors
     }
 }
 
@@ -617,10 +611,10 @@ mod tests {
     use rowan::WalkEvent;
     use std::fmt::Write;
 
-    fn stringify(node: &Node) -> String {
+    fn stringify(node: &SyntaxNode) -> String {
         let mut out = String::new();
         let mut indent = 0;
-        for event in node.preorder() {
+        for event in node.preorder_with_tokens() {
             match event {
                 WalkEvent::Enter(node) => {
                     writeln!(out, "{:indent$}{:?}", "", node, indent = indent).unwrap();
@@ -630,15 +624,102 @@ mod tests {
                     indent -= 2
             }
         }
+        // Until rowan lets you map ID -> name
+        // (I heard someone was working on that)
         out
+            .replace(&format!("{:?}", TOKEN_COMMENT), "TOKEN_COMMENT")
+            .replace(&format!("{:?}", TOKEN_ERROR), "TOKEN_ERROR")
+            .replace(&format!("{:?}", TOKEN_WHITESPACE), "TOKEN_WHITESPACE")
+            .replace(&format!("{:?}", TOKEN_ASSERT), "TOKEN_ASSERT")
+            .replace(&format!("{:?}", TOKEN_ELSE), "TOKEN_ELSE")
+            .replace(&format!("{:?}", TOKEN_IF), "TOKEN_IF")
+            .replace(&format!("{:?}", TOKEN_IN), "TOKEN_IN")
+            .replace(&format!("{:?}", TOKEN_INHERIT), "TOKEN_INHERIT")
+            .replace(&format!("{:?}", TOKEN_LET), "TOKEN_LET")
+            .replace(&format!("{:?}", TOKEN_REC), "TOKEN_REC")
+            .replace(&format!("{:?}", TOKEN_THEN), "TOKEN_THEN")
+            .replace(&format!("{:?}", TOKEN_WITH), "TOKEN_WITH")
+            .replace(&format!("{:?}", TOKEN_CURLY_B_OPEN), "TOKEN_CURLY_B_OPEN")
+            .replace(&format!("{:?}", TOKEN_CURLY_B_CLOSE), "TOKEN_CURLY_B_CLOSE")
+            .replace(&format!("{:?}", TOKEN_SQUARE_B_OPEN), "TOKEN_SQUARE_B_OPEN")
+            .replace(&format!("{:?}", TOKEN_SQUARE_B_CLOSE), "TOKEN_SQUARE_B_CLOSE")
+            .replace(&format!("{:?}", TOKEN_ASSIGN), "TOKEN_ASSIGN")
+            .replace(&format!("{:?}", TOKEN_AT), "TOKEN_AT")
+            .replace(&format!("{:?}", TOKEN_COLON), "TOKEN_COLON")
+            .replace(&format!("{:?}", TOKEN_COMMA), "TOKEN_COMMA")
+            .replace(&format!("{:?}", TOKEN_DOT), "TOKEN_DOT")
+            .replace(&format!("{:?}", TOKEN_ELLIPSIS), "TOKEN_ELLIPSIS")
+            .replace(&format!("{:?}", TOKEN_QUESTION), "TOKEN_QUESTION")
+            .replace(&format!("{:?}", TOKEN_SEMICOLON), "TOKEN_SEMICOLON")
+            .replace(&format!("{:?}", TOKEN_PAREN_OPEN), "TOKEN_PAREN_OPEN")
+            .replace(&format!("{:?}", TOKEN_PAREN_CLOSE), "TOKEN_PAREN_CLOSE")
+            .replace(&format!("{:?}", TOKEN_CONCAT), "TOKEN_CONCAT")
+            .replace(&format!("{:?}", TOKEN_INVERT), "TOKEN_INVERT")
+            .replace(&format!("{:?}", TOKEN_MERGE), "TOKEN_MERGE")
+            .replace(&format!("{:?}", TOKEN_ADD), "TOKEN_ADD")
+            .replace(&format!("{:?}", TOKEN_SUB), "TOKEN_SUB")
+            .replace(&format!("{:?}", TOKEN_MUL), "TOKEN_MUL")
+            .replace(&format!("{:?}", TOKEN_DIV), "TOKEN_DIV")
+            .replace(&format!("{:?}", TOKEN_AND), "TOKEN_AND")
+            .replace(&format!("{:?}", TOKEN_EQUAL), "TOKEN_EQUAL")
+            .replace(&format!("{:?}", TOKEN_IMPLICATION), "TOKEN_IMPLICATION")
+            .replace(&format!("{:?}", TOKEN_LESS), "TOKEN_LESS")
+            .replace(&format!("{:?}", TOKEN_LESS_OR_EQ), "TOKEN_LESS_OR_EQ")
+            .replace(&format!("{:?}", TOKEN_MORE), "TOKEN_MORE")
+            .replace(&format!("{:?}", TOKEN_MORE_OR_EQ), "TOKEN_MORE_OR_EQ")
+            .replace(&format!("{:?}", TOKEN_NOT_EQUAL), "TOKEN_NOT_EQUAL")
+            .replace(&format!("{:?}", TOKEN_OR), "TOKEN_OR")
+            .replace(&format!("{:?}", TOKEN_DYNAMIC_END), "TOKEN_DYNAMIC_END")
+            .replace(&format!("{:?}", TOKEN_DYNAMIC_START), "TOKEN_DYNAMIC_START")
+            .replace(&format!("{:?}", TOKEN_FLOAT), "TOKEN_FLOAT")
+            .replace(&format!("{:?}", TOKEN_IDENT), "TOKEN_IDENT")
+            .replace(&format!("{:?}", TOKEN_INTEGER), "TOKEN_INTEGER")
+            .replace(&format!("{:?}", TOKEN_INTERPOL_END), "TOKEN_INTERPOL_END")
+            .replace(&format!("{:?}", TOKEN_INTERPOL_END_START), "TOKEN_INTERPOL_END_START")
+            .replace(&format!("{:?}", TOKEN_INTERPOL_START), "TOKEN_INTERPOL_START")
+            .replace(&format!("{:?}", TOKEN_PATH), "TOKEN_PATH")
+            .replace(&format!("{:?}", TOKEN_STRING), "TOKEN_STRING")
+            .replace(&format!("{:?}", NODE_APPLY), "NODE_APPLY")
+            .replace(&format!("{:?}", NODE_ASSERT), "NODE_ASSERT")
+            .replace(&format!("{:?}", NODE_ATTRIBUTE), "NODE_ATTRIBUTE")
+            .replace(&format!("{:?}", NODE_DYNAMIC), "NODE_DYNAMIC")
+            .replace(&format!("{:?}", NODE_ERROR), "NODE_ERROR")
+            .replace(&format!("{:?}", NODE_IDENT), "NODE_IDENT")
+            .replace(&format!("{:?}", NODE_IF_ELSE), "NODE_IF_ELSE")
+            .replace(&format!("{:?}", NODE_INDEX_SET), "NODE_INDEX_SET")
+            .replace(&format!("{:?}", NODE_INHERIT), "NODE_INHERIT")
+            .replace(&format!("{:?}", NODE_INHERIT_FROM), "NODE_INHERIT_FROM")
+            .replace(&format!("{:?}", NODE_INTERPOL), "NODE_INTERPOL")
+            .replace(&format!("{:?}", NODE_INTERPOL_LITERAL), "NODE_INTERPOL_LITERAL")
+            .replace(&format!("{:?}", NODE_LAMBDA), "NODE_LAMBDA")
+            .replace(&format!("{:?}", NODE_LET), "NODE_LET")
+            .replace(&format!("{:?}", NODE_LET_IN), "NODE_LET_IN")
+            .replace(&format!("{:?}", NODE_LIST), "NODE_LIST")
+            .replace(&format!("{:?}", NODE_OPERATION), "NODE_OPERATION")
+            .replace(&format!("{:?}", NODE_OR_DEFAULT), "NODE_OR_DEFAULT")
+            .replace(&format!("{:?}", NODE_PAREN), "NODE_PAREN")
+            .replace(&format!("{:?}", NODE_PATTERN), "NODE_PATTERN")
+            .replace(&format!("{:?}", NODE_PAT_BIND), "NODE_PAT_BIND")
+            .replace(&format!("{:?}", NODE_PAT_ENTRY), "NODE_PAT_ENTRY")
+            .replace(&format!("{:?}", NODE_ROOT), "NODE_ROOT")
+            .replace(&format!("{:?}", NODE_SET), "NODE_SET")
+            .replace(&format!("{:?}", NODE_SET_ENTRY), "NODE_SET_ENTRY")
+            .replace(&format!("{:?}", NODE_UNARY), "NODE_UNARY")
+            .replace(&format!("{:?}", NODE_VALUE), "NODE_VALUE")
+            .replace(&format!("{:?}", NODE_WITH), "NODE_WITH")
     }
 
-    macro_rules! assert_eq {
+    macro_rules! test {
         ([$(($token:expr, $str:expr)),*], $expected:expr) => {
-            let parsed = parse(vec![$(($token, $str.into())),*]).as_result().expect("error occured when parsing");
-
+            let parsed = parse(vec![$(($token, $str.into())),*]);
             let actual = stringify(parsed.node());
-            if actual != $expected {
+
+            if let Err(err) = parsed.as_result() {
+                eprintln!("--- Errnous AST ---");
+                eprintln!("{}", actual);
+                eprintln!("--- End ---");
+                panic!(err);
+            } else if actual != $expected {
                 eprintln!("--- Actual ---");
                 eprintln!("{}", actual);
                 eprintln!("-- Expected ---");
@@ -651,1193 +732,1304 @@ mod tests {
 
     #[test]
     fn set() {
-        assert_eq!(
+        test!(
             [
-                (Token::CurlyBOpen, "{"),
-                (Token::Whitespace, " "),
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_WHITESPACE, " "),
 
-                (Token::Ident, "meaning_of_life"),
-                (Token::Whitespace, " "),
-                (Token::Assign, "="),
-                (Token::Whitespace, " "),
-                (Token::Integer, "42"),
-                (Token::Semicolon, ";"),
+                (TOKEN_IDENT, "meaning_of_life"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "42"),
+                (TOKEN_SEMICOLON, ";"),
 
-                (Token::Ident, "H4X0RNUM83R"),
-                (Token::Whitespace, " "),
-                (Token::Assign, "="),
-                (Token::Whitespace, " "),
-                (Token::Float, "1.337"),
-                (Token::Semicolon, ";"),
+                (TOKEN_IDENT, "H4X0RNUM83R"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_FLOAT, "1.337"),
+                (TOKEN_SEMICOLON, ";"),
 
-                (Token::Whitespace, " "),
-                (Token::CurlyBClose, "}")
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_CURLY_B_CLOSE, "}")
             ],
             "\
-Root@[0; 45)
-  Set@[0; 45)
-    Token(CurlyBOpen)@[0; 1)
-    Token(Whitespace)@[1; 2)
-    SetEntry@[2; 23)
-      Attribute@[2; 18)
-        Token(Ident)@[2; 17)
-        Token(Whitespace)@[17; 18)
-      Token(Assign)@[18; 19)
-      Token(Whitespace)@[19; 20)
-      Token(Integer)@[20; 22)
-      Token(Semicolon)@[22; 23)
-    SetEntry@[23; 43)
-      Attribute@[23; 35)
-        Token(Ident)@[23; 34)
-        Token(Whitespace)@[34; 35)
-      Token(Assign)@[35; 36)
-      Token(Whitespace)@[36; 37)
-      Token(Float)@[37; 42)
-      Token(Semicolon)@[42; 43)
-    Token(Whitespace)@[43; 44)
-    Token(CurlyBClose)@[44; 45)
+Node(NODE_ROOT@[0; 45))
+  Node(NODE_SET@[0; 45))
+    Token(TOKEN_CURLY_B_OPEN@[0; 1))
+    Token(TOKEN_WHITESPACE@[1; 2))
+    Node(NODE_SET_ENTRY@[2; 23))
+      Node(NODE_ATTRIBUTE@[2; 18))
+        Node(NODE_IDENT@[2; 17))
+          Token(TOKEN_IDENT@[2; 17))
+        Token(TOKEN_WHITESPACE@[17; 18))
+      Token(TOKEN_ASSIGN@[18; 19))
+      Token(TOKEN_WHITESPACE@[19; 20))
+      Node(NODE_VALUE@[20; 22))
+        Token(TOKEN_INTEGER@[20; 22))
+      Token(TOKEN_SEMICOLON@[22; 23))
+    Node(NODE_SET_ENTRY@[23; 43))
+      Node(NODE_ATTRIBUTE@[23; 35))
+        Node(NODE_IDENT@[23; 34))
+          Token(TOKEN_IDENT@[23; 34))
+        Token(TOKEN_WHITESPACE@[34; 35))
+      Token(TOKEN_ASSIGN@[35; 36))
+      Token(TOKEN_WHITESPACE@[36; 37))
+      Node(NODE_VALUE@[37; 42))
+        Token(TOKEN_FLOAT@[37; 42))
+      Token(TOKEN_SEMICOLON@[42; 43))
+    Token(TOKEN_WHITESPACE@[43; 44))
+    Token(TOKEN_CURLY_B_CLOSE@[44; 45))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::Rec, "rec"),
-                (Token::CurlyBOpen, "{"),
-                (Token::Ident, "test"),
-                (Token::Assign, "="),
-                (Token::Integer, "1"),
-                (Token::Semicolon, ";"),
-                (Token::CurlyBClose, "}")
+                (TOKEN_REC, "rec"),
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_IDENT, "test"),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_INTEGER, "1"),
+                (TOKEN_SEMICOLON, ";"),
+                (TOKEN_CURLY_B_CLOSE, "}")
             ],
             "\
-Root@[0; 12)
-  Set@[0; 12)
-    Token(Rec)@[0; 3)
-    Token(CurlyBOpen)@[3; 4)
-    SetEntry@[4; 11)
-      Attribute@[4; 8)
-        Token(Ident)@[4; 8)
-      Token(Assign)@[8; 9)
-      Token(Integer)@[9; 10)
-      Token(Semicolon)@[10; 11)
-    Token(CurlyBClose)@[11; 12)
+Node(NODE_ROOT@[0; 12))
+  Node(NODE_SET@[0; 12))
+    Token(TOKEN_REC@[0; 3))
+    Token(TOKEN_CURLY_B_OPEN@[3; 4))
+    Node(NODE_SET_ENTRY@[4; 11))
+      Node(NODE_ATTRIBUTE@[4; 8))
+        Node(NODE_IDENT@[4; 8))
+          Token(TOKEN_IDENT@[4; 8))
+      Token(TOKEN_ASSIGN@[8; 9))
+      Node(NODE_VALUE@[9; 10))
+        Token(TOKEN_INTEGER@[9; 10))
+      Token(TOKEN_SEMICOLON@[10; 11))
+    Token(TOKEN_CURLY_B_CLOSE@[11; 12))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::CurlyBOpen, "{"),
-                (Token::CurlyBClose, "}")
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_CURLY_B_CLOSE, "}")
             ],
             "\
-Root@[0; 2)
-  Set@[0; 2)
-    Token(CurlyBOpen)@[0; 1)
-    Token(CurlyBClose)@[1; 2)
+Node(NODE_ROOT@[0; 2))
+  Node(NODE_SET@[0; 2))
+    Token(TOKEN_CURLY_B_OPEN@[0; 1))
+    Token(TOKEN_CURLY_B_CLOSE@[1; 2))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::CurlyBOpen, "{"),
+                (TOKEN_CURLY_B_OPEN, "{"),
 
-                (Token::Ident, "a"),
-                    (Token::Dot, "."),
-                    (Token::Ident, "b"),
-                (Token::Assign, "="),
-                (Token::Integer, "2"),
-                (Token::Semicolon, ";"),
+                (TOKEN_IDENT, "a"),
+                    (TOKEN_DOT, "."),
+                    (TOKEN_IDENT, "b"),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_INTEGER, "2"),
+                (TOKEN_SEMICOLON, ";"),
 
-                (Token::InterpolStart, "\"${"),
-                    (Token::Ident, "c"),
-                (Token::InterpolEnd, "}\""),
-                    (Token::Dot, "."),
-                    (Token::DynamicStart, "${"),
-                        (Token::Ident, "d"),
-                    (Token::DynamicEnd, "${"),
-                (Token::Assign, "="),
-                (Token::Integer, "3"),
-                (Token::Semicolon, ";"),
+                (TOKEN_INTERPOL_START, "\"${"),
+                    (TOKEN_IDENT, "c"),
+                (TOKEN_INTERPOL_END, "}\""),
+                    (TOKEN_DOT, "."),
+                    (TOKEN_DYNAMIC_START, "${"),
+                        (TOKEN_IDENT, "d"),
+                    (TOKEN_DYNAMIC_END, "${"),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_INTEGER, "3"),
+                (TOKEN_SEMICOLON, ";"),
 
-                (Token::CurlyBClose, "}")
+                (TOKEN_CURLY_B_CLOSE, "}")
             ],
             "\
-Root@[0; 23)
-  Set@[0; 23)
-    Token(CurlyBOpen)@[0; 1)
-    SetEntry@[1; 7)
-      Attribute@[1; 4)
-        Token(Ident)@[1; 2)
-        Token(Dot)@[2; 3)
-        Token(Ident)@[3; 4)
-      Token(Assign)@[4; 5)
-      Token(Integer)@[5; 6)
-      Token(Semicolon)@[6; 7)
-    SetEntry@[7; 22)
-      Attribute@[7; 19)
-        Interpol@[7; 13)
-          InterpolLiteral@[7; 10)
-            Token(InterpolStart)@[7; 10)
-          InterpolAst@[10; 11)
-            Token(Ident)@[10; 11)
-          InterpolLiteral@[11; 13)
-            Token(InterpolEnd)@[11; 13)
-        Token(Dot)@[13; 14)
-        Dynamic@[14; 19)
-          Token(DynamicStart)@[14; 16)
-          Token(Ident)@[16; 17)
-          Token(DynamicEnd)@[17; 19)
-      Token(Assign)@[19; 20)
-      Token(Integer)@[20; 21)
-      Token(Semicolon)@[21; 22)
-    Token(CurlyBClose)@[22; 23)
+Node(NODE_ROOT@[0; 23))
+  Node(NODE_SET@[0; 23))
+    Token(TOKEN_CURLY_B_OPEN@[0; 1))
+    Node(NODE_SET_ENTRY@[1; 7))
+      Node(NODE_ATTRIBUTE@[1; 4))
+        Node(NODE_IDENT@[1; 2))
+          Token(TOKEN_IDENT@[1; 2))
+        Token(TOKEN_DOT@[2; 3))
+        Node(NODE_IDENT@[3; 4))
+          Token(TOKEN_IDENT@[3; 4))
+      Token(TOKEN_ASSIGN@[4; 5))
+      Node(NODE_VALUE@[5; 6))
+        Token(TOKEN_INTEGER@[5; 6))
+      Token(TOKEN_SEMICOLON@[6; 7))
+    Node(NODE_SET_ENTRY@[7; 22))
+      Node(NODE_ATTRIBUTE@[7; 19))
+        Node(NODE_INTERPOL@[7; 13))
+          Node(NODE_INTERPOL_LITERAL@[7; 10))
+            Token(TOKEN_INTERPOL_START@[7; 10))
+          Node(NODE_IDENT@[10; 11))
+            Token(TOKEN_IDENT@[10; 11))
+          Node(NODE_INTERPOL_LITERAL@[11; 13))
+            Token(TOKEN_INTERPOL_END@[11; 13))
+        Token(TOKEN_DOT@[13; 14))
+        Node(NODE_DYNAMIC@[14; 19))
+          Token(TOKEN_DYNAMIC_START@[14; 16))
+          Node(NODE_IDENT@[16; 17))
+            Token(TOKEN_IDENT@[16; 17))
+          Token(TOKEN_DYNAMIC_END@[17; 19))
+      Token(TOKEN_ASSIGN@[19; 20))
+      Node(NODE_VALUE@[20; 21))
+        Token(TOKEN_INTEGER@[20; 21))
+      Token(TOKEN_SEMICOLON@[21; 22))
+    Token(TOKEN_CURLY_B_CLOSE@[22; 23))
 "
         );
     }
     #[test]
     fn math() {
-        assert_eq!(
+        test!(
             [
-                (Token::Integer, "1"),
-                (Token::Whitespace, " "),
-                (Token::Add, "+"),
-                (Token::Whitespace, " "),
-                (Token::Integer, "2"),
-                (Token::Whitespace, " "),
-                (Token::Add, "+"),
-                (Token::Whitespace, " "),
-                (Token::Integer, "3"),
-                (Token::Whitespace, " "),
-                (Token::Mul, "*"),
-                (Token::Whitespace, " "),
-                (Token::Integer, "4")
+                (TOKEN_INTEGER, "1"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ADD, "+"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "2"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ADD, "+"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "3"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_MUL, "*"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "4")
             ],
             "\
-Root@[0; 13)
-  Operation@[0; 13)
-    Operation@[0; 6)
-      Token(Integer)@[0; 1)
-      Token(Whitespace)@[1; 2)
-      Token(Add)@[2; 3)
-      Token(Whitespace)@[3; 4)
-      Token(Integer)@[4; 5)
-      Token(Whitespace)@[5; 6)
-    Token(Add)@[6; 7)
-    Operation@[7; 13)
-      Token(Whitespace)@[7; 8)
-      Token(Integer)@[8; 9)
-      Token(Whitespace)@[9; 10)
-      Token(Mul)@[10; 11)
-      Token(Whitespace)@[11; 12)
-      Token(Integer)@[12; 13)
+Node(NODE_ROOT@[0; 13))
+  Node(NODE_OPERATION@[0; 13))
+    Node(NODE_OPERATION@[0; 6))
+      Node(NODE_VALUE@[0; 1))
+        Token(TOKEN_INTEGER@[0; 1))
+      Token(TOKEN_WHITESPACE@[1; 2))
+      Token(TOKEN_ADD@[2; 3))
+      Token(TOKEN_WHITESPACE@[3; 4))
+      Node(NODE_VALUE@[4; 5))
+        Token(TOKEN_INTEGER@[4; 5))
+      Token(TOKEN_WHITESPACE@[5; 6))
+    Token(TOKEN_ADD@[6; 7))
+    Node(NODE_OPERATION@[7; 13))
+      Token(TOKEN_WHITESPACE@[7; 8))
+      Node(NODE_VALUE@[8; 9))
+        Token(TOKEN_INTEGER@[8; 9))
+      Token(TOKEN_WHITESPACE@[9; 10))
+      Token(TOKEN_MUL@[10; 11))
+      Token(TOKEN_WHITESPACE@[11; 12))
+      Node(NODE_VALUE@[12; 13))
+        Token(TOKEN_INTEGER@[12; 13))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::Integer, "5"),
-                (Token::Mul, "*"),
-                (Token::Sub, "-"),
-                (Token::ParenOpen, "("),
-                (Token::Integer, "3"),
-                (Token::Sub, "-"),
-                (Token::Integer, "2"),
-                (Token::ParenClose, ")")
+                (TOKEN_INTEGER, "5"),
+                (TOKEN_MUL, "*"),
+                (TOKEN_SUB, "-"),
+                (TOKEN_PAREN_OPEN, "("),
+                (TOKEN_INTEGER, "3"),
+                (TOKEN_SUB, "-"),
+                (TOKEN_INTEGER, "2"),
+                (TOKEN_PAREN_CLOSE, ")")
             ],
             "\
-Root@[0; 8)
-  Operation@[0; 8)
-    Token(Integer)@[0; 1)
-    Token(Mul)@[1; 2)
-    Unary@[2; 8)
-      Token(Sub)@[2; 3)
-      Paren@[3; 8)
-        Token(ParenOpen)@[3; 4)
-        Operation@[4; 7)
-          Token(Integer)@[4; 5)
-          Token(Sub)@[5; 6)
-          Token(Integer)@[6; 7)
-        Token(ParenClose)@[7; 8)
+Node(NODE_ROOT@[0; 8))
+  Node(NODE_OPERATION@[0; 8))
+    Node(NODE_VALUE@[0; 1))
+      Token(TOKEN_INTEGER@[0; 1))
+    Token(TOKEN_MUL@[1; 2))
+    Node(NODE_UNARY@[2; 8))
+      Token(TOKEN_SUB@[2; 3))
+      Node(NODE_PAREN@[3; 8))
+        Token(TOKEN_PAREN_OPEN@[3; 4))
+        Node(NODE_OPERATION@[4; 7))
+          Node(NODE_VALUE@[4; 5))
+            Token(TOKEN_INTEGER@[4; 5))
+          Token(TOKEN_SUB@[5; 6))
+          Node(NODE_VALUE@[6; 7))
+            Token(TOKEN_INTEGER@[6; 7))
+        Token(TOKEN_PAREN_CLOSE@[7; 8))
 "
         );
     }
     #[test]
     fn let_in() {
-        assert_eq!(
+        test!(
             [
-                (Token::Let, "let"),
-                    (Token::Whitespace, " "),
-                    (Token::Ident, "a"),
-                    (Token::Whitespace, " "),
-                    (Token::Assign, "="),
-                    (Token::Whitespace, " "),
-                    (Token::Integer, "42"),
-                    (Token::Semicolon, ";"),
-                (Token::Whitespace, " "),
-                (Token::In, "in"),
-                    (Token::Whitespace, " "),
-                    (Token::Ident, "a")
+                (TOKEN_LET, "let"),
+                    (TOKEN_WHITESPACE, " "),
+                    (TOKEN_IDENT, "a"),
+                    (TOKEN_WHITESPACE, " "),
+                    (TOKEN_ASSIGN, "="),
+                    (TOKEN_WHITESPACE, " "),
+                    (TOKEN_INTEGER, "42"),
+                    (TOKEN_SEMICOLON, ";"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IN, "in"),
+                    (TOKEN_WHITESPACE, " "),
+                    (TOKEN_IDENT, "a")
             ],
             "\
-Root@[0; 16)
-  LetIn@[0; 16)
-    Token(Let)@[0; 3)
-    Token(Whitespace)@[3; 4)
-    SetEntry@[4; 11)
-      Attribute@[4; 6)
-        Token(Ident)@[4; 5)
-        Token(Whitespace)@[5; 6)
-      Token(Assign)@[6; 7)
-      Token(Whitespace)@[7; 8)
-      Token(Integer)@[8; 10)
-      Token(Semicolon)@[10; 11)
-    Token(Whitespace)@[11; 12)
-    Token(In)@[12; 14)
-    Token(Whitespace)@[14; 15)
-    Token(Ident)@[15; 16)
+Node(NODE_ROOT@[0; 16))
+  Node(NODE_LET_IN@[0; 16))
+    Token(TOKEN_LET@[0; 3))
+    Token(TOKEN_WHITESPACE@[3; 4))
+    Node(NODE_SET_ENTRY@[4; 11))
+      Node(NODE_ATTRIBUTE@[4; 6))
+        Node(NODE_IDENT@[4; 5))
+          Token(TOKEN_IDENT@[4; 5))
+        Token(TOKEN_WHITESPACE@[5; 6))
+      Token(TOKEN_ASSIGN@[6; 7))
+      Token(TOKEN_WHITESPACE@[7; 8))
+      Node(NODE_VALUE@[8; 10))
+        Token(TOKEN_INTEGER@[8; 10))
+      Token(TOKEN_SEMICOLON@[10; 11))
+    Token(TOKEN_WHITESPACE@[11; 12))
+    Token(TOKEN_IN@[12; 14))
+    Token(TOKEN_WHITESPACE@[14; 15))
+    Node(NODE_IDENT@[15; 16))
+      Token(TOKEN_IDENT@[15; 16))
 "
         );
     }
     #[test]
     fn let_legacy_syntax() {
-        assert_eq!(
+        test!(
             [
-                (Token::Let, "let"),
-                (Token::CurlyBOpen, "{"),
-                    (Token::Ident, "a"),
-                        (Token::Assign, "="),
-                        (Token::Integer, "42"),
-                        (Token::Semicolon, ";"),
-                    (Token::Ident, "body"),
-                        (Token::Assign, "="),
-                        (Token::Ident, "a"),
-                        (Token::Semicolon, ";"),
-                (Token::CurlyBClose, "}")
+                (TOKEN_LET, "let"),
+                (TOKEN_CURLY_B_OPEN, "{"),
+                    (TOKEN_IDENT, "a"),
+                        (TOKEN_ASSIGN, "="),
+                        (TOKEN_INTEGER, "42"),
+                        (TOKEN_SEMICOLON, ";"),
+                    (TOKEN_IDENT, "body"),
+                        (TOKEN_ASSIGN, "="),
+                        (TOKEN_IDENT, "a"),
+                        (TOKEN_SEMICOLON, ";"),
+                (TOKEN_CURLY_B_CLOSE, "}")
             ],
             "\
-Root@[0; 17)
-  Let@[0; 17)
-    Token(Let)@[0; 3)
-    Token(CurlyBOpen)@[3; 4)
-    SetEntry@[4; 9)
-      Attribute@[4; 5)
-        Token(Ident)@[4; 5)
-      Token(Assign)@[5; 6)
-      Token(Integer)@[6; 8)
-      Token(Semicolon)@[8; 9)
-    SetEntry@[9; 16)
-      Attribute@[9; 13)
-        Token(Ident)@[9; 13)
-      Token(Assign)@[13; 14)
-      Token(Ident)@[14; 15)
-      Token(Semicolon)@[15; 16)
-    Token(CurlyBClose)@[16; 17)
+Node(NODE_ROOT@[0; 17))
+  Node(NODE_LET@[0; 17))
+    Token(TOKEN_LET@[0; 3))
+    Token(TOKEN_CURLY_B_OPEN@[3; 4))
+    Node(NODE_SET_ENTRY@[4; 9))
+      Node(NODE_ATTRIBUTE@[4; 5))
+        Node(NODE_IDENT@[4; 5))
+          Token(TOKEN_IDENT@[4; 5))
+      Token(TOKEN_ASSIGN@[5; 6))
+      Node(NODE_VALUE@[6; 8))
+        Token(TOKEN_INTEGER@[6; 8))
+      Token(TOKEN_SEMICOLON@[8; 9))
+    Node(NODE_SET_ENTRY@[9; 16))
+      Node(NODE_ATTRIBUTE@[9; 13))
+        Node(NODE_IDENT@[9; 13))
+          Token(TOKEN_IDENT@[9; 13))
+      Token(TOKEN_ASSIGN@[13; 14))
+      Node(NODE_IDENT@[14; 15))
+        Token(TOKEN_IDENT@[14; 15))
+      Token(TOKEN_SEMICOLON@[15; 16))
+    Token(TOKEN_CURLY_B_CLOSE@[16; 17))
 "
         );
     }
     #[test]
     fn interpolation() {
-        assert_eq!(
+        test!(
             [
-                (Token::Whitespace, " "),
-                (Token::InterpolStart, r#""Hello, ${"#),
-                    (Token::Whitespace, " "),
-                    (Token::CurlyBOpen, "{"),
-                    (Token::Whitespace, " "),
-                    (Token::Ident, "world"),
-                    (Token::Whitespace, " "),
-                    (Token::Assign, "="),
-                    (Token::Whitespace, " "),
-                    (Token::String, r#""World""#),
-                    (Token::Semicolon, ";"),
-                    (Token::Whitespace, " "),
-                    (Token::CurlyBClose, "}"),
-                    (Token::Dot, "."),
-                    (Token::Ident, "world"),
-                    (Token::Whitespace, " "),
-                (Token::InterpolEnd, r#"}!""#),
-                (Token::Whitespace, " ")
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTERPOL_START, r#""Hello, ${"#),
+                    (TOKEN_WHITESPACE, " "),
+                    (TOKEN_CURLY_B_OPEN, "{"),
+                    (TOKEN_WHITESPACE, " "),
+                    (TOKEN_IDENT, "world"),
+                    (TOKEN_WHITESPACE, " "),
+                    (TOKEN_ASSIGN, "="),
+                    (TOKEN_WHITESPACE, " "),
+                    (TOKEN_STRING, r#""World""#),
+                    (TOKEN_SEMICOLON, ";"),
+                    (TOKEN_WHITESPACE, " "),
+                    (TOKEN_CURLY_B_CLOSE, "}"),
+                    (TOKEN_DOT, "."),
+                    (TOKEN_IDENT, "world"),
+                    (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTERPOL_END, r#"}!""#),
+                (TOKEN_WHITESPACE, " ")
             ],
             "\
-Root@[0; 43)
-  Token(Whitespace)@[0; 1)
-  Interpol@[1; 42)
-    InterpolLiteral@[1; 11)
-      Token(InterpolStart)@[1; 11)
-    InterpolAst@[11; 39)
-      Token(Whitespace)@[11; 12)
-      IndexSet@[12; 38)
-        Set@[12; 32)
-          Token(CurlyBOpen)@[12; 13)
-          Token(Whitespace)@[13; 14)
-          SetEntry@[14; 30)
-            Attribute@[14; 20)
-              Token(Ident)@[14; 19)
-              Token(Whitespace)@[19; 20)
-            Token(Assign)@[20; 21)
-            Token(Whitespace)@[21; 22)
-            Token(String)@[22; 29)
-            Token(Semicolon)@[29; 30)
-          Token(Whitespace)@[30; 31)
-          Token(CurlyBClose)@[31; 32)
-        Token(Dot)@[32; 33)
-        Token(Ident)@[33; 38)
-      Token(Whitespace)@[38; 39)
-    InterpolLiteral@[39; 42)
-      Token(InterpolEnd)@[39; 42)
-  Token(Whitespace)@[42; 43)
+Node(NODE_ROOT@[0; 43))
+  Token(TOKEN_WHITESPACE@[0; 1))
+  Node(NODE_INTERPOL@[1; 42))
+    Node(NODE_INTERPOL_LITERAL@[1; 11))
+      Token(TOKEN_INTERPOL_START@[1; 11))
+    Token(TOKEN_WHITESPACE@[11; 12))
+    Node(NODE_INDEX_SET@[12; 38))
+      Node(NODE_SET@[12; 32))
+        Token(TOKEN_CURLY_B_OPEN@[12; 13))
+        Token(TOKEN_WHITESPACE@[13; 14))
+        Node(NODE_SET_ENTRY@[14; 30))
+          Node(NODE_ATTRIBUTE@[14; 20))
+            Node(NODE_IDENT@[14; 19))
+              Token(TOKEN_IDENT@[14; 19))
+            Token(TOKEN_WHITESPACE@[19; 20))
+          Token(TOKEN_ASSIGN@[20; 21))
+          Token(TOKEN_WHITESPACE@[21; 22))
+          Node(NODE_VALUE@[22; 29))
+            Token(TOKEN_STRING@[22; 29))
+          Token(TOKEN_SEMICOLON@[29; 30))
+        Token(TOKEN_WHITESPACE@[30; 31))
+        Token(TOKEN_CURLY_B_CLOSE@[31; 32))
+      Token(TOKEN_DOT@[32; 33))
+      Node(NODE_IDENT@[33; 38))
+        Token(TOKEN_IDENT@[33; 38))
+    Token(TOKEN_WHITESPACE@[38; 39))
+    Node(NODE_INTERPOL_LITERAL@[39; 42))
+      Token(TOKEN_INTERPOL_END@[39; 42))
+  Token(TOKEN_WHITESPACE@[42; 43))
 "
         );
-      assert_eq!(
+      test!(
           [
-                (Token::Whitespace, " "),
-                (Token::InterpolStart, r#""${"#),
-                    (Token::Ident, "hello"),
-                (Token::InterpolEndStart, r#"} ${"#),
-                    (Token::Ident, "world"),
-                (Token::InterpolEnd, r#"}""#),
-                (Token::Whitespace, " ")
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTERPOL_START, r#""${"#),
+                    (TOKEN_IDENT, "hello"),
+                (TOKEN_INTERPOL_END_START, r#"} ${"#),
+                    (TOKEN_IDENT, "world"),
+                (TOKEN_INTERPOL_END, r#"}""#),
+                (TOKEN_WHITESPACE, " ")
           ],
           "\
-Root@[0; 21)
-  Token(Whitespace)@[0; 1)
-  Interpol@[1; 20)
-    InterpolLiteral@[1; 4)
-      Token(InterpolStart)@[1; 4)
-    InterpolAst@[4; 9)
-      Token(Ident)@[4; 9)
-    InterpolLiteral@[9; 13)
-      Token(InterpolEndStart)@[9; 13)
-    InterpolAst@[13; 18)
-      Token(Ident)@[13; 18)
-    InterpolLiteral@[18; 20)
-      Token(InterpolEnd)@[18; 20)
-  Token(Whitespace)@[20; 21)
+Node(NODE_ROOT@[0; 21))
+  Token(TOKEN_WHITESPACE@[0; 1))
+  Node(NODE_INTERPOL@[1; 20))
+    Node(NODE_INTERPOL_LITERAL@[1; 4))
+      Token(TOKEN_INTERPOL_START@[1; 4))
+    Node(NODE_IDENT@[4; 9))
+      Token(TOKEN_IDENT@[4; 9))
+    Node(NODE_INTERPOL_LITERAL@[9; 13))
+      Token(TOKEN_INTERPOL_END_START@[9; 13))
+    Node(NODE_IDENT@[13; 18))
+      Token(TOKEN_IDENT@[13; 18))
+    Node(NODE_INTERPOL_LITERAL@[18; 20))
+      Token(TOKEN_INTERPOL_END@[18; 20))
+  Token(TOKEN_WHITESPACE@[20; 21))
 "
       );
-      assert_eq!(
+      test!(
           [
-                (Token::Whitespace, " "),
-                (Token::InterpolStart, r#"''${"#),
-                    (Token::InterpolStart, r#""${"#),
-                        (Token::Ident, "var"),
-                    (Token::InterpolEnd, r#"}""#),
-                (Token::InterpolEnd, r#"}''"#),
-                (Token::Whitespace, " ")
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTERPOL_START, r#"''${"#),
+                    (TOKEN_INTERPOL_START, r#""${"#),
+                        (TOKEN_IDENT, "var"),
+                    (TOKEN_INTERPOL_END, r#"}""#),
+                (TOKEN_INTERPOL_END, r#"}''"#),
+                (TOKEN_WHITESPACE, " ")
           ],
           "\
-Root@[0; 17)
-  Token(Whitespace)@[0; 1)
-  Interpol@[1; 16)
-    InterpolLiteral@[1; 5)
-      Token(InterpolStart)@[1; 5)
-    InterpolAst@[5; 13)
-      Interpol@[5; 13)
-        InterpolLiteral@[5; 8)
-          Token(InterpolStart)@[5; 8)
-        InterpolAst@[8; 11)
-          Token(Ident)@[8; 11)
-        InterpolLiteral@[11; 13)
-          Token(InterpolEnd)@[11; 13)
-    InterpolLiteral@[13; 16)
-      Token(InterpolEnd)@[13; 16)
-  Token(Whitespace)@[16; 17)
+Node(NODE_ROOT@[0; 17))
+  Token(TOKEN_WHITESPACE@[0; 1))
+  Node(NODE_INTERPOL@[1; 16))
+    Node(NODE_INTERPOL_LITERAL@[1; 5))
+      Token(TOKEN_INTERPOL_START@[1; 5))
+    Node(NODE_INTERPOL@[5; 13))
+      Node(NODE_INTERPOL_LITERAL@[5; 8))
+        Token(TOKEN_INTERPOL_START@[5; 8))
+      Node(NODE_IDENT@[8; 11))
+        Token(TOKEN_IDENT@[8; 11))
+      Node(NODE_INTERPOL_LITERAL@[11; 13))
+        Token(TOKEN_INTERPOL_END@[11; 13))
+    Node(NODE_INTERPOL_LITERAL@[13; 16))
+      Token(TOKEN_INTERPOL_END@[13; 16))
+  Token(TOKEN_WHITESPACE@[16; 17))
 "
       );
     }
     #[test]
     fn index_set() {
-        assert_eq!(
+        test!(
             [
-                (Token::Ident, "a"),
-                (Token::Dot, "."),
-                (Token::Ident, "b"),
-                (Token::Dot, "."),
-                (Token::Ident, "c")
+                (TOKEN_IDENT, "a"),
+                (TOKEN_DOT, "."),
+                (TOKEN_IDENT, "b"),
+                (TOKEN_DOT, "."),
+                (TOKEN_IDENT, "c")
             ],
             "\
-Root@[0; 5)
-  IndexSet@[0; 5)
-    IndexSet@[0; 3)
-      Token(Ident)@[0; 1)
-      Token(Dot)@[1; 2)
-      Token(Ident)@[2; 3)
-    Token(Dot)@[3; 4)
-    Token(Ident)@[4; 5)
+Node(NODE_ROOT@[0; 5))
+  Node(NODE_INDEX_SET@[0; 5))
+    Node(NODE_INDEX_SET@[0; 3))
+      Node(NODE_IDENT@[0; 1))
+        Token(TOKEN_IDENT@[0; 1))
+      Token(TOKEN_DOT@[1; 2))
+      Node(NODE_IDENT@[2; 3))
+        Token(TOKEN_IDENT@[2; 3))
+    Token(TOKEN_DOT@[3; 4))
+    Node(NODE_IDENT@[4; 5))
+      Token(TOKEN_IDENT@[4; 5))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::CurlyBOpen, "{"),
-                    (Token::Ident, "a"),
-                        (Token::Dot, "."),
-                        (Token::Ident, "b"),
-                        (Token::Dot, "."),
-                        (Token::Ident, "c"),
-                    (Token::Assign, "="),
-                    (Token::Integer, "1"),
-                    (Token::Semicolon, ";"),
-                (Token::CurlyBClose, "}")
+                (TOKEN_CURLY_B_OPEN, "{"),
+                    (TOKEN_IDENT, "a"),
+                        (TOKEN_DOT, "."),
+                        (TOKEN_IDENT, "b"),
+                        (TOKEN_DOT, "."),
+                        (TOKEN_IDENT, "c"),
+                    (TOKEN_ASSIGN, "="),
+                    (TOKEN_INTEGER, "1"),
+                    (TOKEN_SEMICOLON, ";"),
+                (TOKEN_CURLY_B_CLOSE, "}")
             ],
             "\
-Root@[0; 10)
-  Set@[0; 10)
-    Token(CurlyBOpen)@[0; 1)
-    SetEntry@[1; 9)
-      Attribute@[1; 6)
-        Token(Ident)@[1; 2)
-        Token(Dot)@[2; 3)
-        Token(Ident)@[3; 4)
-        Token(Dot)@[4; 5)
-        Token(Ident)@[5; 6)
-      Token(Assign)@[6; 7)
-      Token(Integer)@[7; 8)
-      Token(Semicolon)@[8; 9)
-    Token(CurlyBClose)@[9; 10)
+Node(NODE_ROOT@[0; 10))
+  Node(NODE_SET@[0; 10))
+    Token(TOKEN_CURLY_B_OPEN@[0; 1))
+    Node(NODE_SET_ENTRY@[1; 9))
+      Node(NODE_ATTRIBUTE@[1; 6))
+        Node(NODE_IDENT@[1; 2))
+          Token(TOKEN_IDENT@[1; 2))
+        Token(TOKEN_DOT@[2; 3))
+        Node(NODE_IDENT@[3; 4))
+          Token(TOKEN_IDENT@[3; 4))
+        Token(TOKEN_DOT@[4; 5))
+        Node(NODE_IDENT@[5; 6))
+          Token(TOKEN_IDENT@[5; 6))
+      Token(TOKEN_ASSIGN@[6; 7))
+      Node(NODE_VALUE@[7; 8))
+        Token(TOKEN_INTEGER@[7; 8))
+      Token(TOKEN_SEMICOLON@[8; 9))
+    Token(TOKEN_CURLY_B_CLOSE@[9; 10))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::Ident, "test"),
-                    (Token::Dot, "."),
-                    (Token::String, "\"invalid ident\""),
-                    (Token::Dot, "."),
-                    (Token::InterpolStart, "\"${"),
-                        (Token::Ident, "hi"),
-                    (Token::InterpolEnd, "}\""),
-                    (Token::Dot, "."),
-                    (Token::DynamicStart, "${"),
-                        (Token::Ident, "a"),
-                    (Token::DynamicEnd, "}")
+                (TOKEN_IDENT, "test"),
+                    (TOKEN_DOT, "."),
+                    (TOKEN_STRING, "\"invalid ident\""),
+                    (TOKEN_DOT, "."),
+                    (TOKEN_INTERPOL_START, "\"${"),
+                        (TOKEN_IDENT, "hi"),
+                    (TOKEN_INTERPOL_END, "}\""),
+                    (TOKEN_DOT, "."),
+                    (TOKEN_DYNAMIC_START, "${"),
+                        (TOKEN_IDENT, "a"),
+                    (TOKEN_DYNAMIC_END, "}")
             ],
             "\
-Root@[0; 33)
-  IndexSet@[0; 33)
-    IndexSet@[0; 28)
-      IndexSet@[0; 20)
-        Token(Ident)@[0; 4)
-        Token(Dot)@[4; 5)
-        Token(String)@[5; 20)
-      Token(Dot)@[20; 21)
-      Interpol@[21; 28)
-        InterpolLiteral@[21; 24)
-          Token(InterpolStart)@[21; 24)
-        InterpolAst@[24; 26)
-          Token(Ident)@[24; 26)
-        InterpolLiteral@[26; 28)
-          Token(InterpolEnd)@[26; 28)
-    Token(Dot)@[28; 29)
-    Dynamic@[29; 33)
-      Token(DynamicStart)@[29; 31)
-      Token(Ident)@[31; 32)
-      Token(DynamicEnd)@[32; 33)
+Node(NODE_ROOT@[0; 33))
+  Node(NODE_INDEX_SET@[0; 33))
+    Node(NODE_INDEX_SET@[0; 28))
+      Node(NODE_INDEX_SET@[0; 20))
+        Node(NODE_IDENT@[0; 4))
+          Token(TOKEN_IDENT@[0; 4))
+        Token(TOKEN_DOT@[4; 5))
+        Node(NODE_VALUE@[5; 20))
+          Token(TOKEN_STRING@[5; 20))
+      Token(TOKEN_DOT@[20; 21))
+      Node(NODE_INTERPOL@[21; 28))
+        Node(NODE_INTERPOL_LITERAL@[21; 24))
+          Token(TOKEN_INTERPOL_START@[21; 24))
+        Node(NODE_IDENT@[24; 26))
+          Token(TOKEN_IDENT@[24; 26))
+        Node(NODE_INTERPOL_LITERAL@[26; 28))
+          Token(TOKEN_INTERPOL_END@[26; 28))
+    Token(TOKEN_DOT@[28; 29))
+    Node(NODE_DYNAMIC@[29; 33))
+      Token(TOKEN_DYNAMIC_START@[29; 31))
+      Node(NODE_IDENT@[31; 32))
+        Token(TOKEN_IDENT@[31; 32))
+      Token(TOKEN_DYNAMIC_END@[32; 33))
 "
         );
     }
     #[test]
     fn isset() {
-        assert_eq!(
+        test!(
             [
-                (Token::Ident, "a"),
-                (Token::Question, "?"),
-                (Token::String, "\"b\""),
-                (Token::And, "&&"),
-                (Token::Ident, "true")
+                (TOKEN_IDENT, "a"),
+                (TOKEN_QUESTION, "?"),
+                (TOKEN_STRING, "\"b\""),
+                (TOKEN_AND, "&&"),
+                (TOKEN_IDENT, "true")
             ],
             "\
-Root@[0; 11)
-  Operation@[0; 11)
-    Operation@[0; 5)
-      Token(Ident)@[0; 1)
-      Token(Question)@[1; 2)
-      Token(String)@[2; 5)
-    Token(And)@[5; 7)
-    Token(Ident)@[7; 11)
+Node(NODE_ROOT@[0; 11))
+  Node(NODE_OPERATION@[0; 11))
+    Node(NODE_OPERATION@[0; 5))
+      Node(NODE_IDENT@[0; 1))
+        Token(TOKEN_IDENT@[0; 1))
+      Token(TOKEN_QUESTION@[1; 2))
+      Node(NODE_VALUE@[2; 5))
+        Token(TOKEN_STRING@[2; 5))
+    Token(TOKEN_AND@[5; 7))
+    Node(NODE_IDENT@[7; 11))
+      Token(TOKEN_IDENT@[7; 11))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::Ident, "a"),
-                    (Token::Dot, "."),
-                    (Token::Ident, "b"),
-                    (Token::Dot, "."),
-                    (Token::Ident, "c"),
-                (Token::Ident, OR),
-                (Token::Integer, "1"),
-                (Token::Add, "+"),
-                (Token::Integer, "1")
+                (TOKEN_IDENT, "a"),
+                    (TOKEN_DOT, "."),
+                    (TOKEN_IDENT, "b"),
+                    (TOKEN_DOT, "."),
+                    (TOKEN_IDENT, "c"),
+                (TOKEN_IDENT, OR),
+                (TOKEN_INTEGER, "1"),
+                (TOKEN_ADD, "+"),
+                (TOKEN_INTEGER, "1")
             ],
             "\
-Root@[0; 10)
-  Operation@[0; 10)
-    OrDefault@[0; 8)
-      IndexSet@[0; 5)
-        IndexSet@[0; 3)
-          Token(Ident)@[0; 1)
-          Token(Dot)@[1; 2)
-          Token(Ident)@[2; 3)
-        Token(Dot)@[3; 4)
-        Token(Ident)@[4; 5)
-      Token(Ident)@[5; 7)
-      Token(Integer)@[7; 8)
-    Token(Add)@[8; 9)
-    Token(Integer)@[9; 10)
+Node(NODE_ROOT@[0; 10))
+  Node(NODE_OPERATION@[0; 10))
+    Node(NODE_OR_DEFAULT@[0; 8))
+      Node(NODE_INDEX_SET@[0; 5))
+        Node(NODE_INDEX_SET@[0; 3))
+          Node(NODE_IDENT@[0; 1))
+            Token(TOKEN_IDENT@[0; 1))
+          Token(TOKEN_DOT@[1; 2))
+          Node(NODE_IDENT@[2; 3))
+            Token(TOKEN_IDENT@[2; 3))
+        Token(TOKEN_DOT@[3; 4))
+        Node(NODE_IDENT@[4; 5))
+          Token(TOKEN_IDENT@[4; 5))
+      Token(TOKEN_IDENT@[5; 7))
+      Node(NODE_VALUE@[7; 8))
+        Token(TOKEN_INTEGER@[7; 8))
+    Token(TOKEN_ADD@[8; 9))
+    Node(NODE_VALUE@[9; 10))
+      Token(TOKEN_INTEGER@[9; 10))
 "
         );
     }
     #[test]
     fn merge() {
-        assert_eq!(
+        test!(
             [
-                (Token::CurlyBOpen, "{"),
-                (Token::Ident, "a"),
-                (Token::Assign, "="),
-                (Token::Integer, "1"),
-                (Token::Semicolon, ";"),
-                (Token::CurlyBClose, "}"),
-                (Token::Merge, "//"),
-                (Token::CurlyBOpen, "{"),
-                (Token::Ident, "b"),
-                (Token::Assign, "="),
-                (Token::Integer, "2"),
-                (Token::Semicolon, ";"),
-                (Token::CurlyBClose, "}")
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_IDENT, "a"),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_INTEGER, "1"),
+                (TOKEN_SEMICOLON, ";"),
+                (TOKEN_CURLY_B_CLOSE, "}"),
+                (TOKEN_MERGE, "//"),
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_IDENT, "b"),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_INTEGER, "2"),
+                (TOKEN_SEMICOLON, ";"),
+                (TOKEN_CURLY_B_CLOSE, "}")
             ],
             "\
-Root@[0; 14)
-  Operation@[0; 14)
-    Set@[0; 6)
-      Token(CurlyBOpen)@[0; 1)
-      SetEntry@[1; 5)
-        Attribute@[1; 2)
-          Token(Ident)@[1; 2)
-        Token(Assign)@[2; 3)
-        Token(Integer)@[3; 4)
-        Token(Semicolon)@[4; 5)
-      Token(CurlyBClose)@[5; 6)
-    Token(Merge)@[6; 8)
-    Set@[8; 14)
-      Token(CurlyBOpen)@[8; 9)
-      SetEntry@[9; 13)
-        Attribute@[9; 10)
-          Token(Ident)@[9; 10)
-        Token(Assign)@[10; 11)
-        Token(Integer)@[11; 12)
-        Token(Semicolon)@[12; 13)
-      Token(CurlyBClose)@[13; 14)
+Node(NODE_ROOT@[0; 14))
+  Node(NODE_OPERATION@[0; 14))
+    Node(NODE_SET@[0; 6))
+      Token(TOKEN_CURLY_B_OPEN@[0; 1))
+      Node(NODE_SET_ENTRY@[1; 5))
+        Node(NODE_ATTRIBUTE@[1; 2))
+          Node(NODE_IDENT@[1; 2))
+            Token(TOKEN_IDENT@[1; 2))
+        Token(TOKEN_ASSIGN@[2; 3))
+        Node(NODE_VALUE@[3; 4))
+          Token(TOKEN_INTEGER@[3; 4))
+        Token(TOKEN_SEMICOLON@[4; 5))
+      Token(TOKEN_CURLY_B_CLOSE@[5; 6))
+    Token(TOKEN_MERGE@[6; 8))
+    Node(NODE_SET@[8; 14))
+      Token(TOKEN_CURLY_B_OPEN@[8; 9))
+      Node(NODE_SET_ENTRY@[9; 13))
+        Node(NODE_ATTRIBUTE@[9; 10))
+          Node(NODE_IDENT@[9; 10))
+            Token(TOKEN_IDENT@[9; 10))
+        Token(TOKEN_ASSIGN@[10; 11))
+        Node(NODE_VALUE@[11; 12))
+          Token(TOKEN_INTEGER@[11; 12))
+        Token(TOKEN_SEMICOLON@[12; 13))
+      Token(TOKEN_CURLY_B_CLOSE@[13; 14))
 "
         );
     }
     #[test]
     fn with() {
-        assert_eq!(
+        test!(
             [
-                (Token::With, "with"),
-                (Token::Ident, "namespace"),
-                (Token::Semicolon, ";"),
-                (Token::Ident, "expr")
+                (TOKEN_WITH, "with"),
+                (TOKEN_IDENT, "namespace"),
+                (TOKEN_SEMICOLON, ";"),
+                (TOKEN_IDENT, "expr")
             ],
             "\
-Root@[0; 18)
-  With@[0; 18)
-    Token(With)@[0; 4)
-    Token(Ident)@[4; 13)
-    Token(Semicolon)@[13; 14)
-    Token(Ident)@[14; 18)
+Node(NODE_ROOT@[0; 18))
+  Node(NODE_WITH@[0; 18))
+    Token(TOKEN_WITH@[0; 4))
+    Node(NODE_IDENT@[4; 13))
+      Token(TOKEN_IDENT@[4; 13))
+    Token(TOKEN_SEMICOLON@[13; 14))
+    Node(NODE_IDENT@[14; 18))
+      Token(TOKEN_IDENT@[14; 18))
 "
         );
     }
     #[test]
     fn assert() {
-        assert_eq!(
+        test!(
             [
-                (Token::Assert, "assert"),
-                (Token::Ident, "a"),
-                (Token::Equal, "=="),
-                (Token::Ident, "b"),
-                (Token::Semicolon, ";"),
-                (Token::String, "\"a == b\"")
+                (TOKEN_ASSERT, "assert"),
+                (TOKEN_IDENT, "a"),
+                (TOKEN_EQUAL, "=="),
+                (TOKEN_IDENT, "b"),
+                (TOKEN_SEMICOLON, ";"),
+                (TOKEN_STRING, "\"a == b\"")
             ],
             "\
-Root@[0; 19)
-  Assert@[0; 19)
-    Token(Assert)@[0; 6)
-    Operation@[6; 10)
-      Token(Ident)@[6; 7)
-      Token(Equal)@[7; 9)
-      Token(Ident)@[9; 10)
-    Token(Semicolon)@[10; 11)
-    Token(String)@[11; 19)
+Node(NODE_ROOT@[0; 19))
+  Node(NODE_ASSERT@[0; 19))
+    Token(TOKEN_ASSERT@[0; 6))
+    Node(NODE_OPERATION@[6; 10))
+      Node(NODE_IDENT@[6; 7))
+        Token(TOKEN_IDENT@[6; 7))
+      Token(TOKEN_EQUAL@[7; 9))
+      Node(NODE_IDENT@[9; 10))
+        Token(TOKEN_IDENT@[9; 10))
+    Token(TOKEN_SEMICOLON@[10; 11))
+    Node(NODE_VALUE@[11; 19))
+      Token(TOKEN_STRING@[11; 19))
 "
         );
     }
     #[test]
     fn inherit() {
-        assert_eq!(
+        test!(
             [
-                (Token::CurlyBOpen, "{"),
-                    (Token::Ident, "a"),
-                        (Token::Assign, "="),
-                        (Token::Integer, "1"),
-                        (Token::Semicolon, ";"),
-                    (Token::Inherit, "inherit"),
-                        (Token::Whitespace, " "),
-                        (Token::Ident, "b"),
-                        (Token::Whitespace, " "),
-                        (Token::Ident, "c"),
-                        (Token::Semicolon, ";"),
-                    (Token::Inherit, "inherit"),
-                        (Token::Whitespace, " "),
-                        (Token::ParenOpen, "("),
-                        (Token::Ident, "set"),
-                        (Token::ParenClose, ")"),
-                        (Token::Whitespace, " "),
-                        (Token::Ident, "d"),
-                        (Token::Whitespace, " "),
-                        (Token::Ident, "e"),
-                        (Token::Semicolon, ";"),
-                (Token::CurlyBClose, "}")
+                (TOKEN_CURLY_B_OPEN, "{"),
+                    (TOKEN_IDENT, "a"),
+                        (TOKEN_ASSIGN, "="),
+                        (TOKEN_INTEGER, "1"),
+                        (TOKEN_SEMICOLON, ";"),
+                    (TOKEN_INHERIT, "inherit"),
+                        (TOKEN_WHITESPACE, " "),
+                        (TOKEN_IDENT, "b"),
+                        (TOKEN_WHITESPACE, " "),
+                        (TOKEN_IDENT, "c"),
+                        (TOKEN_SEMICOLON, ";"),
+                    (TOKEN_INHERIT, "inherit"),
+                        (TOKEN_WHITESPACE, " "),
+                        (TOKEN_PAREN_OPEN, "("),
+                        (TOKEN_IDENT, "set"),
+                        (TOKEN_PAREN_CLOSE, ")"),
+                        (TOKEN_WHITESPACE, " "),
+                        (TOKEN_IDENT, "d"),
+                        (TOKEN_WHITESPACE, " "),
+                        (TOKEN_IDENT, "e"),
+                        (TOKEN_SEMICOLON, ";"),
+                (TOKEN_CURLY_B_CLOSE, "}")
             ],
             "\
-Root@[0; 36)
-  Set@[0; 36)
-    Token(CurlyBOpen)@[0; 1)
-    SetEntry@[1; 5)
-      Attribute@[1; 2)
-        Token(Ident)@[1; 2)
-      Token(Assign)@[2; 3)
-      Token(Integer)@[3; 4)
-      Token(Semicolon)@[4; 5)
-    Inherit@[5; 17)
-      Token(Inherit)@[5; 12)
-      Token(Whitespace)@[12; 13)
-      Token(Ident)@[13; 14)
-      Token(Whitespace)@[14; 15)
-      Token(Ident)@[15; 16)
-      Token(Semicolon)@[16; 17)
-    Inherit@[17; 35)
-      Token(Inherit)@[17; 24)
-      Token(Whitespace)@[24; 25)
-      InheritFrom@[25; 30)
-        Token(ParenOpen)@[25; 26)
-        Token(Ident)@[26; 29)
-        Token(ParenClose)@[29; 30)
-      Token(Whitespace)@[30; 31)
-      Token(Ident)@[31; 32)
-      Token(Whitespace)@[32; 33)
-      Token(Ident)@[33; 34)
-      Token(Semicolon)@[34; 35)
-    Token(CurlyBClose)@[35; 36)
+Node(NODE_ROOT@[0; 36))
+  Node(NODE_SET@[0; 36))
+    Token(TOKEN_CURLY_B_OPEN@[0; 1))
+    Node(NODE_SET_ENTRY@[1; 5))
+      Node(NODE_ATTRIBUTE@[1; 2))
+        Node(NODE_IDENT@[1; 2))
+          Token(TOKEN_IDENT@[1; 2))
+      Token(TOKEN_ASSIGN@[2; 3))
+      Node(NODE_VALUE@[3; 4))
+        Token(TOKEN_INTEGER@[3; 4))
+      Token(TOKEN_SEMICOLON@[4; 5))
+    Node(NODE_INHERIT@[5; 17))
+      Token(TOKEN_INHERIT@[5; 12))
+      Token(TOKEN_WHITESPACE@[12; 13))
+      Node(NODE_IDENT@[13; 14))
+        Token(TOKEN_IDENT@[13; 14))
+      Token(TOKEN_WHITESPACE@[14; 15))
+      Node(NODE_IDENT@[15; 16))
+        Token(TOKEN_IDENT@[15; 16))
+      Token(TOKEN_SEMICOLON@[16; 17))
+    Node(NODE_INHERIT@[17; 35))
+      Token(TOKEN_INHERIT@[17; 24))
+      Token(TOKEN_WHITESPACE@[24; 25))
+      Node(NODE_INHERIT_FROM@[25; 30))
+        Token(TOKEN_PAREN_OPEN@[25; 26))
+        Node(NODE_IDENT@[26; 29))
+          Token(TOKEN_IDENT@[26; 29))
+        Token(TOKEN_PAREN_CLOSE@[29; 30))
+      Token(TOKEN_WHITESPACE@[30; 31))
+      Node(NODE_IDENT@[31; 32))
+        Token(TOKEN_IDENT@[31; 32))
+      Token(TOKEN_WHITESPACE@[32; 33))
+      Node(NODE_IDENT@[33; 34))
+        Token(TOKEN_IDENT@[33; 34))
+      Token(TOKEN_SEMICOLON@[34; 35))
+    Token(TOKEN_CURLY_B_CLOSE@[35; 36))
 "
         );
     }
     #[test]
     fn ifs() {
-        assert_eq!(
+        test!(
             [
-                (Token::Ident, "false"),
-                (Token::Implication, "->"),
-                (Token::Invert, "!"),
-                (Token::Ident, "false"),
+                (TOKEN_IDENT, "false"),
+                (TOKEN_IMPLICATION, "->"),
+                (TOKEN_INVERT, "!"),
+                (TOKEN_IDENT, "false"),
 
-                (Token::And, "&&"),
+                (TOKEN_AND, "&&"),
 
-                (Token::Ident, "false"),
-                (Token::Equal, "=="),
-                (Token::Ident, "true"),
+                (TOKEN_IDENT, "false"),
+                (TOKEN_EQUAL, "=="),
+                (TOKEN_IDENT, "true"),
 
-                (Token::Or, "||"),
+                (TOKEN_OR, "||"),
 
-                (Token::Ident, "true")
+                (TOKEN_IDENT, "true")
             ],
             "\
-Root@[0; 32)
-  Operation@[0; 32)
-    Token(Ident)@[0; 5)
-    Token(Implication)@[5; 7)
-    Operation@[7; 32)
-      Operation@[7; 26)
-        Unary@[7; 13)
-          Token(Invert)@[7; 8)
-          Token(Ident)@[8; 13)
-        Token(And)@[13; 15)
-        Operation@[15; 26)
-          Token(Ident)@[15; 20)
-          Token(Equal)@[20; 22)
-          Token(Ident)@[22; 26)
-      Token(Or)@[26; 28)
-      Token(Ident)@[28; 32)
+Node(NODE_ROOT@[0; 32))
+  Node(NODE_OPERATION@[0; 32))
+    Node(NODE_IDENT@[0; 5))
+      Token(TOKEN_IDENT@[0; 5))
+    Token(TOKEN_IMPLICATION@[5; 7))
+    Node(NODE_OPERATION@[7; 32))
+      Node(NODE_OPERATION@[7; 26))
+        Node(NODE_UNARY@[7; 13))
+          Token(TOKEN_INVERT@[7; 8))
+          Node(NODE_IDENT@[8; 13))
+            Token(TOKEN_IDENT@[8; 13))
+        Token(TOKEN_AND@[13; 15))
+        Node(NODE_OPERATION@[15; 26))
+          Node(NODE_IDENT@[15; 20))
+            Token(TOKEN_IDENT@[15; 20))
+          Token(TOKEN_EQUAL@[20; 22))
+          Node(NODE_IDENT@[22; 26))
+            Token(TOKEN_IDENT@[22; 26))
+      Token(TOKEN_OR@[26; 28))
+      Node(NODE_IDENT@[28; 32))
+        Token(TOKEN_IDENT@[28; 32))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::Integer, "1"),
-                (Token::Less, "<"),
-                (Token::Integer, "2"),
+                (TOKEN_INTEGER, "1"),
+                (TOKEN_LESS, "<"),
+                (TOKEN_INTEGER, "2"),
 
-                (Token::Or, "||"),
+                (TOKEN_OR, "||"),
 
-                (Token::Integer, "2"),
-                (Token::LessOrEq, "<="),
-                (Token::Integer, "2"),
+                (TOKEN_INTEGER, "2"),
+                (TOKEN_LESS_OR_EQ, "<="),
+                (TOKEN_INTEGER, "2"),
 
-                (Token::And, "&&"),
+                (TOKEN_AND, "&&"),
 
-                (Token::Integer, "2"),
-                (Token::More, ">"),
-                (Token::Integer, "1"),
+                (TOKEN_INTEGER, "2"),
+                (TOKEN_MORE, ">"),
+                (TOKEN_INTEGER, "1"),
 
-                (Token::And, "&&"),
+                (TOKEN_AND, "&&"),
 
-                (Token::Integer, "2"),
-                (Token::MoreOrEq, ">="),
-                (Token::Integer, "2")
+                (TOKEN_INTEGER, "2"),
+                (TOKEN_MORE_OR_EQ, ">="),
+                (TOKEN_INTEGER, "2")
             ],
             "\
-Root@[0; 20)
-  Operation@[0; 20)
-    Operation@[0; 3)
-      Token(Integer)@[0; 1)
-      Token(Less)@[1; 2)
-      Token(Integer)@[2; 3)
-    Token(Or)@[3; 5)
-    Operation@[5; 20)
-      Operation@[5; 14)
-        Operation@[5; 9)
-          Token(Integer)@[5; 6)
-          Token(LessOrEq)@[6; 8)
-          Token(Integer)@[8; 9)
-        Token(And)@[9; 11)
-        Operation@[11; 14)
-          Token(Integer)@[11; 12)
-          Token(More)@[12; 13)
-          Token(Integer)@[13; 14)
-      Token(And)@[14; 16)
-      Operation@[16; 20)
-        Token(Integer)@[16; 17)
-        Token(MoreOrEq)@[17; 19)
-        Token(Integer)@[19; 20)
+Node(NODE_ROOT@[0; 20))
+  Node(NODE_OPERATION@[0; 20))
+    Node(NODE_OPERATION@[0; 3))
+      Node(NODE_VALUE@[0; 1))
+        Token(TOKEN_INTEGER@[0; 1))
+      Token(TOKEN_LESS@[1; 2))
+      Node(NODE_VALUE@[2; 3))
+        Token(TOKEN_INTEGER@[2; 3))
+    Token(TOKEN_OR@[3; 5))
+    Node(NODE_OPERATION@[5; 20))
+      Node(NODE_OPERATION@[5; 14))
+        Node(NODE_OPERATION@[5; 9))
+          Node(NODE_VALUE@[5; 6))
+            Token(TOKEN_INTEGER@[5; 6))
+          Token(TOKEN_LESS_OR_EQ@[6; 8))
+          Node(NODE_VALUE@[8; 9))
+            Token(TOKEN_INTEGER@[8; 9))
+        Token(TOKEN_AND@[9; 11))
+        Node(NODE_OPERATION@[11; 14))
+          Node(NODE_VALUE@[11; 12))
+            Token(TOKEN_INTEGER@[11; 12))
+          Token(TOKEN_MORE@[12; 13))
+          Node(NODE_VALUE@[13; 14))
+            Token(TOKEN_INTEGER@[13; 14))
+      Token(TOKEN_AND@[14; 16))
+      Node(NODE_OPERATION@[16; 20))
+        Node(NODE_VALUE@[16; 17))
+          Token(TOKEN_INTEGER@[16; 17))
+        Token(TOKEN_MORE_OR_EQ@[17; 19))
+        Node(NODE_VALUE@[19; 20))
+          Token(TOKEN_INTEGER@[19; 20))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::Integer, "1"),
-                (Token::Equal, "=="),
-                (Token::Integer, "1"),
+                (TOKEN_INTEGER, "1"),
+                (TOKEN_EQUAL, "=="),
+                (TOKEN_INTEGER, "1"),
 
-                (Token::And, "&&"),
+                (TOKEN_AND, "&&"),
 
-                (Token::Integer, "2"),
-                (Token::NotEqual, "!="),
-                (Token::Integer, "3")
+                (TOKEN_INTEGER, "2"),
+                (TOKEN_NOT_EQUAL, "!="),
+                (TOKEN_INTEGER, "3")
             ],
             "\
-Root@[0; 10)
-  Operation@[0; 10)
-    Operation@[0; 4)
-      Token(Integer)@[0; 1)
-      Token(Equal)@[1; 3)
-      Token(Integer)@[3; 4)
-    Token(And)@[4; 6)
-    Operation@[6; 10)
-      Token(Integer)@[6; 7)
-      Token(NotEqual)@[7; 9)
-      Token(Integer)@[9; 10)
+Node(NODE_ROOT@[0; 10))
+  Node(NODE_OPERATION@[0; 10))
+    Node(NODE_OPERATION@[0; 4))
+      Node(NODE_VALUE@[0; 1))
+        Token(TOKEN_INTEGER@[0; 1))
+      Token(TOKEN_EQUAL@[1; 3))
+      Node(NODE_VALUE@[3; 4))
+        Token(TOKEN_INTEGER@[3; 4))
+    Token(TOKEN_AND@[4; 6))
+    Node(NODE_OPERATION@[6; 10))
+      Node(NODE_VALUE@[6; 7))
+        Token(TOKEN_INTEGER@[6; 7))
+      Token(TOKEN_NOT_EQUAL@[7; 9))
+      Node(NODE_VALUE@[9; 10))
+        Token(TOKEN_INTEGER@[9; 10))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::If, "if"),
-                (Token::Ident, "false"),
-                (Token::Then, "then"),
-                    (Token::Integer, "1"),
-                (Token::Else, "else"),
-                    (Token::If, "if"),
-                    (Token::Ident, "true"),
-                    (Token::Then, "then"),
-                        (Token::Ident, "two"),
-                    (Token::Else, "else"),
-                        (Token::Integer, "3")
+                (TOKEN_IF, "if"),
+                (TOKEN_IDENT, "false"),
+                (TOKEN_THEN, "then"),
+                    (TOKEN_INTEGER, "1"),
+                (TOKEN_ELSE, "else"),
+                    (TOKEN_IF, "if"),
+                    (TOKEN_IDENT, "true"),
+                    (TOKEN_THEN, "then"),
+                        (TOKEN_IDENT, "two"),
+                    (TOKEN_ELSE, "else"),
+                        (TOKEN_INTEGER, "3")
             ],
             "\
-Root@[0; 34)
-  IfElse@[0; 34)
-    Token(If)@[0; 2)
-    Token(Ident)@[2; 7)
-    Token(Then)@[7; 11)
-    Token(Integer)@[11; 12)
-    Token(Else)@[12; 16)
-    IfElse@[16; 34)
-      Token(If)@[16; 18)
-      Token(Ident)@[18; 22)
-      Token(Then)@[22; 26)
-      Token(Ident)@[26; 29)
-      Token(Else)@[29; 33)
-      Token(Integer)@[33; 34)
+Node(NODE_ROOT@[0; 34))
+  Node(NODE_IF_ELSE@[0; 34))
+    Token(TOKEN_IF@[0; 2))
+    Node(NODE_IDENT@[2; 7))
+      Token(TOKEN_IDENT@[2; 7))
+    Token(TOKEN_THEN@[7; 11))
+    Node(NODE_VALUE@[11; 12))
+      Token(TOKEN_INTEGER@[11; 12))
+    Token(TOKEN_ELSE@[12; 16))
+    Node(NODE_IF_ELSE@[16; 34))
+      Token(TOKEN_IF@[16; 18))
+      Node(NODE_IDENT@[18; 22))
+        Token(TOKEN_IDENT@[18; 22))
+      Token(TOKEN_THEN@[22; 26))
+      Node(NODE_IDENT@[26; 29))
+        Token(TOKEN_IDENT@[26; 29))
+      Token(TOKEN_ELSE@[29; 33))
+      Node(NODE_VALUE@[33; 34))
+        Token(TOKEN_INTEGER@[33; 34))
 "
         );
     }
     #[test]
     fn list() {
-        assert_eq!(
+        test!(
             [
-                (Token::SquareBOpen, "["),
-                (Token::Ident, "a"),
-                (Token::Integer, "2"),
-                (Token::Integer, "3"),
-                (Token::String, "\"lol\""),
-                (Token::SquareBClose, "]")
+                (TOKEN_SQUARE_B_OPEN, "["),
+                (TOKEN_IDENT, "a"),
+                (TOKEN_INTEGER, "2"),
+                (TOKEN_INTEGER, "3"),
+                (TOKEN_STRING, "\"lol\""),
+                (TOKEN_SQUARE_B_CLOSE, "]")
             ],
             "\
-Root@[0; 10)
-  List@[0; 10)
-    Token(SquareBOpen)@[0; 1)
-    ListItem@[1; 2)
-      Token(Ident)@[1; 2)
-    ListItem@[2; 3)
-      Token(Integer)@[2; 3)
-    ListItem@[3; 4)
-      Token(Integer)@[3; 4)
-    ListItem@[4; 9)
-      Token(String)@[4; 9)
-    Token(SquareBClose)@[9; 10)
+Node(NODE_ROOT@[0; 10))
+  Node(NODE_LIST@[0; 10))
+    Token(TOKEN_SQUARE_B_OPEN@[0; 1))
+    Node(NODE_IDENT@[1; 2))
+      Token(TOKEN_IDENT@[1; 2))
+    Node(NODE_VALUE@[2; 3))
+      Token(TOKEN_INTEGER@[2; 3))
+    Node(NODE_VALUE@[3; 4))
+      Token(TOKEN_INTEGER@[3; 4))
+    Node(NODE_VALUE@[4; 9))
+      Token(TOKEN_STRING@[4; 9))
+    Token(TOKEN_SQUARE_B_CLOSE@[9; 10))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::SquareBOpen, "["), (Token::Integer, "1"), (Token::SquareBClose, "]"),
-                (Token::Concat, "++"),
-                (Token::SquareBOpen, "["), (Token::Ident, "two"), (Token::SquareBClose, "]"),
-                (Token::Concat, "++"),
-                (Token::SquareBOpen, "["), (Token::Integer, "3"), (Token::SquareBClose, "]")
+                (TOKEN_SQUARE_B_OPEN, "["), (TOKEN_INTEGER, "1"), (TOKEN_SQUARE_B_CLOSE, "]"),
+                (TOKEN_CONCAT, "++"),
+                (TOKEN_SQUARE_B_OPEN, "["), (TOKEN_IDENT, "two"), (TOKEN_SQUARE_B_CLOSE, "]"),
+                (TOKEN_CONCAT, "++"),
+                (TOKEN_SQUARE_B_OPEN, "["), (TOKEN_INTEGER, "3"), (TOKEN_SQUARE_B_CLOSE, "]")
             ],
             "\
-Root@[0; 15)
-  Operation@[0; 15)
-    Operation@[0; 10)
-      List@[0; 3)
-        Token(SquareBOpen)@[0; 1)
-        ListItem@[1; 2)
-          Token(Integer)@[1; 2)
-        Token(SquareBClose)@[2; 3)
-      Token(Concat)@[3; 5)
-      List@[5; 10)
-        Token(SquareBOpen)@[5; 6)
-        ListItem@[6; 9)
-          Token(Ident)@[6; 9)
-        Token(SquareBClose)@[9; 10)
-    Token(Concat)@[10; 12)
-    List@[12; 15)
-      Token(SquareBOpen)@[12; 13)
-      ListItem@[13; 14)
-        Token(Integer)@[13; 14)
-      Token(SquareBClose)@[14; 15)
+Node(NODE_ROOT@[0; 15))
+  Node(NODE_OPERATION@[0; 15))
+    Node(NODE_OPERATION@[0; 10))
+      Node(NODE_LIST@[0; 3))
+        Token(TOKEN_SQUARE_B_OPEN@[0; 1))
+        Node(NODE_VALUE@[1; 2))
+          Token(TOKEN_INTEGER@[1; 2))
+        Token(TOKEN_SQUARE_B_CLOSE@[2; 3))
+      Token(TOKEN_CONCAT@[3; 5))
+      Node(NODE_LIST@[5; 10))
+        Token(TOKEN_SQUARE_B_OPEN@[5; 6))
+        Node(NODE_IDENT@[6; 9))
+          Token(TOKEN_IDENT@[6; 9))
+        Token(TOKEN_SQUARE_B_CLOSE@[9; 10))
+    Token(TOKEN_CONCAT@[10; 12))
+    Node(NODE_LIST@[12; 15))
+      Token(TOKEN_SQUARE_B_OPEN@[12; 13))
+      Node(NODE_VALUE@[13; 14))
+        Token(TOKEN_INTEGER@[13; 14))
+      Token(TOKEN_SQUARE_B_CLOSE@[14; 15))
 "
         );
     }
     #[test]
     fn lambda() {
-        assert_eq!(
+        test!(
             [
-                (Token::Ident, "import"),
-                (Token::Path, "<nixpkgs>"),
-                (Token::CurlyBOpen, "{"),
-                (Token::CurlyBClose, "}")
+                (TOKEN_IDENT, "import"),
+                (TOKEN_PATH, "<nixpkgs>"),
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_CURLY_B_CLOSE, "}")
             ],
             "\
-Root@[0; 17)
-  Apply@[0; 17)
-    Apply@[0; 15)
-      Token(Ident)@[0; 6)
-      Token(Path)@[6; 15)
-    Set@[15; 17)
-      Token(CurlyBOpen)@[15; 16)
-      Token(CurlyBClose)@[16; 17)
+Node(NODE_ROOT@[0; 17))
+  Node(NODE_APPLY@[0; 17))
+    Node(NODE_APPLY@[0; 15))
+      Node(NODE_IDENT@[0; 6))
+        Token(TOKEN_IDENT@[0; 6))
+      Node(NODE_VALUE@[6; 15))
+        Token(TOKEN_PATH@[6; 15))
+    Node(NODE_SET@[15; 17))
+      Token(TOKEN_CURLY_B_OPEN@[15; 16))
+      Token(TOKEN_CURLY_B_CLOSE@[16; 17))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::Ident, "a"),
-                (Token::Colon, ":"),
-                (Token::Whitespace, " "),
-                (Token::Ident, "b"),
-                (Token::Colon, ":"),
-                (Token::Whitespace, " "),
-                (Token::Ident, "a"),
-                (Token::Whitespace, " "),
-                (Token::Add, "+"),
-                (Token::Whitespace, " "),
-                (Token::Ident, "b")
+                (TOKEN_IDENT, "a"),
+                (TOKEN_COLON, ":"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "b"),
+                (TOKEN_COLON, ":"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "a"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ADD, "+"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "b")
             ],
             "\
-Root@[0; 11)
-  Lambda@[0; 11)
-    Token(Ident)@[0; 1)
-    Token(Colon)@[1; 2)
-    Token(Whitespace)@[2; 3)
-    Lambda@[3; 11)
-      Token(Ident)@[3; 4)
-      Token(Colon)@[4; 5)
-      Token(Whitespace)@[5; 6)
-      Operation@[6; 11)
-        Token(Ident)@[6; 7)
-        Token(Whitespace)@[7; 8)
-        Token(Add)@[8; 9)
-        Token(Whitespace)@[9; 10)
-        Token(Ident)@[10; 11)
+Node(NODE_ROOT@[0; 11))
+  Node(NODE_LAMBDA@[0; 11))
+    Node(NODE_IDENT@[0; 1))
+      Token(TOKEN_IDENT@[0; 1))
+    Token(TOKEN_COLON@[1; 2))
+    Token(TOKEN_WHITESPACE@[2; 3))
+    Node(NODE_LAMBDA@[3; 11))
+      Node(NODE_IDENT@[3; 4))
+        Token(TOKEN_IDENT@[3; 4))
+      Token(TOKEN_COLON@[4; 5))
+      Token(TOKEN_WHITESPACE@[5; 6))
+      Node(NODE_OPERATION@[6; 11))
+        Node(NODE_IDENT@[6; 7))
+          Token(TOKEN_IDENT@[6; 7))
+        Token(TOKEN_WHITESPACE@[7; 8))
+        Token(TOKEN_ADD@[8; 9))
+        Token(TOKEN_WHITESPACE@[9; 10))
+        Node(NODE_IDENT@[10; 11))
+          Token(TOKEN_IDENT@[10; 11))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::Ident, "a"),
-                (Token::Whitespace, " "),
-                (Token::Integer, "1"),
-                (Token::Whitespace, " "),
-                (Token::Integer, "2"),
-                (Token::Whitespace, " "),
-                (Token::Add, "+"),
-                (Token::Whitespace, " "),
-                (Token::Integer, "3")
+                (TOKEN_IDENT, "a"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "1"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "2"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ADD, "+"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "3")
             ],
             "\
-Root@[0; 9)
-  Operation@[0; 9)
-    Apply@[0; 6)
-      Apply@[0; 4)
-        Token(Ident)@[0; 1)
-        Token(Whitespace)@[1; 2)
-        Token(Integer)@[2; 3)
-        Token(Whitespace)@[3; 4)
-      Token(Integer)@[4; 5)
-      Token(Whitespace)@[5; 6)
-    Token(Add)@[6; 7)
-    Token(Whitespace)@[7; 8)
-    Token(Integer)@[8; 9)
+Node(NODE_ROOT@[0; 9))
+  Node(NODE_OPERATION@[0; 9))
+    Node(NODE_APPLY@[0; 6))
+      Node(NODE_APPLY@[0; 4))
+        Node(NODE_IDENT@[0; 1))
+          Token(TOKEN_IDENT@[0; 1))
+        Token(TOKEN_WHITESPACE@[1; 2))
+        Node(NODE_VALUE@[2; 3))
+          Token(TOKEN_INTEGER@[2; 3))
+        Token(TOKEN_WHITESPACE@[3; 4))
+      Node(NODE_VALUE@[4; 5))
+        Token(TOKEN_INTEGER@[4; 5))
+      Token(TOKEN_WHITESPACE@[5; 6))
+    Token(TOKEN_ADD@[6; 7))
+    Token(TOKEN_WHITESPACE@[7; 8))
+    Node(NODE_VALUE@[8; 9))
+      Token(TOKEN_INTEGER@[8; 9))
 "
         );
    }
     #[test]
     fn patterns() {
-        assert_eq!(
+        test!(
             [
-                (Token::CurlyBOpen, "{"),
-                (Token::Whitespace, " "),
-                (Token::Ellipsis, "..."),
-                (Token::Whitespace, " "),
-                (Token::CurlyBClose, "}"),
-                (Token::Colon, ":"),
-                (Token::Whitespace, " "),
-                (Token::Integer, "1")
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ELLIPSIS, "..."),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_CURLY_B_CLOSE, "}"),
+                (TOKEN_COLON, ":"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "1")
             ],
             "\
-Root@[0; 10)
-  Lambda@[0; 10)
-    Pattern@[0; 7)
-      Token(CurlyBOpen)@[0; 1)
-      Token(Whitespace)@[1; 2)
-      Token(Ellipsis)@[2; 5)
-      Token(Whitespace)@[5; 6)
-      Token(CurlyBClose)@[6; 7)
-    Token(Colon)@[7; 8)
-    Token(Whitespace)@[8; 9)
-    Token(Integer)@[9; 10)
+Node(NODE_ROOT@[0; 10))
+  Node(NODE_LAMBDA@[0; 10))
+    Node(NODE_PATTERN@[0; 7))
+      Token(TOKEN_CURLY_B_OPEN@[0; 1))
+      Token(TOKEN_WHITESPACE@[1; 2))
+      Token(TOKEN_ELLIPSIS@[2; 5))
+      Token(TOKEN_WHITESPACE@[5; 6))
+      Token(TOKEN_CURLY_B_CLOSE@[6; 7))
+    Token(TOKEN_COLON@[7; 8))
+    Token(TOKEN_WHITESPACE@[8; 9))
+    Node(NODE_VALUE@[9; 10))
+      Token(TOKEN_INTEGER@[9; 10))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::CurlyBOpen, "{"),
-                (Token::CurlyBClose, "}"),
-                (Token::Whitespace, " "),
-                (Token::At, "@"),
-                (Token::Whitespace, " "),
-                (Token::Ident, "outer"),
-                (Token::Colon, ":"),
-                (Token::Whitespace, " "),
-                (Token::Integer, "1")
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_CURLY_B_CLOSE, "}"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_AT, "@"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "outer"),
+                (TOKEN_COLON, ":"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "1")
             ],
             "\
-Root@[0; 13)
-  Lambda@[0; 13)
-    Pattern@[0; 10)
-      Token(CurlyBOpen)@[0; 1)
-      Token(CurlyBClose)@[1; 2)
-      Token(Whitespace)@[2; 3)
-      PatBind@[3; 10)
-        Token(At)@[3; 4)
-        Token(Whitespace)@[4; 5)
-        Token(Ident)@[5; 10)
-    Token(Colon)@[10; 11)
-    Token(Whitespace)@[11; 12)
-    Token(Integer)@[12; 13)
+Node(NODE_ROOT@[0; 13))
+  Node(NODE_LAMBDA@[0; 13))
+    Node(NODE_PATTERN@[0; 10))
+      Token(TOKEN_CURLY_B_OPEN@[0; 1))
+      Token(TOKEN_CURLY_B_CLOSE@[1; 2))
+      Token(TOKEN_WHITESPACE@[2; 3))
+      Node(NODE_PAT_BIND@[3; 10))
+        Token(TOKEN_AT@[3; 4))
+        Node(NODE_IDENT@[4; 10))
+          Token(TOKEN_WHITESPACE@[4; 5))
+          Token(TOKEN_IDENT@[5; 10))
+    Token(TOKEN_COLON@[10; 11))
+    Token(TOKEN_WHITESPACE@[11; 12))
+    Node(NODE_VALUE@[12; 13))
+      Token(TOKEN_INTEGER@[12; 13))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::CurlyBOpen, "{"), (Token::Whitespace, " "),
+                (TOKEN_CURLY_B_OPEN, "{"), (TOKEN_WHITESPACE, " "),
 
-                (Token::Ident, "a"), (Token::Comma, ","), (Token::Whitespace, " "),
-                (Token::Ident, "b"), (Token::Whitespace, " "),
-                    (Token::Question, "?"), (Token::Whitespace, " "),
-                    (Token::String, "\"default\""),
+                (TOKEN_IDENT, "a"), (TOKEN_COMMA, ","), (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "b"), (TOKEN_WHITESPACE, " "),
+                    (TOKEN_QUESTION, "?"), (TOKEN_WHITESPACE, " "),
+                    (TOKEN_STRING, "\"default\""),
 
-                (Token::CurlyBClose, "}"),
-                (Token::Colon, ":"),
-                (Token::Whitespace, " "),
-                (Token::Ident, "a")
+                (TOKEN_CURLY_B_CLOSE, "}"),
+                (TOKEN_COLON, ":"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "a")
             ],
             "\
-Root@[0; 22)
-  Lambda@[0; 22)
-    Pattern@[0; 19)
-      Token(CurlyBOpen)@[0; 1)
-      Token(Whitespace)@[1; 2)
-      PatEntry@[2; 3)
-        Token(Ident)@[2; 3)
-      Token(Comma)@[3; 4)
-      Token(Whitespace)@[4; 5)
-      PatEntry@[5; 18)
-        Token(Ident)@[5; 6)
-        Token(Whitespace)@[6; 7)
-        Token(Question)@[7; 8)
-        Token(Whitespace)@[8; 9)
-        Token(String)@[9; 18)
-      Token(CurlyBClose)@[18; 19)
-    Token(Colon)@[19; 20)
-    Token(Whitespace)@[20; 21)
-    Token(Ident)@[21; 22)
+Node(NODE_ROOT@[0; 22))
+  Node(NODE_LAMBDA@[0; 22))
+    Node(NODE_PATTERN@[0; 19))
+      Token(TOKEN_CURLY_B_OPEN@[0; 1))
+      Token(TOKEN_WHITESPACE@[1; 2))
+      Node(NODE_PAT_ENTRY@[2; 3))
+        Node(NODE_IDENT@[2; 3))
+          Token(TOKEN_IDENT@[2; 3))
+      Token(TOKEN_COMMA@[3; 4))
+      Token(TOKEN_WHITESPACE@[4; 5))
+      Node(NODE_PAT_ENTRY@[5; 18))
+        Node(NODE_IDENT@[5; 6))
+          Token(TOKEN_IDENT@[5; 6))
+        Token(TOKEN_WHITESPACE@[6; 7))
+        Token(TOKEN_QUESTION@[7; 8))
+        Token(TOKEN_WHITESPACE@[8; 9))
+        Node(NODE_VALUE@[9; 18))
+          Token(TOKEN_STRING@[9; 18))
+      Token(TOKEN_CURLY_B_CLOSE@[18; 19))
+    Token(TOKEN_COLON@[19; 20))
+    Token(TOKEN_WHITESPACE@[20; 21))
+    Node(NODE_IDENT@[21; 22))
+      Token(TOKEN_IDENT@[21; 22))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::CurlyBOpen, "{"), (Token::Whitespace, " "),
+                (TOKEN_CURLY_B_OPEN, "{"), (TOKEN_WHITESPACE, " "),
 
-                (Token::Ident, "a"), (Token::Comma, ","), (Token::Whitespace, " "),
-                (Token::Ident, "b"), (Token::Whitespace, " "),
-                    (Token::Question, "?"), (Token::Whitespace, " "),
-                    (Token::String, "\"default\""), (Token::Comma, ","), (Token::Whitespace, " "),
-                (Token::Ellipsis, "..."), (Token::Whitespace, " "),
+                (TOKEN_IDENT, "a"), (TOKEN_COMMA, ","), (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "b"), (TOKEN_WHITESPACE, " "),
+                    (TOKEN_QUESTION, "?"), (TOKEN_WHITESPACE, " "),
+                    (TOKEN_STRING, "\"default\""), (TOKEN_COMMA, ","), (TOKEN_WHITESPACE, " "),
+                (TOKEN_ELLIPSIS, "..."), (TOKEN_WHITESPACE, " "),
 
-                (Token::CurlyBClose, "}"),
-                (Token::Colon, ":"),
-                (Token::Whitespace, " "),
-                (Token::Ident, "a")
+                (TOKEN_CURLY_B_CLOSE, "}"),
+                (TOKEN_COLON, ":"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "a")
             ],
             "\
-Root@[0; 28)
-  Lambda@[0; 28)
-    Pattern@[0; 25)
-      Token(CurlyBOpen)@[0; 1)
-      Token(Whitespace)@[1; 2)
-      PatEntry@[2; 3)
-        Token(Ident)@[2; 3)
-      Token(Comma)@[3; 4)
-      Token(Whitespace)@[4; 5)
-      PatEntry@[5; 18)
-        Token(Ident)@[5; 6)
-        Token(Whitespace)@[6; 7)
-        Token(Question)@[7; 8)
-        Token(Whitespace)@[8; 9)
-        Token(String)@[9; 18)
-      Token(Comma)@[18; 19)
-      Token(Whitespace)@[19; 20)
-      Token(Ellipsis)@[20; 23)
-      Token(Whitespace)@[23; 24)
-      Token(CurlyBClose)@[24; 25)
-    Token(Colon)@[25; 26)
-    Token(Whitespace)@[26; 27)
-    Token(Ident)@[27; 28)
+Node(NODE_ROOT@[0; 28))
+  Node(NODE_LAMBDA@[0; 28))
+    Node(NODE_PATTERN@[0; 25))
+      Token(TOKEN_CURLY_B_OPEN@[0; 1))
+      Token(TOKEN_WHITESPACE@[1; 2))
+      Node(NODE_PAT_ENTRY@[2; 3))
+        Node(NODE_IDENT@[2; 3))
+          Token(TOKEN_IDENT@[2; 3))
+      Token(TOKEN_COMMA@[3; 4))
+      Token(TOKEN_WHITESPACE@[4; 5))
+      Node(NODE_PAT_ENTRY@[5; 18))
+        Node(NODE_IDENT@[5; 6))
+          Token(TOKEN_IDENT@[5; 6))
+        Token(TOKEN_WHITESPACE@[6; 7))
+        Token(TOKEN_QUESTION@[7; 8))
+        Token(TOKEN_WHITESPACE@[8; 9))
+        Node(NODE_VALUE@[9; 18))
+          Token(TOKEN_STRING@[9; 18))
+      Token(TOKEN_COMMA@[18; 19))
+      Token(TOKEN_WHITESPACE@[19; 20))
+      Token(TOKEN_ELLIPSIS@[20; 23))
+      Token(TOKEN_WHITESPACE@[23; 24))
+      Token(TOKEN_CURLY_B_CLOSE@[24; 25))
+    Token(TOKEN_COLON@[25; 26))
+    Token(TOKEN_WHITESPACE@[26; 27))
+    Node(NODE_IDENT@[27; 28))
+      Token(TOKEN_IDENT@[27; 28))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::Ident, "outer"), (Token::Whitespace, " "),
-                (Token::At, "@"), (Token::Whitespace, " "),
-                (Token::CurlyBOpen, "{"), (Token::Whitespace, " "),
-                (Token::Ident, "a"), (Token::Whitespace, " "),
-                (Token::CurlyBClose, "}"),
-                (Token::Colon, ":"), (Token::Whitespace, " "),
-                (Token::Ident, "outer")
+                (TOKEN_IDENT, "outer"), (TOKEN_WHITESPACE, " "),
+                (TOKEN_AT, "@"), (TOKEN_WHITESPACE, " "),
+                (TOKEN_CURLY_B_OPEN, "{"), (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "a"), (TOKEN_WHITESPACE, " "),
+                (TOKEN_CURLY_B_CLOSE, "}"),
+                (TOKEN_COLON, ":"), (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "outer")
             ],
             "\
-Root@[0; 20)
-  Lambda@[0; 20)
-    Pattern@[0; 13)
-      PatBind@[0; 7)
-        Token(Ident)@[0; 5)
-        Token(Whitespace)@[5; 6)
-        Token(At)@[6; 7)
-      Token(Whitespace)@[7; 8)
-      Token(CurlyBOpen)@[8; 9)
-      Token(Whitespace)@[9; 10)
-      PatEntry@[10; 12)
-        Token(Ident)@[10; 11)
-        Token(Whitespace)@[11; 12)
-      Token(CurlyBClose)@[12; 13)
-    Token(Colon)@[13; 14)
-    Token(Whitespace)@[14; 15)
-    Token(Ident)@[15; 20)
+Node(NODE_ROOT@[0; 20))
+  Node(NODE_LAMBDA@[0; 20))
+    Node(NODE_PATTERN@[0; 13))
+      Node(NODE_PAT_BIND@[0; 7))
+        Node(NODE_IDENT@[0; 5))
+          Token(TOKEN_IDENT@[0; 5))
+        Token(TOKEN_WHITESPACE@[5; 6))
+        Token(TOKEN_AT@[6; 7))
+      Token(TOKEN_WHITESPACE@[7; 8))
+      Token(TOKEN_CURLY_B_OPEN@[8; 9))
+      Token(TOKEN_WHITESPACE@[9; 10))
+      Node(NODE_PAT_ENTRY@[10; 12))
+        Node(NODE_IDENT@[10; 11))
+          Token(TOKEN_IDENT@[10; 11))
+        Token(TOKEN_WHITESPACE@[11; 12))
+      Token(TOKEN_CURLY_B_CLOSE@[12; 13))
+    Token(TOKEN_COLON@[13; 14))
+    Token(TOKEN_WHITESPACE@[14; 15))
+    Node(NODE_IDENT@[15; 20))
+      Token(TOKEN_IDENT@[15; 20))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::CurlyBOpen, "{"),
-                (Token::Ident, "a"),
-                (Token::Question, "?"),
-                (Token::CurlyBOpen, "{"),
-                (Token::CurlyBClose, "}"),
-                (Token::CurlyBClose, "}"),
-                (Token::Colon, ":"),
-                (Token::Ident, "a")
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_IDENT, "a"),
+                (TOKEN_QUESTION, "?"),
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_CURLY_B_CLOSE, "}"),
+                (TOKEN_CURLY_B_CLOSE, "}"),
+                (TOKEN_COLON, ":"),
+                (TOKEN_IDENT, "a")
             ],
             "\
-Root@[0; 8)
-  Lambda@[0; 8)
-    Pattern@[0; 6)
-      Token(CurlyBOpen)@[0; 1)
-      PatEntry@[1; 5)
-        Token(Ident)@[1; 2)
-        Token(Question)@[2; 3)
-        Set@[3; 5)
-          Token(CurlyBOpen)@[3; 4)
-          Token(CurlyBClose)@[4; 5)
-      Token(CurlyBClose)@[5; 6)
-    Token(Colon)@[6; 7)
-    Token(Ident)@[7; 8)
+Node(NODE_ROOT@[0; 8))
+  Node(NODE_LAMBDA@[0; 8))
+    Node(NODE_PATTERN@[0; 6))
+      Token(TOKEN_CURLY_B_OPEN@[0; 1))
+      Node(NODE_PAT_ENTRY@[1; 5))
+        Node(NODE_IDENT@[1; 2))
+          Token(TOKEN_IDENT@[1; 2))
+        Token(TOKEN_QUESTION@[2; 3))
+        Node(NODE_SET@[3; 5))
+          Token(TOKEN_CURLY_B_OPEN@[3; 4))
+          Token(TOKEN_CURLY_B_CLOSE@[4; 5))
+      Token(TOKEN_CURLY_B_CLOSE@[5; 6))
+    Token(TOKEN_COLON@[6; 7))
+    Node(NODE_IDENT@[7; 8))
+      Token(TOKEN_IDENT@[7; 8))
 "
         );
-        assert_eq!(
+        test!(
             [
-                (Token::CurlyBOpen, "{"),
-                (Token::Ident, "a"),
-                (Token::Comma, ","),
-                (Token::CurlyBClose, "}"),
-                (Token::Colon, ":"),
-                (Token::Ident, "a")
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_IDENT, "a"),
+                (TOKEN_COMMA, ","),
+                (TOKEN_CURLY_B_CLOSE, "}"),
+                (TOKEN_COLON, ":"),
+                (TOKEN_IDENT, "a")
             ],
             "\
-Root@[0; 6)
-  Lambda@[0; 6)
-    Pattern@[0; 4)
-      Token(CurlyBOpen)@[0; 1)
-      PatEntry@[1; 2)
-        Token(Ident)@[1; 2)
-      Token(Comma)@[2; 3)
-      Token(CurlyBClose)@[3; 4)
-    Token(Colon)@[4; 5)
-    Token(Ident)@[5; 6)
+Node(NODE_ROOT@[0; 6))
+  Node(NODE_LAMBDA@[0; 6))
+    Node(NODE_PATTERN@[0; 4))
+      Token(TOKEN_CURLY_B_OPEN@[0; 1))
+      Node(NODE_PAT_ENTRY@[1; 2))
+        Node(NODE_IDENT@[1; 2))
+          Token(TOKEN_IDENT@[1; 2))
+      Token(TOKEN_COMMA@[2; 3))
+      Token(TOKEN_CURLY_B_CLOSE@[3; 4))
+    Token(TOKEN_COLON@[4; 5))
+    Node(NODE_IDENT@[5; 6))
+      Token(TOKEN_IDENT@[5; 6))
 "
         );
     }
     #[test]
     fn dynamic() {
-        assert_eq!(
+        test!(
             [
-                (Token::DynamicStart, "${"),
-                    (Token::Ident, "a"),
-                (Token::DynamicEnd, "}")
+                (TOKEN_DYNAMIC_START, "${"),
+                    (TOKEN_IDENT, "a"),
+                (TOKEN_DYNAMIC_END, "}")
             ],
             "\
-Root@[0; 4)
-  Dynamic@[0; 4)
-    Token(DynamicStart)@[0; 2)
-    Token(Ident)@[2; 3)
-    Token(DynamicEnd)@[3; 4)
+Node(NODE_ROOT@[0; 4))
+  Node(NODE_DYNAMIC@[0; 4))
+    Token(TOKEN_DYNAMIC_START@[0; 2))
+    Node(NODE_IDENT@[2; 3))
+      Token(TOKEN_IDENT@[2; 3))
+    Token(TOKEN_DYNAMIC_END@[3; 4))
 "
         );
     }

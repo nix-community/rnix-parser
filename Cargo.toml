@@ -6,7 +6,7 @@ license-file = "LICENSE"
 name = "rnix"
 readme = "README.md"
 repository = "https://gitlab.com/jD91mZM2/rnix"
-version = "0.5.2"
+version = "0.6.0"
 
 [[bench]]
 harness = false
@@ -14,7 +14,7 @@ name = "all-packages"
 
 [dependencies]
 failure = "0.1.5"
-rowan = "0.3.3"
+rowan = "0.5.0"
 
 [dev-dependencies]
-criterion = "0.2.8"
+criterion = "0.2.11"

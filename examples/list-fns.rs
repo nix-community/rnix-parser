@@ -2,12 +2,8 @@
 extern crate failure;
 
 use failure::Error;
-use rnix::{
-    parser::{Node, NodeType},
-    tokenizer::Token,
-    types::*,
-};
-use rowan::SmolStr;
+use rnix::{parser::nodes::*, types::*};
+use rowan::{SyntaxElement, SyntaxNode};
 use std::{env, fs};
 
 fn main() -> Result<(), Error> {
@@ -28,39 +24,53 @@ fn main() -> Result<(), Error> {
             let ident = attr.path().last().and_then(Ident::cast);
             let s = ident.map(Ident::as_str).unwrap_or("error");
             println!("Function name: {}", s);
+            if let Some(comment) = find_comment(entry.key().node()) {
+                println!("-> Doc: {}", comment);
+            }
 
             let mut value = Some(lambda);
             while let Some(lambda) = value {
                 let ident = Ident::cast(lambda.arg());
                 let s = ident.map(Ident::as_str).unwrap_or("error");
-                println!("Arg: {}", s);
+                println!("-> Arg: {}", s);
                 if let Some(comment) = find_comment(lambda.arg()) {
-                    println!("Doc: {}", comment);
+                    println!("--> Doc: {}", comment);
                 }
                 value = Lambda::cast(lambda.body());
             }
+            println!();
         }
     }
 
     Ok(())
 }
-fn find_comment(mut node: &Node) -> Option<String> {
+fn find_comment(node: &SyntaxNode) -> Option<String> {
+    let mut node = SyntaxElement::Node(node);
+    let mut doc = Vec::new();
     loop {
         loop {
-            let new = node.prev_sibling();
+            let new = node.prev_sibling_or_token();
             if let Some(new) = new {
                 node = new;
                 break;
             } else {
-                node = node.parent()?;
+                node = SyntaxElement::Node(node.parent()?);
             }
         }
 
         match node.kind() {
-            NodeType::Token(Token::Comment) =>
-                return node.leaf_text().map(SmolStr::as_str).map(String::from),
-            NodeType::Token(t) if t.is_trivia() => (),
-            _ => return None
+            TOKEN_COMMENT => match node {
+                SyntaxElement::Token(token) => doc.push(
+                    token.text().as_str().trim_start_matches('#').trim()
+                ),
+                SyntaxElement::Node(_) => unreachable!()
+            },
+            t if token_helpers::is_trivia(t) => (),
+            _ => break
         }
     }
+    doc.reverse();
+    return Some(doc)
+        .filter(|lines| !lines.is_empty())
+        .map(|lines| lines.join("\n        "));
 }
