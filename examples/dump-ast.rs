@@ -1,4 +1,4 @@
-use rowan::{SyntaxElement, WalkEvent};
+use rnix::types::*;
 use std::{env, fs};
 
 fn main() {
@@ -21,19 +21,6 @@ fn main() {
             println!("error: {}", error);
         }
 
-        let mut indent = 0;
-        for event in ast.node().preorder_with_tokens() {
-            match event {
-                WalkEvent::Enter(node) => {
-                    match node {
-                        SyntaxElement::Node(node) => println!("{:indent$}{:?}", "", node, indent = indent),
-                        SyntaxElement::Token(token) => println!("{:indent$}{:?} {:?}", "", token, token.text(), indent = indent)
-                    }
-                    indent += 2;
-                },
-                WalkEvent::Leave(_) =>
-                    indent -= 2
-            }
-        }
+        println!("{}", ast.root().dump());
     }
 }

@@ -1,0 +1,14 @@
+NODE_ROOT 0..20 {
+  NODE_WITH 0..20 {
+    TOKEN_WITH("with") 0..4
+    TOKEN_WHITESPACE(" ") 4..5
+    NODE_IDENT 5..14 {
+      TOKEN_IDENT("namespace") 5..14
+    }
+    TOKEN_SEMICOLON(";") 14..15
+    TOKEN_WHITESPACE(" ") 15..16
+    NODE_IDENT 16..20 {
+      TOKEN_IDENT("expr") 16..20
+    }
+  }
+}

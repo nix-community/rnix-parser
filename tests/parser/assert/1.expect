@@ -1,0 +1,19 @@
+NODE_ROOT 0..18 {
+  NODE_ASSERT 0..18 {
+    TOKEN_ASSERT("assert") 0..6
+    TOKEN_WHITESPACE(" ") 6..7
+    NODE_OPERATION 7..11 {
+      NODE_IDENT 7..8 {
+        TOKEN_IDENT("a") 7..8
+      }
+      TOKEN_EQUAL("==") 8..10
+      NODE_IDENT 10..11 {
+        TOKEN_IDENT("b") 10..11
+      }
+    }
+    TOKEN_SEMICOLON(";") 11..12
+    NODE_VALUE 12..18 {
+      TOKEN_STRING("\"a==b\"") 12..18
+    }
+  }
+}

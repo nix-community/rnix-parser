@@ -2,15 +2,36 @@
 extern crate failure;
 extern crate rowan;
 
+macro_rules! magic {
+    (start $init:expr; lookup $fn:ident; $($ident:ident)*) => {
+        magic!(def start $init; $($ident)*);
+        pub fn $fn(val: SyntaxKind) -> Option<&'static str> {
+            match val {
+                // Depending on stringify! is bad, but how else can I
+                // get the identifier name?
+                $($ident => Some(stringify!($ident)),)*
+                _ => None
+            }
+        }
+    };
+    (def start $init:expr; $ident:ident $($remaining:tt)*) => {
+        pub const $ident: SyntaxKind = SyntaxKind($init);
+        magic!(def start $init+1; $($remaining)*);
+    };
+    (def start $init:expr;) => {};
+}
+
 pub mod parser;
 pub mod tokenizer;
 pub mod types;
 pub mod value;
 
-use self::{
-    parser::AST,
-    tokenizer::Tokenizer
+pub use self::{
+    parser::{AST, nodes},
+    value::Value as NixValue
 };
+
+use self::tokenizer::Tokenizer;
 
 /// A convenience function for first tokenizing and then parsing given input
 pub fn parse(input: &str) -> AST {
@@ -19,10 +40,7 @@ pub fn parse(input: &str) -> AST {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        types::*,
-        parse
-    };
+    use super::{NixValue, parse, types::*};
 
     fn test(code: &str) {
         parse(code).as_result().expect("parsing error");
@@ -81,6 +99,18 @@ mod tests {
         assert_eq!(children.next().unwrap().as_str(), "z");
         assert_eq!(children.next().unwrap().as_str(), "a");
         assert!(children.next().is_none());
+    }
+    #[test]
+    fn math() {
+        let ast = parse(include_str!("../tests/math.nix"));
+        let root = Operation::cast(ast.root().inner()).unwrap();
+        let operation = Operation::cast(root.value1()).unwrap();
+
+        assert_eq!(root.operator(), OpKind::Add);
+        assert_eq!(operation.operator(), OpKind::Add);
+
+        let value = Value::cast(operation.value1()).unwrap();
+        assert_eq!(value.to_value(), Ok(NixValue::Integer(1)));
     }
     // #[test]
     // fn remove_pattern_entry() {

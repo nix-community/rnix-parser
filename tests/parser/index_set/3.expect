@@ -1,0 +1,35 @@
+NODE_ROOT 0..33 {
+  NODE_INDEX_SET 0..33 {
+    NODE_INDEX_SET 0..28 {
+      NODE_INDEX_SET 0..20 {
+        NODE_IDENT 0..4 {
+          TOKEN_IDENT("test") 0..4
+        }
+        TOKEN_DOT(".") 4..5
+        NODE_VALUE 5..20 {
+          TOKEN_STRING("\"invalid ident\"") 5..20
+        }
+      }
+      TOKEN_DOT(".") 20..21
+      NODE_INTERPOL 21..28 {
+        NODE_INTERPOL_LITERAL 21..24 {
+          TOKEN_INTERPOL_START("\"${") 21..24
+        }
+        NODE_IDENT 24..26 {
+          TOKEN_IDENT("hi") 24..26
+        }
+        NODE_INTERPOL_LITERAL 26..28 {
+          TOKEN_INTERPOL_END("}\"") 26..28
+        }
+      }
+    }
+    TOKEN_DOT(".") 28..29
+    NODE_DYNAMIC 29..33 {
+      TOKEN_DYNAMIC_START("${") 29..31
+      NODE_IDENT 31..32 {
+        TOKEN_IDENT("a") 31..32
+      }
+      TOKEN_DYNAMIC_END("}") 32..33
+    }
+  }
+}

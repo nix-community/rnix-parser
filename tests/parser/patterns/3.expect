@@ -1,0 +1,33 @@
+NODE_ROOT 0..23 {
+  NODE_LAMBDA 0..23 {
+    NODE_PATTERN 0..20 {
+      TOKEN_CURLY_B_OPEN("{") 0..1
+      TOKEN_WHITESPACE(" ") 1..2
+      NODE_PAT_ENTRY 2..3 {
+        NODE_IDENT 2..3 {
+          TOKEN_IDENT("a") 2..3
+        }
+      }
+      TOKEN_COMMA(",") 3..4
+      TOKEN_WHITESPACE(" ") 4..5
+      NODE_PAT_ENTRY 5..19 {
+        NODE_IDENT 5..6 {
+          TOKEN_IDENT("b") 5..6
+        }
+        TOKEN_WHITESPACE(" ") 6..7
+        TOKEN_QUESTION("?") 7..8
+        TOKEN_WHITESPACE(" ") 8..9
+        NODE_VALUE 9..18 {
+          TOKEN_STRING("\"default\"") 9..18
+        }
+        TOKEN_WHITESPACE(" ") 18..19
+      }
+      TOKEN_CURLY_B_CLOSE("}") 19..20
+    }
+    TOKEN_COLON(":") 20..21
+    TOKEN_WHITESPACE(" ") 21..22
+    NODE_IDENT 22..23 {
+      TOKEN_IDENT("a") 22..23
+    }
+  }
+}

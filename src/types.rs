@@ -6,6 +6,7 @@ use crate::{
 };
 
 use rowan::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken, TransparentNewType, TreeArc, WalkEvent};
+use std::fmt;
 
 macro_rules! typed {
     ($($kind:expr => $name:ident$(: $trait:ident)*$(: { $($block:tt)* })*),*) => {
@@ -121,6 +122,46 @@ pub enum InterpolPart<'a> {
     Ast(&'a SyntaxNode)
 }
 
+/// A struct that prints out the textual representation of a node in a
+/// stable format. See TypedNode::dump.
+pub struct TextDump<'a>(&'a SyntaxNode);
+
+impl fmt::Display for TextDump<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut indent = 0;
+        let mut skip_newline = true;
+        for event in self.0.preorder_with_tokens() {
+            if skip_newline {
+                skip_newline = false;
+            } else {
+                writeln!(f)?;
+            }
+            match event {
+                WalkEvent::Enter(enter) => {
+                    write!(f, "{:i$}{}", "", syntax_name(enter.kind()).expect("invalid ast"), i=indent)?;
+                    if let SyntaxElement::Token(token) = enter {
+                        write!(f, "(\"{}\")", token.text().escape_default())?
+                    }
+                    write!(f, " {}..{}", enter.range().start(), enter.range().end())?;
+                    if let SyntaxElement::Node(_) = enter {
+                        write!(f, " {{")?;
+                    }
+                    indent += 2;
+                },
+                WalkEvent::Leave(leave) => {
+                    indent -= 2;
+                    if let SyntaxElement::Node(_) = leave {
+                        write!(f, "{:i$}}}", "", i=indent)?;
+                    } else {
+                        skip_newline = true;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 /// A TypedNode is simply a wrapper around an untyped node to provide a type
 /// system in some sense.
 pub trait TypedNode: TransparentNewType<Repr = SyntaxNode> + ToOwned + Sized {
@@ -145,11 +186,20 @@ pub trait TypedNode: TransparentNewType<Repr = SyntaxNode> + ToOwned + Sized {
     }
     /// Return the first non-trivia token
     fn first_token(&self) -> Option<SyntaxToken> {
-        let mut token = self.node().first_token()?;
-        while token_helpers::is_trivia(token.kind()) {
-            token = token.next_token()?;
+        let mut cursor = self.node().first_child_or_token()?;
+        loop {
+            if let SyntaxElement::Token(token) = cursor {
+                if !token_helpers::is_trivia(token.kind()) {
+                    break Some(token);
+                }
+            }
+            cursor = cursor.next_sibling_or_token()?;
         }
-        Some(token)
+    }
+    /// Return a dump of the AST. One of the goals is to be a stable
+    /// format that can be used in tests.
+    fn dump(&self) -> TextDump {
+        TextDump(self.node())
     }
 }
 /// Provides the function `.entries()`
@@ -186,7 +236,7 @@ typed! [
 
         /// Parse the value
         pub fn to_value(&self) -> Result<ParsedValue, ValueError> {
-            ParsedValue::from_token(self.0.kind(), self.as_str())
+            ParsedValue::from_token(self.first_token().expect("invalid ast").kind(), self.as_str())
         }
     },
 

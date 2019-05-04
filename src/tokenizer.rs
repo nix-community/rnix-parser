@@ -13,69 +13,75 @@ enum IdentType {
 pub mod tokens {
     use rowan::SyntaxKind;
 
-    // Internals
-    pub const TOKEN_COMMENT: SyntaxKind = SyntaxKind(0);
-    pub const TOKEN_ERROR: SyntaxKind = SyntaxKind(1);
-    pub const TOKEN_WHITESPACE: SyntaxKind = SyntaxKind(2);
+    // Generates the constants like an enum, see lib.rs
+    magic! {
+        start 0;
+        lookup token_name;
 
-    // Keywords
-    pub const TOKEN_ASSERT: SyntaxKind = SyntaxKind(3);
-    pub const TOKEN_ELSE: SyntaxKind = SyntaxKind(4);
-    pub const TOKEN_IF: SyntaxKind = SyntaxKind(5);
-    pub const TOKEN_IN: SyntaxKind = SyntaxKind(6);
-    pub const TOKEN_INHERIT: SyntaxKind = SyntaxKind(7);
-    pub const TOKEN_LET: SyntaxKind = SyntaxKind(8);
-    pub const TOKEN_REC: SyntaxKind = SyntaxKind(9);
-    pub const TOKEN_THEN: SyntaxKind = SyntaxKind(10);
-    pub const TOKEN_WITH: SyntaxKind = SyntaxKind(11);
+        // Internals
+        TOKEN_COMMENT
+        TOKEN_ERROR
+        TOKEN_WHITESPACE
 
-    // Symbols
-    pub const TOKEN_CURLY_B_OPEN: SyntaxKind = SyntaxKind(12);
-    pub const TOKEN_CURLY_B_CLOSE: SyntaxKind = SyntaxKind(13);
-    pub const TOKEN_SQUARE_B_OPEN: SyntaxKind = SyntaxKind(14);
-    pub const TOKEN_SQUARE_B_CLOSE: SyntaxKind = SyntaxKind(15);
-    pub const TOKEN_ASSIGN: SyntaxKind = SyntaxKind(16);
-    pub const TOKEN_AT: SyntaxKind = SyntaxKind(17);
-    pub const TOKEN_COLON: SyntaxKind = SyntaxKind(18);
-    pub const TOKEN_COMMA: SyntaxKind = SyntaxKind(19);
-    pub const TOKEN_DOT: SyntaxKind = SyntaxKind(20);
-    pub const TOKEN_ELLIPSIS: SyntaxKind = SyntaxKind(21);
-    pub const TOKEN_QUESTION: SyntaxKind = SyntaxKind(22);
-    pub const TOKEN_SEMICOLON: SyntaxKind = SyntaxKind(23);
+        // Keywords
+        TOKEN_ASSERT
+        TOKEN_ELSE
+        TOKEN_IF
+        TOKEN_IN
+        TOKEN_INHERIT
+        TOKEN_LET
+        TOKEN_REC
+        TOKEN_THEN
+        TOKEN_WITH
 
-    // Operators
-    pub const TOKEN_PAREN_OPEN: SyntaxKind = SyntaxKind(24);
-    pub const TOKEN_PAREN_CLOSE: SyntaxKind = SyntaxKind(25);
-    pub const TOKEN_CONCAT: SyntaxKind = SyntaxKind(26);
-    pub const TOKEN_INVERT: SyntaxKind = SyntaxKind(27);
-    pub const TOKEN_MERGE: SyntaxKind = SyntaxKind(28);
+        // Symbols
+        TOKEN_CURLY_B_OPEN
+        TOKEN_CURLY_B_CLOSE
+        TOKEN_SQUARE_B_OPEN
+        TOKEN_SQUARE_B_CLOSE
+        TOKEN_ASSIGN
+        TOKEN_AT
+        TOKEN_COLON
+        TOKEN_COMMA
+        TOKEN_DOT
+        TOKEN_ELLIPSIS
+        TOKEN_QUESTION
+        TOKEN_SEMICOLON
 
-    pub const TOKEN_ADD: SyntaxKind = SyntaxKind(29);
-    pub const TOKEN_SUB: SyntaxKind = SyntaxKind(30);
-    pub const TOKEN_MUL: SyntaxKind = SyntaxKind(31);
-    pub const TOKEN_DIV: SyntaxKind = SyntaxKind(32);
+        // Operators
+        TOKEN_PAREN_OPEN
+        TOKEN_PAREN_CLOSE
+        TOKEN_CONCAT
+        TOKEN_INVERT
+        TOKEN_MERGE
 
-    pub const TOKEN_AND: SyntaxKind = SyntaxKind(33);
-    pub const TOKEN_EQUAL: SyntaxKind = SyntaxKind(34);
-    pub const TOKEN_IMPLICATION: SyntaxKind = SyntaxKind(35);
-    pub const TOKEN_LESS: SyntaxKind = SyntaxKind(36);
-    pub const TOKEN_LESS_OR_EQ: SyntaxKind = SyntaxKind(37);
-    pub const TOKEN_MORE: SyntaxKind = SyntaxKind(38);
-    pub const TOKEN_MORE_OR_EQ: SyntaxKind = SyntaxKind(39);
-    pub const TOKEN_NOT_EQUAL: SyntaxKind = SyntaxKind(40);
-    pub const TOKEN_OR: SyntaxKind = SyntaxKind(41);
+        TOKEN_ADD
+        TOKEN_SUB
+        TOKEN_MUL
+        TOKEN_DIV
 
-    // Identifiers and values
-    pub const TOKEN_DYNAMIC_END: SyntaxKind = SyntaxKind(42);
-    pub const TOKEN_DYNAMIC_START: SyntaxKind = SyntaxKind(43);
-    pub const TOKEN_FLOAT: SyntaxKind = SyntaxKind(44);
-    pub const TOKEN_IDENT: SyntaxKind = SyntaxKind(45);
-    pub const TOKEN_INTEGER: SyntaxKind = SyntaxKind(46);
-    pub const TOKEN_INTERPOL_END: SyntaxKind = SyntaxKind(47);
-    pub const TOKEN_INTERPOL_END_START: SyntaxKind = SyntaxKind(48);
-    pub const TOKEN_INTERPOL_START: SyntaxKind = SyntaxKind(49);
-    pub const TOKEN_PATH: SyntaxKind = SyntaxKind(50);
-    pub const TOKEN_STRING: SyntaxKind = SyntaxKind(51);
+        TOKEN_AND
+        TOKEN_EQUAL
+        TOKEN_IMPLICATION
+        TOKEN_LESS
+        TOKEN_LESS_OR_EQ
+        TOKEN_MORE
+        TOKEN_MORE_OR_EQ
+        TOKEN_NOT_EQUAL
+        TOKEN_OR
+
+        // Identifiers and values
+        TOKEN_DYNAMIC_END
+        TOKEN_DYNAMIC_START
+        TOKEN_FLOAT
+        TOKEN_IDENT
+        TOKEN_INTEGER
+        TOKEN_INTERPOL_END
+        TOKEN_INTERPOL_END_START
+        TOKEN_INTERPOL_START
+        TOKEN_PATH
+        TOKEN_STRING
+    }
 
     pub mod token_helpers {
         use super::*;

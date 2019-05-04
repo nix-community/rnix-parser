@@ -1,0 +1,31 @@
+NODE_ROOT 0..17 {
+  NODE_LET 0..17 {
+    TOKEN_LET("let") 0..3
+    TOKEN_CURLY_B_OPEN("{") 3..4
+    NODE_SET_ENTRY 4..9 {
+      NODE_ATTRIBUTE 4..5 {
+        NODE_IDENT 4..5 {
+          TOKEN_IDENT("a") 4..5
+        }
+      }
+      TOKEN_ASSIGN("=") 5..6
+      NODE_VALUE 6..8 {
+        TOKEN_INTEGER("42") 6..8
+      }
+      TOKEN_SEMICOLON(";") 8..9
+    }
+    NODE_SET_ENTRY 9..16 {
+      NODE_ATTRIBUTE 9..13 {
+        NODE_IDENT 9..13 {
+          TOKEN_IDENT("body") 9..13
+        }
+      }
+      TOKEN_ASSIGN("=") 13..14
+      NODE_IDENT 14..15 {
+        TOKEN_IDENT("a") 14..15
+      }
+      TOKEN_SEMICOLON(";") 15..16
+    }
+    TOKEN_CURLY_B_CLOSE("}") 16..17
+  }
+}

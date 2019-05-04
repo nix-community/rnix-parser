@@ -1,0 +1,16 @@
+NODE_ROOT 0..10 {
+  NODE_LAMBDA 0..10 {
+    NODE_PATTERN 0..7 {
+      TOKEN_CURLY_B_OPEN("{") 0..1
+      TOKEN_WHITESPACE(" ") 1..2
+      TOKEN_ELLIPSIS("...") 2..5
+      TOKEN_WHITESPACE(" ") 5..6
+      TOKEN_CURLY_B_CLOSE("}") 6..7
+    }
+    TOKEN_COLON(":") 7..8
+    TOKEN_WHITESPACE(" ") 8..9
+    NODE_VALUE 9..10 {
+      TOKEN_INTEGER("1") 9..10
+    }
+  }
+}

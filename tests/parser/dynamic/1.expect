@@ -1,0 +1,9 @@
+NODE_ROOT 0..4 {
+  NODE_DYNAMIC 0..4 {
+    TOKEN_DYNAMIC_START("${") 0..2
+    NODE_IDENT 2..3 {
+      TOKEN_IDENT("a") 2..3
+    }
+    TOKEN_DYNAMIC_END("}") 3..4
+  }
+}
