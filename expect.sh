@@ -1,6 +1,6 @@
 #!/bin/sh
 
-for nix in $(find tests/parser -name "*.nix"); do
+for nix in $(find test_data/parser -name "*.nix"); do
     expected="$(echo -n "$nix" | sed "s/\.nix$//").expect"
     code="$(cat "$nix")"
     code="${code%\n}"

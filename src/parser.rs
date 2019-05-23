@@ -627,7 +627,7 @@ mod tests {
     };
 
     fn test_dir(name: &str) {
-        let dir: PathBuf = ["tests", "parser", name].iter().collect();
+        let dir: PathBuf = ["test_data", "parser", name].iter().collect();
 
         for entry in dir.read_dir().unwrap() {
             let entry = entry.unwrap();

@@ -44,23 +44,23 @@ mod tests {
 
     #[test]
     fn all() {
-        test(include_str!("../tests/dynamic-attrs.nix"));
-        //test(include_str!("../tests/error.nix"));
-        test(include_str!("../tests/ifs.nix"));
-        test(include_str!("../tests/inherit.nix"));
-        test(include_str!("../tests/interpolation.nix"));
-        test(include_str!("../tests/isset.nix"));
-        test(include_str!("../tests/lambdas.nix"));
-        test(include_str!("../tests/lists.nix"));
-        test(include_str!("../tests/math.nix"));
-        test(include_str!("../tests/meta.nix"));
-        test(include_str!("../tests/pattern.nix"));
-        test(include_str!("../tests/simple-set.nix"));
-        test(include_str!("../tests/with-import-let-in.nix"));
+        test(include_str!("../test_data/dynamic-attrs.nix"));
+        //test(include_str!("../test_data/error.nix"));
+        test(include_str!("../test_data/ifs.nix"));
+        test(include_str!("../test_data/inherit.nix"));
+        test(include_str!("../test_data/interpolation.nix"));
+        test(include_str!("../test_data/isset.nix"));
+        test(include_str!("../test_data/lambdas.nix"));
+        test(include_str!("../test_data/lists.nix"));
+        test(include_str!("../test_data/math.nix"));
+        test(include_str!("../test_data/meta.nix"));
+        test(include_str!("../test_data/pattern.nix"));
+        test(include_str!("../test_data/simple-set.nix"));
+        test(include_str!("../test_data/with-import-let-in.nix"));
     }
     #[test]
     fn interpolation() {
-        let ast = parse(include_str!("../tests/interpolation.nix"));
+        let ast = parse(include_str!("../test_data/interpolation.nix"));
 
         let let_in = LetIn::cast(ast.root().inner()).unwrap();
         let set = Set::cast(let_in.body()).unwrap();
@@ -83,7 +83,7 @@ mod tests {
     }
     #[test]
     fn inherit() {
-        let ast = parse(include_str!("../tests/inherit.nix"));
+        let ast = parse(include_str!("../test_data/inherit.nix"));
 
         let let_in = LetIn::cast(ast.root().inner()).unwrap();
         let set = Set::cast(let_in.body()).unwrap();
@@ -98,7 +98,7 @@ mod tests {
     }
     #[test]
     fn math() {
-        let ast = parse(include_str!("../tests/math.nix"));
+        let ast = parse(include_str!("../test_data/math.nix"));
         let root = Operation::cast(ast.root().inner()).unwrap();
         let operation = Operation::cast(root.value1()).unwrap();
 
