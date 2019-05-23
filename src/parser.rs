@@ -3,6 +3,7 @@
 use crate::types::{Root, TypedNode};
 
 use rowan::{GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TreeArc};
+use failure::Fail;
 use std::collections::VecDeque;
 
 const OR: &'static str = "or";

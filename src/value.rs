@@ -2,6 +2,7 @@
 
 use crate::tokenizer::tokens::*;
 use rowan::SyntaxKind;
+use failure::Fail;
 
 /// An anchor point for a path, such as if it's relative or absolute
 #[derive(Clone, Debug, PartialEq)]

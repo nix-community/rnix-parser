@@ -2,7 +2,7 @@
 authors = ["jD91mZM2 <me@krake.one>"]
 description = "A Nix parser written in Rust"
 edition = "2018"
-license-file = "LICENSE"
+license = "MIT"
 name = "rnix"
 readme = "README.md"
 repository = "https://gitlab.com/jD91mZM2/rnix"

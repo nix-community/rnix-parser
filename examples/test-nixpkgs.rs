@@ -1,7 +1,4 @@
-#[macro_use]
-extern crate failure;
-
-use failure::Error;
+use failure::{Error, bail, format_err};
 use std::{env, fs, path::Path};
 
 fn main() -> Result<(), Error> {

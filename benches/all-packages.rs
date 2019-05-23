@@ -1,7 +1,3 @@
-extern crate rnix;
-#[macro_use]
-extern crate criterion;
-
 use criterion::{Criterion, Benchmark, Throughput};
 use rnix::parse;
 
