@@ -1,7 +1,4 @@
-#[macro_use]
-extern crate failure;
-
-use failure::Error;
+use failure::{Error, format_err};
 use rnix::{parser::nodes::*, types::*};
 use rowan::{SyntaxElement, SyntaxNode};
 use std::{env, fs};

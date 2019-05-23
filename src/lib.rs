@@ -1,7 +1,3 @@
-#[macro_use]
-extern crate failure;
-extern crate rowan;
-
 macro_rules! magic {
     (start $init:expr; lookup $fn:ident; $($ident:ident)*) => {
         magic!(def start $init; $($ident)*);
