@@ -121,6 +121,7 @@ struct Parser<I>
     builder: GreenNodeBuilder,
     errors: Vec<ParseError>,
 
+    trivia_buffer: Vec<I::Item>,
     buffer: VecDeque<I::Item>,
     iter: I
 }
@@ -132,8 +133,9 @@ impl<I> Parser<I>
             builder: GreenNodeBuilder::new(),
             errors: Vec::new(),
 
+            trivia_buffer: Vec::with_capacity(1),
             buffer: VecDeque::with_capacity(1),
-            iter
+            iter,
         }
     }
 
@@ -148,7 +150,18 @@ impl<I> Parser<I>
     fn bump(&mut self) {
         let next = self.buffer.pop_front().or_else(|| self.iter.next());
         match next {
-            Some((token, s)) => self.builder.token(token, s),
+            Some((token, s)) => {
+                if token_helpers::is_trivia(token) {
+                    self.trivia_buffer.push((token, s))
+                } else {
+                    self.trivia_buffer.drain(..)
+                        .for_each({
+                            let builder = &mut self.builder;
+                            move |(t, s)| builder.token(t, s)
+                        });
+                    self.builder.token(token, s)
+                }
+            },
             None => self.errors.push(ParseError::UnexpectedEOF)
         }
     }
@@ -608,6 +621,11 @@ pub fn parse<I>(iter: I) -> AST
         }
         parser.builder.finish_node();
     }
+    parser.trivia_buffer.drain(..)
+        .for_each({
+            let builder = &mut parser.builder;
+            move |(t, s)| builder.token(t, s)
+        });
     parser.builder.finish_node();
     AST {
         node: SyntaxNode::new(parser.builder.finish(), None),
