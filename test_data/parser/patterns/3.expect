@@ -10,7 +10,7 @@ NODE_ROOT 0..23 {
       }
       TOKEN_COMMA(",") 3..4
       TOKEN_WHITESPACE(" ") 4..5
-      NODE_PAT_ENTRY 5..19 {
+      NODE_PAT_ENTRY 5..18 {
         NODE_IDENT 5..6 {
           TOKEN_IDENT("b") 5..6
         }
@@ -20,8 +20,8 @@ NODE_ROOT 0..23 {
         NODE_VALUE 9..18 {
           TOKEN_STRING("\"default\"") 9..18
         }
-        TOKEN_WHITESPACE(" ") 18..19
       }
+      TOKEN_WHITESPACE(" ") 18..19
       TOKEN_CURLY_B_CLOSE("}") 19..20
     }
     TOKEN_COLON(":") 20..21

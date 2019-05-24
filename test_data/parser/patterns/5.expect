@@ -11,12 +11,12 @@ NODE_ROOT 0..20 {
       TOKEN_WHITESPACE(" ") 7..8
       TOKEN_CURLY_B_OPEN("{") 8..9
       TOKEN_WHITESPACE(" ") 9..10
-      NODE_PAT_ENTRY 10..12 {
+      NODE_PAT_ENTRY 10..11 {
         NODE_IDENT 10..11 {
           TOKEN_IDENT("a") 10..11
         }
-        TOKEN_WHITESPACE(" ") 11..12
       }
+      TOKEN_WHITESPACE(" ") 11..12
       TOKEN_CURLY_B_CLOSE("}") 12..13
     }
     TOKEN_COLON(":") 13..14

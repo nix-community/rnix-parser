@@ -10,12 +10,12 @@ NODE_ROOT 0..43 {
         TOKEN_CURLY_B_OPEN("{") 12..13
         TOKEN_WHITESPACE(" ") 13..14
         NODE_SET_ENTRY 14..30 {
-          NODE_ATTRIBUTE 14..20 {
+          NODE_ATTRIBUTE 14..19 {
             NODE_IDENT 14..19 {
               TOKEN_IDENT("world") 14..19
             }
-            TOKEN_WHITESPACE(" ") 19..20
           }
+          TOKEN_WHITESPACE(" ") 19..20
           TOKEN_ASSIGN("=") 20..21
           TOKEN_WHITESPACE(" ") 21..22
           NODE_VALUE 22..29 {

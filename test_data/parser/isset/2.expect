@@ -1,6 +1,6 @@
 NODE_ROOT 0..14 {
   NODE_OPERATION 0..14 {
-    NODE_OR_DEFAULT 0..11 {
+    NODE_OR_DEFAULT 0..10 {
       NODE_INDEX_SET 0..5 {
         NODE_INDEX_SET 0..3 {
           NODE_IDENT 0..1 {
@@ -22,8 +22,8 @@ NODE_ROOT 0..14 {
       NODE_VALUE 9..10 {
         TOKEN_INTEGER("1") 9..10
       }
-      TOKEN_WHITESPACE(" ") 10..11
     }
+    TOKEN_WHITESPACE(" ") 10..11
     TOKEN_ADD("+") 11..12
     TOKEN_WHITESPACE(" ") 12..13
     NODE_VALUE 13..14 {

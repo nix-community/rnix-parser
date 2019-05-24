@@ -2,7 +2,7 @@
 
 use crate::types::{Root, TypedNode};
 
-use rowan::{GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TreeArc};
+use rowan::{GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TreeArc, Checkpoint};
 use failure::Fail;
 use std::collections::VecDeque;
 
@@ -121,6 +121,7 @@ struct Parser<I>
     builder: GreenNodeBuilder,
     errors: Vec<ParseError>,
 
+    trivia_buffer: Vec<I::Item>,
     buffer: VecDeque<I::Item>,
     iter: I
 }
@@ -132,8 +133,9 @@ impl<I> Parser<I>
             builder: GreenNodeBuilder::new(),
             errors: Vec::new(),
 
+            trivia_buffer: Vec::with_capacity(1),
             buffer: VecDeque::with_capacity(1),
-            iter
+            iter,
         }
     }
 
@@ -145,10 +147,37 @@ impl<I> Parser<I>
         }
         self.buffer.front()
     }
+    fn eat_trivia(&mut self) {
+        self.peek();
+        self.trivia_buffer.drain(..)
+            .for_each({
+                let builder = &mut self.builder;
+                move |(t, s)| builder.token(t, s)
+            });
+    }
+    fn start_node(&mut self, kind: SyntaxKind) {
+        self.eat_trivia();
+        self.builder.start_node(kind);
+    }
+    fn checkpoint(&mut self) -> Checkpoint {
+        self.eat_trivia();
+        self.builder.checkpoint()
+    }
     fn bump(&mut self) {
         let next = self.buffer.pop_front().or_else(|| self.iter.next());
         match next {
-            Some((token, s)) => self.builder.token(token, s),
+            Some((token, s)) => {
+                if token_helpers::is_trivia(token) {
+                    self.trivia_buffer.push((token, s))
+                } else {
+                    self.trivia_buffer.drain(..)
+                        .for_each({
+                            let builder = &mut self.builder;
+                            move |(t, s)| builder.token(t, s)
+                        });
+                    self.builder.token(token, s)
+                }
+            },
             None => self.errors.push(ParseError::UnexpectedEOF)
         }
     }
@@ -164,7 +193,7 @@ impl<I> Parser<I>
     fn expect(&mut self, expected: SyntaxKind) {
         if let Some(actual) = self.peek() {
             if actual != expected {
-                self.builder.start_node(NODE_ERROR);
+                self.start_node(NODE_ERROR);
                 while { self.bump(); self.peek().map(|actual| actual != expected).unwrap_or(false) } {}
                 self.builder.finish_node();
             } else {
@@ -176,7 +205,7 @@ impl<I> Parser<I>
     }
 
     fn parse_dynamic(&mut self) {
-        self.builder.start_node(NODE_DYNAMIC);
+        self.start_node(NODE_DYNAMIC);
         self.bump();
         while self.peek().map(|t| t != TOKEN_DYNAMIC_END).unwrap_or(false) {
             self.parse_expr();
@@ -185,22 +214,22 @@ impl<I> Parser<I>
         self.builder.finish_node();
     }
     fn parse_interpol(&mut self) {
-        self.builder.start_node(NODE_INTERPOL);
+        self.start_node(NODE_INTERPOL);
 
-        self.builder.start_node(NODE_INTERPOL_LITERAL);
+        self.start_node(NODE_INTERPOL_LITERAL);
         self.bump();
         self.builder.finish_node();
 
         loop {
             match self.peek() {
                 None | Some(TOKEN_INTERPOL_END) => {
-                    self.builder.start_node(NODE_INTERPOL_LITERAL);
+                    self.start_node(NODE_INTERPOL_LITERAL);
                     self.bump();
                     self.builder.finish_node();
                     break;
                 },
                 Some(TOKEN_INTERPOL_END_START) => {
-                    self.builder.start_node(NODE_INTERPOL_LITERAL);
+                    self.start_node(NODE_INTERPOL_LITERAL);
                     self.bump();
                     self.builder.finish_node();
                 },
@@ -215,19 +244,19 @@ impl<I> Parser<I>
             Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
             Some(TOKEN_INTERPOL_START) => self.parse_interpol(),
             Some(TOKEN_STRING) => {
-                self.builder.start_node(NODE_VALUE);
+                self.start_node(NODE_VALUE);
                 self.bump();
                 self.builder.finish_node();
             },
             _ => {
-                self.builder.start_node(NODE_IDENT);
+                self.start_node(NODE_IDENT);
                 self.expect(TOKEN_IDENT);
                 self.builder.finish_node();
             }
         }
     }
     fn parse_attr(&mut self) {
-        self.builder.start_node(NODE_ATTRIBUTE);
+        self.start_node(NODE_ATTRIBUTE);
         loop {
             self.next_attr();
 
@@ -255,9 +284,9 @@ impl<I> Parser<I>
                         break;
                     },
                     Some(TOKEN_IDENT) => {
-                        self.builder.start_node(NODE_PAT_ENTRY);
+                        self.start_node(NODE_PAT_ENTRY);
 
-                        self.builder.start_node(NODE_IDENT);
+                        self.start_node(NODE_IDENT);
                         self.bump();
                         self.builder.finish_node();
 
@@ -280,7 +309,7 @@ impl<I> Parser<I>
                         break;
                     },
                     Some(_) => {
-                        self.builder.start_node(NODE_ERROR);
+                        self.start_node(NODE_ERROR);
                         self.bump();
                         self.builder.finish_node();
                     }
@@ -290,9 +319,9 @@ impl<I> Parser<I>
 
         if self.peek() == Some(TOKEN_AT) {
             let kind = if bound { NODE_ERROR } else { NODE_PAT_BIND };
-            self.builder.start_node(kind);
+            self.start_node(kind);
             self.bump();
-            self.builder.start_node(NODE_IDENT);
+            self.start_node(NODE_IDENT);
             self.expect(TOKEN_IDENT);
             self.builder.finish_node();
             self.builder.finish_node();
@@ -304,11 +333,11 @@ impl<I> Parser<I>
                 None => break,
                 token if token == Some(until) => break,
                 Some(TOKEN_INHERIT) => {
-                    self.builder.start_node(NODE_INHERIT);
+                    self.start_node(NODE_INHERIT);
                     self.bump();
 
                     if self.peek() == Some(TOKEN_PAREN_OPEN) {
-                        self.builder.start_node(NODE_INHERIT_FROM);
+                        self.start_node(NODE_INHERIT_FROM);
                         self.bump();
                         self.parse_expr();
                         self.expect(TOKEN_PAREN_CLOSE);
@@ -316,7 +345,7 @@ impl<I> Parser<I>
                     }
 
                     while let Some(TOKEN_IDENT) = self.peek() {
-                        self.builder.start_node(NODE_IDENT);
+                        self.start_node(NODE_IDENT);
                         self.bump();
                         self.builder.finish_node();
                     }
@@ -325,7 +354,7 @@ impl<I> Parser<I>
                     self.builder.finish_node();
                 },
                 Some(_) => {
-                    self.builder.start_node(NODE_SET_ENTRY);
+                    self.start_node(NODE_SET_ENTRY);
                     self.parse_attr();
                     self.expect(TOKEN_ASSIGN);
                     self.parse_expr();
@@ -337,17 +366,17 @@ impl<I> Parser<I>
         self.bump(); // the final close, like '}'
     }
     fn parse_val(&mut self) {
-        let checkpoint = self.builder.checkpoint();
+        let checkpoint = self.checkpoint();
         match self.peek() {
             Some(TOKEN_PAREN_OPEN) => {
-                self.builder.start_node(NODE_PAREN);
+                self.start_node(NODE_PAREN);
                 self.bump();
                 self.parse_expr();
                 self.bump();
                 self.builder.finish_node();
             },
             Some(TOKEN_REC) => {
-                self.builder.start_node(NODE_SET);
+                self.start_node(NODE_SET);
                 self.bump();
                 self.expect(TOKEN_CURLY_B_OPEN);
                 self.parse_set(TOKEN_CURLY_B_CLOSE);
@@ -378,9 +407,9 @@ impl<I> Parser<I>
                     | [Some(TOKEN_CURLY_B_CLOSE), Some(TOKEN_COLON)]
                     | [Some(TOKEN_CURLY_B_CLOSE), Some(TOKEN_AT)] => {
                         // This looks like a pattern
-                        self.builder.start_node(NODE_LAMBDA);
+                        self.start_node(NODE_LAMBDA);
 
-                        self.builder.start_node(NODE_PATTERN);
+                        self.start_node(NODE_PATTERN);
                         self.bump();
                         self.parse_pattern(false);
                         self.builder.finish_node();
@@ -392,7 +421,7 @@ impl<I> Parser<I>
                     },
                     _ => {
                         // This looks like a set
-                        self.builder.start_node(NODE_SET);
+                        self.start_node(NODE_SET);
                         self.bump();
                         self.parse_set(TOKEN_CURLY_B_CLOSE);
                         self.builder.finish_node();
@@ -400,7 +429,7 @@ impl<I> Parser<I>
                 }
             },
             Some(TOKEN_SQUARE_B_OPEN) => {
-                self.builder.start_node(NODE_LIST);
+                self.start_node(NODE_LIST);
                 self.bump();
                 while self.peek().map(|t| t != TOKEN_SQUARE_B_CLOSE).unwrap_or(false) {
                     self.parse_val();
@@ -411,13 +440,13 @@ impl<I> Parser<I>
             Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
             Some(TOKEN_INTERPOL_START) => self.parse_interpol(),
             Some(t) if token_helpers::is_value(t) => {
-                self.builder.start_node(NODE_VALUE);
+                self.start_node(NODE_VALUE);
                 self.bump();
                 self.builder.finish_node();
             },
             Some(TOKEN_IDENT) => {
-                let checkpoint = self.builder.checkpoint();
-                self.builder.start_node(NODE_IDENT);
+                let checkpoint = self.checkpoint();
+                self.start_node(NODE_IDENT);
                 self.bump();
                 self.builder.finish_node();
 
@@ -447,7 +476,7 @@ impl<I> Parser<I>
                 }
             },
             _ => {
-                self.builder.start_node(NODE_ERROR);
+                self.start_node(NODE_ERROR);
                 self.bump();
                 self.builder.finish_node();
             }
@@ -467,7 +496,7 @@ impl<I> Parser<I>
         }
     }
     fn parse_fn(&mut self) {
-        let checkpoint = self.builder.checkpoint();
+        let checkpoint = self.checkpoint();
         self.parse_val();
 
         while self.peek().map(|t| token_helpers::is_fn_arg(t)).unwrap_or(false) {
@@ -478,7 +507,7 @@ impl<I> Parser<I>
     }
     fn parse_negate(&mut self) {
         if self.peek() == Some(TOKEN_SUB) {
-            self.builder.start_node(NODE_UNARY);
+            self.start_node(NODE_UNARY);
             self.bump();
             self.parse_negate();
             self.builder.finish_node();
@@ -487,7 +516,7 @@ impl<I> Parser<I>
         }
     }
     fn handle_operation(&mut self, once: bool, next: fn(&mut Self), ops: &[SyntaxKind]) {
-        let checkpoint = self.builder.checkpoint();
+        let checkpoint = self.checkpoint();
         next(self);
         while self.peek().map(|t| ops.contains(&t)).unwrap_or(false) {
             self.builder.start_node_at(checkpoint, NODE_OPERATION);
@@ -513,7 +542,7 @@ impl<I> Parser<I>
     }
     fn parse_invert(&mut self) {
         if self.peek() == Some(TOKEN_INVERT) {
-            self.builder.start_node(NODE_UNARY);
+            self.start_node(NODE_UNARY);
             self.bump();
             self.parse_invert();
             self.builder.finish_node();
@@ -548,7 +577,7 @@ impl<I> Parser<I>
     pub fn parse_expr(&mut self) {
         match self.peek() {
             Some(TOKEN_LET) => {
-                let checkpoint = self.builder.checkpoint();
+                let checkpoint = self.checkpoint();
                 self.bump();
 
                 if self.peek() == Some(TOKEN_CURLY_B_OPEN) {
@@ -564,7 +593,7 @@ impl<I> Parser<I>
                 }
             },
             Some(TOKEN_WITH) => {
-                self.builder.start_node(NODE_WITH);
+                self.start_node(NODE_WITH);
                 self.bump();
                 self.parse_expr();
                 self.expect(TOKEN_SEMICOLON);
@@ -572,7 +601,7 @@ impl<I> Parser<I>
                 self.builder.finish_node();
             },
             Some(TOKEN_IF) => {
-                self.builder.start_node(NODE_IF_ELSE);
+                self.start_node(NODE_IF_ELSE);
                 self.bump();
                 self.parse_expr();
                 self.expect(TOKEN_THEN);
@@ -582,7 +611,7 @@ impl<I> Parser<I>
                 self.builder.finish_node();
             },
             Some(TOKEN_ASSERT) => {
-                self.builder.start_node(NODE_ASSERT);
+                self.start_node(NODE_ASSERT);
                 self.bump();
                 self.parse_expr();
                 self.expect(TOKEN_SEMICOLON);
@@ -608,6 +637,7 @@ pub fn parse<I>(iter: I) -> AST
         }
         parser.builder.finish_node();
     }
+    parser.eat_trivia();
     parser.builder.finish_node();
     AST {
         node: SyntaxNode::new(parser.builder.finish(), None),

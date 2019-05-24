@@ -3,12 +3,12 @@ NODE_ROOT 0..16 {
     TOKEN_LET("let") 0..3
     TOKEN_WHITESPACE(" ") 3..4
     NODE_SET_ENTRY 4..11 {
-      NODE_ATTRIBUTE 4..6 {
+      NODE_ATTRIBUTE 4..5 {
         NODE_IDENT 4..5 {
           TOKEN_IDENT("a") 4..5
         }
-        TOKEN_WHITESPACE(" ") 5..6
       }
+      TOKEN_WHITESPACE(" ") 5..6
       TOKEN_ASSIGN("=") 6..7
       TOKEN_WHITESPACE(" ") 7..8
       NODE_VALUE 8..10 {
