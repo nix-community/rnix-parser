@@ -4,8 +4,8 @@ NODE_ROOT 0..43 {
     NODE_INTERPOL_LITERAL 1..11 {
       TOKEN_INTERPOL_START("\"Hello, ${") 1..11
     }
-    NODE_INDEX_SET 11..38 {
-      TOKEN_WHITESPACE(" ") 11..12
+    TOKEN_WHITESPACE(" ") 11..12
+    NODE_INDEX_SET 12..38 {
       NODE_SET 12..32 {
         TOKEN_CURLY_B_OPEN("{") 12..13
         TOKEN_WHITESPACE(" ") 13..14

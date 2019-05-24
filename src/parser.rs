@@ -2,7 +2,7 @@
 
 use crate::types::{Root, TypedNode};
 
-use rowan::{GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TreeArc};
+use rowan::{GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TreeArc, Checkpoint};
 use failure::Fail;
 use std::collections::VecDeque;
 
@@ -158,6 +158,10 @@ impl<I> Parser<I>
     fn start_node(&mut self, kind: SyntaxKind) {
         self.eat_trivia();
         self.builder.start_node(kind);
+    }
+    fn checkpoint(&mut self) -> Checkpoint {
+        self.eat_trivia();
+        self.builder.checkpoint()
     }
     fn bump(&mut self) {
         let next = self.buffer.pop_front().or_else(|| self.iter.next());
@@ -362,7 +366,7 @@ impl<I> Parser<I>
         self.bump(); // the final close, like '}'
     }
     fn parse_val(&mut self) {
-        let checkpoint = self.builder.checkpoint();
+        let checkpoint = self.checkpoint();
         match self.peek() {
             Some(TOKEN_PAREN_OPEN) => {
                 self.start_node(NODE_PAREN);
@@ -441,7 +445,7 @@ impl<I> Parser<I>
                 self.builder.finish_node();
             },
             Some(TOKEN_IDENT) => {
-                let checkpoint = self.builder.checkpoint();
+                let checkpoint = self.checkpoint();
                 self.start_node(NODE_IDENT);
                 self.bump();
                 self.builder.finish_node();
@@ -492,7 +496,7 @@ impl<I> Parser<I>
         }
     }
     fn parse_fn(&mut self) {
-        let checkpoint = self.builder.checkpoint();
+        let checkpoint = self.checkpoint();
         self.parse_val();
 
         while self.peek().map(|t| token_helpers::is_fn_arg(t)).unwrap_or(false) {
@@ -512,7 +516,7 @@ impl<I> Parser<I>
         }
     }
     fn handle_operation(&mut self, once: bool, next: fn(&mut Self), ops: &[SyntaxKind]) {
-        let checkpoint = self.builder.checkpoint();
+        let checkpoint = self.checkpoint();
         next(self);
         while self.peek().map(|t| ops.contains(&t)).unwrap_or(false) {
             self.builder.start_node_at(checkpoint, NODE_OPERATION);
@@ -573,7 +577,7 @@ impl<I> Parser<I>
     pub fn parse_expr(&mut self) {
         match self.peek() {
             Some(TOKEN_LET) => {
-                let checkpoint = self.builder.checkpoint();
+                let checkpoint = self.checkpoint();
                 self.bump();
 
                 if self.peek() == Some(TOKEN_CURLY_B_OPEN) {
