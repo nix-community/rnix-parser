@@ -1,6 +1,6 @@
 NODE_ROOT 0..13 {
   NODE_OPERATION 0..13 {
-    NODE_OPERATION 0..6 {
+    NODE_OPERATION 0..5 {
       NODE_VALUE 0..1 {
         TOKEN_INTEGER("1") 0..1
       }
@@ -10,8 +10,8 @@ NODE_ROOT 0..13 {
       NODE_VALUE 4..5 {
         TOKEN_INTEGER("2") 4..5
       }
-      TOKEN_WHITESPACE(" ") 5..6
     }
+    TOKEN_WHITESPACE(" ") 5..6
     TOKEN_ADD("+") 6..7
     NODE_OPERATION 7..13 {
       TOKEN_WHITESPACE(" ") 7..8

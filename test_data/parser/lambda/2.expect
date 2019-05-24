@@ -4,14 +4,14 @@ NODE_ROOT 0..11 {
       TOKEN_IDENT("a") 0..1
     }
     TOKEN_COLON(":") 1..2
-    TOKEN_WHITESPACE(" ") 2..3
-    NODE_LAMBDA 3..11 {
+    NODE_LAMBDA 2..11 {
+      TOKEN_WHITESPACE(" ") 2..3
       NODE_IDENT 3..4 {
         TOKEN_IDENT("b") 3..4
       }
       TOKEN_COLON(":") 4..5
-      TOKEN_WHITESPACE(" ") 5..6
-      NODE_OPERATION 6..11 {
+      NODE_OPERATION 5..11 {
+        TOKEN_WHITESPACE(" ") 5..6
         NODE_IDENT 6..7 {
           TOKEN_IDENT("a") 6..7
         }

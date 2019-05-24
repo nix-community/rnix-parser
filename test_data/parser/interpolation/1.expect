@@ -4,18 +4,18 @@ NODE_ROOT 0..43 {
     NODE_INTERPOL_LITERAL 1..11 {
       TOKEN_INTERPOL_START("\"Hello, ${") 1..11
     }
-    TOKEN_WHITESPACE(" ") 11..12
-    NODE_INDEX_SET 12..38 {
+    NODE_INDEX_SET 11..38 {
+      TOKEN_WHITESPACE(" ") 11..12
       NODE_SET 12..32 {
         TOKEN_CURLY_B_OPEN("{") 12..13
         TOKEN_WHITESPACE(" ") 13..14
         NODE_SET_ENTRY 14..30 {
-          NODE_ATTRIBUTE 14..20 {
+          NODE_ATTRIBUTE 14..19 {
             NODE_IDENT 14..19 {
               TOKEN_IDENT("world") 14..19
             }
-            TOKEN_WHITESPACE(" ") 19..20
           }
+          TOKEN_WHITESPACE(" ") 19..20
           TOKEN_ASSIGN("=") 20..21
           TOKEN_WHITESPACE(" ") 21..22
           NODE_VALUE 22..29 {

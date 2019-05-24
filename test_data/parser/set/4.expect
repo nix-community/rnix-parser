@@ -3,7 +3,7 @@ NODE_ROOT 0..33 {
     TOKEN_CURLY_B_OPEN("{") 0..1
     TOKEN_WHITESPACE("\n  ") 1..4
     NODE_SET_ENTRY 4..12 {
-      NODE_ATTRIBUTE 4..8 {
+      NODE_ATTRIBUTE 4..7 {
         NODE_IDENT 4..5 {
           TOKEN_IDENT("a") 4..5
         }
@@ -11,8 +11,8 @@ NODE_ROOT 0..33 {
         NODE_IDENT 6..7 {
           TOKEN_IDENT("b") 6..7
         }
-        TOKEN_WHITESPACE(" ") 7..8
       }
+      TOKEN_WHITESPACE(" ") 7..8
       TOKEN_ASSIGN("=") 8..9
       TOKEN_WHITESPACE(" ") 9..10
       NODE_VALUE 10..11 {
@@ -22,7 +22,7 @@ NODE_ROOT 0..33 {
     }
     TOKEN_WHITESPACE("\n  ") 12..15
     NODE_SET_ENTRY 15..31 {
-      NODE_ATTRIBUTE 15..27 {
+      NODE_ATTRIBUTE 15..26 {
         NODE_INTERPOL 15..21 {
           NODE_INTERPOL_LITERAL 15..18 {
             TOKEN_INTERPOL_START("\"${") 15..18
@@ -42,8 +42,8 @@ NODE_ROOT 0..33 {
           }
           TOKEN_DYNAMIC_END("}") 25..26
         }
-        TOKEN_WHITESPACE(" ") 26..27
       }
+      TOKEN_WHITESPACE(" ") 26..27
       TOKEN_ASSIGN("=") 27..28
       TOKEN_WHITESPACE(" ") 28..29
       NODE_VALUE 29..30 {
