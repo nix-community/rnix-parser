@@ -27,6 +27,12 @@ pub use self::{
     value::Value as NixValue
 };
 
+pub use rowan::{
+    TextUnit, TextRange, SmolStr,
+    SyntaxElement, SyntaxNode, SyntaxToken, SyntaxKind, TreeArc,
+    TokenAtOffset, WalkEvent, SyntaxNodeChildren, SyntaxElementChildren,
+};
+
 use self::tokenizer::Tokenizer;
 
 /// A convenience function for first tokenizing and then parsing given input
