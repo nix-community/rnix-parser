@@ -24,7 +24,7 @@ pub mod value;
 
 pub use self::{
     parser::{AST, nodes},
-    value::Value as NixValue
+    value::{StrPart, Value as NixValue}
 };
 
 pub use rowan::{
@@ -42,7 +42,7 @@ pub fn parse(input: &str) -> AST {
 
 #[cfg(test)]
 mod tests {
-    use super::{NixValue, parse, types::*};
+    use super::{NixValue, parse, types::*, value::StrPart};
 
     fn test(code: &str) {
         parse(code).as_result().expect("parsing error");
@@ -71,15 +71,15 @@ mod tests {
         let let_in = LetIn::cast(ast.root().inner()).unwrap();
         let set = Set::cast(let_in.body()).unwrap();
         let entry = set.entries().nth(1).unwrap();
-        let value = Interpol::cast(entry.value()).unwrap();
+        let value = Str::cast(entry.value()).unwrap();
 
         match &*value.parts() {
             &[
-                InterpolPart::Literal(ref s1),
-                InterpolPart::Ast(_),
-                InterpolPart::Literal(ref s2),
-                InterpolPart::Ast(_),
-                InterpolPart::Literal(ref s3)
+                StrPart::Literal(ref s1),
+                StrPart::Ast(_),
+                StrPart::Literal(ref s2),
+                StrPart::Ast(_),
+                StrPart::Literal(ref s3)
             ]
             if s1 == "The set\'s x value is: "
                 && s2 == "\n\nThis line shall have no indention\n  This line shall be indented by 2\n\n\n"

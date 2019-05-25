@@ -23,16 +23,16 @@ NODE_ROOT 0..33 {
     TOKEN_WHITESPACE("\n  ") 12..15
     NODE_SET_ENTRY 15..31 {
       NODE_ATTRIBUTE 15..26 {
-        NODE_INTERPOL 15..21 {
-          NODE_INTERPOL_LITERAL 15..18 {
-            TOKEN_INTERPOL_START("\"${") 15..18
+        NODE_STRING 15..21 {
+          TOKEN_STRING_START("\"") 15..16
+          NODE_STRING_INTERPOL 16..20 {
+            TOKEN_INTERPOL_START("${") 16..18
+            NODE_IDENT 18..19 {
+              TOKEN_IDENT("c") 18..19
+            }
+            TOKEN_INTERPOL_END("}") 19..20
           }
-          NODE_IDENT 18..19 {
-            TOKEN_IDENT("c") 18..19
-          }
-          NODE_INTERPOL_LITERAL 19..21 {
-            TOKEN_INTERPOL_END("}\"") 19..21
-          }
+          TOKEN_STRING_END("\"") 20..21
         }
         TOKEN_DOT(".") 21..22
         NODE_DYNAMIC 22..26 {

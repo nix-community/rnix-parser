@@ -77,10 +77,11 @@ pub mod tokens {
         TOKEN_IDENT
         TOKEN_INTEGER
         TOKEN_INTERPOL_END
-        TOKEN_INTERPOL_END_START
         TOKEN_INTERPOL_START
         TOKEN_PATH
-        TOKEN_STRING
+        TOKEN_STRING_CONTENT
+        TOKEN_STRING_END
+        TOKEN_STRING_START
     }
 
     pub mod token_helpers {
@@ -89,7 +90,7 @@ pub mod tokens {
         /// Returns true if this token is a value, such as an integer or a string
         pub fn is_value(token: SyntaxKind) -> bool {
             match token {
-                TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_STRING => true,
+                TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH => true,
                 _ => false
             }
         }
@@ -106,7 +107,7 @@ pub mod tokens {
         pub fn is_fn_arg(token: SyntaxKind) -> bool {
             match token {
                 TOKEN_REC | TOKEN_CURLY_B_OPEN | TOKEN_SQUARE_B_OPEN | TOKEN_PAREN_OPEN
-                    | TOKEN_INTERPOL_START | TOKEN_IDENT => true,
+                    | TOKEN_STRING_START | TOKEN_IDENT => true,
                 _ => token_helpers::is_value(token)
             }
         }
@@ -130,12 +131,23 @@ fn is_valid_path_char(c: char) -> bool {
 }
 
 #[derive(Clone, Copy)]
-enum Context {
-    Interpol {
-        brackets: u32,
-        string: bool,
+struct Interpol {
+    brackets: u32,
+    string: bool,
+    multiline: bool
+}
+#[derive(Clone, Copy)]
+enum Todo {
+    StringBody {
         multiline: bool
-    }
+    },
+    StringEnd,
+    InterpolStart
+}
+#[derive(Clone, Copy, Default)]
+struct Context {
+    interpol: Option<Interpol>,
+    todo: Option<Todo>
 }
 
 #[derive(Clone, Copy)]
@@ -143,6 +155,12 @@ struct State<'a> {
     input: &'a str,
     offset: usize,
 }
+impl PartialEq for State<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self.input, other.input) && self.offset == other.offset
+    }
+}
+impl Eq for State<'_> {}
 
 /// The tokenizer. You may want to use the `tokenize` convenience function from this module instead.
 pub struct Tokenizer<'a> {
@@ -153,7 +171,7 @@ impl<'a> Tokenizer<'a> {
     /// Create a new instance
     pub fn new(input: &'a str) -> Self {
         Self {
-            ctx: Vec::new(),
+            ctx: vec![Context::default()],
             state: State {
                 input,
                 offset: 0,
@@ -174,6 +192,13 @@ impl<'a> Tokenizer<'a> {
         }
         c
     }
+    fn starts_with_bump(&mut self, s: &str) -> bool {
+        let starts_with = self.remaining().starts_with(s);
+        if starts_with {
+            self.state.offset += s.len();
+        }
+        starts_with
+    }
     fn string_since(&self, past: State) -> SmolStr {
         SmolStr::new(&past.input[past.offset..self.state.offset])
     }
@@ -190,9 +215,10 @@ impl<'a> Tokenizer<'a> {
     }
     fn next_string(&mut self, multiline: bool) -> SyntaxKind {
         loop {
+            let start = self.state;
             match self.next() {
                 None => return TOKEN_ERROR,
-                Some('"') if !multiline => return TOKEN_STRING,
+                Some('"') if !multiline => { self.state = start; return TOKEN_STRING_CONTENT; },
                 Some('\\') if !multiline => match self.next() {
                     None => return TOKEN_ERROR,
                     Some(_) => ()
@@ -202,7 +228,7 @@ impl<'a> Tokenizer<'a> {
                     None => return TOKEN_ERROR,
                     Some('\'') => match self.peek() {
                         Some('\'') | Some('\\') | Some('$') => { self.next().unwrap(); },
-                        _ => return TOKEN_STRING
+                        _ => { self.state = start; return TOKEN_STRING_CONTENT; }
                     },
                     Some(_) => ()
                 },
@@ -210,13 +236,17 @@ impl<'a> Tokenizer<'a> {
                 Some('$') => match self.peek() {
                     Some('$') => { self.next().unwrap(); },
                     Some('{') => {
-                        self.next().unwrap();
-                        self.ctx.push(Context::Interpol {
-                            brackets: 0,
-                            string: true,
-                            multiline
+                        self.state = start;
+                        self.ctx.push(Context {
+                            interpol: Some(Interpol {
+                                brackets: 0,
+                                string: true,
+                                multiline
+                            }),
+                            todo: Some(Todo::InterpolStart),
+                            ..Default::default()
                         });
-                        return TOKEN_INTERPOL_START;
+                        return TOKEN_STRING_CONTENT;
                     },
                     _ => ()
                 }
@@ -231,6 +261,43 @@ impl<'a> Iterator for Tokenizer<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.state;
 
+        // Handle already started multi-token
+        loop {
+            let todo = &mut self.ctx.last_mut().unwrap().todo;
+            match todo.take() {
+                Some(Todo::InterpolStart) => {
+                    if self.starts_with_bump("${") {
+                        return Some((TOKEN_INTERPOL_START, self.string_since(start)));
+                    }
+                },
+                Some(Todo::StringBody { multiline }) => {
+                    *todo = Some(Todo::StringEnd);
+                    let token = self.next_string(multiline);
+                    if self.state == start {
+                        continue;
+                    }
+                    return Some((token, self.string_since(start)));
+                },
+                Some(Todo::StringEnd) => {
+                    let status = match self.peek() {
+                        Some('"') => { self.next().unwrap(); true },
+                        Some('\'') => match { self.next().unwrap(); self.peek() } {
+                            Some('\'') => { self.next().unwrap(); true },
+                            _ => false
+                        },
+                        _ => false
+                    };
+                    if !status {
+                        return Some((TOKEN_ERROR, self.string_since(start)));
+                    }
+
+                    return Some((TOKEN_STRING_END, self.string_since(start)));
+                },
+                _ => ()
+            }
+            break;
+        }
+
         if self.consume(char::is_whitespace) > 0 {
             return Some((TOKEN_WHITESPACE, self.string_since(start)));
         }
@@ -239,9 +306,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             self.consume(|c| c != '\n');
             return Some((TOKEN_COMMENT, self.string_since(start)));
         }
-        if self.remaining().starts_with("/*") {
-            self.next().unwrap();
-            self.next().unwrap();
+        if self.starts_with_bump("/*") {
             loop {
                 self.consume(|c| c != '*');
                 self.next(); // consume the '*', if any
@@ -256,8 +321,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             }
         }
 
-        if self.remaining().starts_with("...") {
-            self.state.offset += 3;
+        if self.starts_with_bump("...") {
             return Some((TOKEN_ELLIPSIS, self.string_since(start)));
         }
 
@@ -299,24 +363,21 @@ impl<'a> Iterator for Tokenizer<'a> {
             '!' if self.peek() == Some('=') => { self.next().unwrap(); Some((TOKEN_NOT_EQUAL, self.string_since(start))) },
             '!' => Some((TOKEN_INVERT, self.string_since(start))),
             '{' => {
-                if let Some(Context::Interpol { ref mut brackets, .. }) = self.ctx.last_mut() {
+                if let Some(Interpol { ref mut brackets, .. }) = self.ctx.last_mut().unwrap().interpol {
                     *brackets += 1;
                 }
                 Some((TOKEN_CURLY_B_OPEN, self.string_since(start)))
             },
             '}' => {
-                if let Some(&mut Context::Interpol { ref mut brackets, string, multiline }) = self.ctx.last_mut() {
+                if let Some(Interpol { ref mut brackets, string, multiline }) = self.ctx.last_mut().unwrap().interpol {
                     match brackets.checked_sub(1) {
                         Some(new) => *brackets = new,
                         None => {
                             self.ctx.pop().unwrap();
 
                             if string {
-                                return Some((match self.next_string(multiline) {
-                                    TOKEN_STRING => TOKEN_INTERPOL_END,
-                                    TOKEN_INTERPOL_START => TOKEN_INTERPOL_END_START,
-                                    other => other
-                                }, self.string_since(start)));
+                                self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline });
+                                return Some((TOKEN_INTERPOL_END, self.string_since(start)));
                             } else {
                                 return Some((TOKEN_DYNAMIC_END, self.string_since(start)))
                             }
@@ -358,10 +419,13 @@ impl<'a> Iterator for Tokenizer<'a> {
             '>' => Some((TOKEN_MORE, self.string_since(start))),
             '$' if self.peek() == Some('{') => {
                 self.next().unwrap();
-                self.ctx.push(Context::Interpol {
-                    brackets: 0,
-                    string: false,
-                    multiline: false
+                self.ctx.push(Context {
+                    interpol: Some(Interpol {
+                        brackets: 0,
+                        string: false,
+                        multiline: false
+                    }),
+                    ..Default::default()
                 });
                 Some((TOKEN_DYNAMIC_START, self.string_since(start)))
             },
@@ -397,10 +461,14 @@ impl<'a> Iterator for Tokenizer<'a> {
                     Some((TOKEN_PATH, ident))
                 }
             },
-            '"' => Some((self.next_string(false), self.string_since(start))),
+            '"' => {
+                self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: false });
+                Some((TOKEN_STRING_START, self.string_since(start)))
+            },
             '\'' if self.peek() == Some('\'') => {
                 self.next().unwrap();
-                Some((self.next_string(true), self.string_since(start)))
+                self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: true });
+                Some((TOKEN_STRING_START, self.string_since(start)))
             },
             '0'..='9' => {
                 self.consume(|c| c >= '0' && c <= '9');
@@ -439,16 +507,16 @@ mod tests {
         assert_eq!(
             tokenize("{ int = 42; }"),
             tokens![
-               (TOKEN_CURLY_B_OPEN, "{"),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_IDENT, "int"),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_ASSIGN, "="),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_INTEGER, "42"),
-               (TOKEN_SEMICOLON, ";"),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_CURLY_B_CLOSE, "}")
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "int"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "42"),
+                (TOKEN_SEMICOLON, ";"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_CURLY_B_CLOSE, "}")
             ]
         );
     }
@@ -457,16 +525,16 @@ mod tests {
         assert_eq!(
             tokenize("{ float = 1.234; }"),
             tokens![
-               (TOKEN_CURLY_B_OPEN, "{"),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_IDENT, "float"),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_ASSIGN, "="),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_FLOAT, "1.234"),
-               (TOKEN_SEMICOLON, ";"),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_CURLY_B_CLOSE, "}")
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "float"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_FLOAT, "1.234"),
+                (TOKEN_SEMICOLON, ";"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_CURLY_B_CLOSE, "}")
             ]
         );
     }
@@ -475,16 +543,18 @@ mod tests {
         assert_eq!(
             tokenize(r#"{ string = "Hello \"World\""; }"#),
             tokens![
-               (TOKEN_CURLY_B_OPEN, "{"),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_IDENT, "string"),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_ASSIGN, "="),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_STRING, r#""Hello \"World\"""#),
-               (TOKEN_SEMICOLON, ";"),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_CURLY_B_CLOSE, "}")
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "string"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_STRING_START, "\""),
+                (TOKEN_STRING_CONTENT, r#"Hello \"World\""#),
+                (TOKEN_STRING_END, "\""),
+                (TOKEN_SEMICOLON, ";"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_CURLY_B_CLOSE, "}")
             ]
         );
     }
@@ -504,13 +574,14 @@ mod tests {
     '';
 }"#),
             tokens![
-               (TOKEN_CURLY_B_OPEN, "{"),
-               (TOKEN_WHITESPACE, "\n    "),
-               (TOKEN_IDENT, "multiline"),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_ASSIGN, "="),
-               (TOKEN_WHITESPACE, " "),
-               (TOKEN_STRING, r#"''
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_WHITESPACE, "\n    "),
+                (TOKEN_IDENT, "multiline"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_STRING_START, "''"),
+                (TOKEN_STRING_CONTENT, r#"
             
                   
         This is a multiline string :D
@@ -519,7 +590,8 @@ mod tests {
         ''${ interpolation was escaped }
         two single quotes: '''
         three single quotes: ''''
-    ''"#),
+    "#),
+                (TOKEN_STRING_END, "''"),
                 (TOKEN_SEMICOLON, ";"),
                 (TOKEN_WHITESPACE, "\n"),
                 (TOKEN_CURLY_B_CLOSE, "}")
@@ -532,7 +604,9 @@ mod tests {
             tokenize(r#" "$${test}" "#),
             tokens![
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_STRING, r#""$${test}""#),
+                (TOKEN_STRING_START, "\""),
+                (TOKEN_STRING_CONTENT, r#"$${test}"#),
+                (TOKEN_STRING_END, "\""),
                 (TOKEN_WHITESPACE, " ")
             ]
         );
@@ -540,7 +614,9 @@ mod tests {
             tokenize(r#" ''$${test}'' "#),
             tokens![
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_STRING, r#"''$${test}''"#),
+                (TOKEN_STRING_START, "''"),
+                (TOKEN_STRING_CONTENT, r#"$${test}"#),
+                (TOKEN_STRING_END, "''"),
                 (TOKEN_WHITESPACE, " ")
             ]
         );
@@ -551,7 +627,9 @@ mod tests {
             tokenize(r#" "Hello, ${ { world = "World"; }.world }!" "#),
             tokens![
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTERPOL_START, r#""Hello, ${"#),
+                (TOKEN_STRING_START, "\""),
+                (TOKEN_STRING_CONTENT, "Hello, "),
+                (TOKEN_INTERPOL_START, "${"),
                     (TOKEN_WHITESPACE, " "),
                     (TOKEN_CURLY_B_OPEN, "{"),
                     (TOKEN_WHITESPACE, " "),
@@ -559,14 +637,18 @@ mod tests {
                     (TOKEN_WHITESPACE, " "),
                     (TOKEN_ASSIGN, "="),
                     (TOKEN_WHITESPACE, " "),
-                    (TOKEN_STRING, r#""World""#),
+                    (TOKEN_STRING_START, "\""),
+                    (TOKEN_STRING_CONTENT, r#"World"#),
+                    (TOKEN_STRING_END, "\""),
                     (TOKEN_SEMICOLON, ";"),
                     (TOKEN_WHITESPACE, " "),
                     (TOKEN_CURLY_B_CLOSE, "}"),
                     (TOKEN_DOT, "."),
                     (TOKEN_IDENT, "world"),
                     (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTERPOL_END, r#"}!""#),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_STRING_CONTENT, "!"),
+                (TOKEN_STRING_END, "\""),
                 (TOKEN_WHITESPACE, " ")
             ]
         );
@@ -574,9 +656,12 @@ mod tests {
             tokenize(r#" "\$${test}" "#),
             tokens![
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTERPOL_START, r#""\$${"#),
+                (TOKEN_STRING_START, "\""),
+                (TOKEN_STRING_CONTENT, "\\$"),
+                (TOKEN_INTERPOL_START, "${"),
                     (TOKEN_IDENT, "test"),
-                (TOKEN_INTERPOL_END, r#"}""#),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_STRING_END, "\""),
                 (TOKEN_WHITESPACE, " ")
             ]
         );
@@ -584,9 +669,12 @@ mod tests {
             tokenize(r#" ''''$${test}'' "#),
             tokens![
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTERPOL_START, r#"''''$${"#),
+                (TOKEN_STRING_START, "''"),
+                (TOKEN_STRING_CONTENT, "''$"),
+                (TOKEN_INTERPOL_START, "${"),
                     (TOKEN_IDENT, "test"),
-                (TOKEN_INTERPOL_END, r#"}''"#),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_STRING_END, "''"),
                 (TOKEN_WHITESPACE, " ")
             ]
         );
@@ -594,9 +682,12 @@ mod tests {
             tokenize(r#" "${test}#123" "#),
             tokens![
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTERPOL_START, r#""${"#),
+                (TOKEN_STRING_START, "\""),
+                (TOKEN_INTERPOL_START, "${"),
                     (TOKEN_IDENT, "test"),
-                (TOKEN_INTERPOL_END, r#"}#123""#),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_STRING_CONTENT, "#123"),
+                (TOKEN_STRING_END, "\""),
                 (TOKEN_WHITESPACE, " ")
             ]
         );
@@ -604,9 +695,12 @@ mod tests {
             tokenize(" ''\n${test}'' "),
             tokens![
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTERPOL_START, "''\n${"),
+                (TOKEN_STRING_START, "''"),
+                (TOKEN_STRING_CONTENT, "\n"),
+                (TOKEN_INTERPOL_START, "${"),
                     (TOKEN_IDENT, "test"),
-                (TOKEN_INTERPOL_END, r#"}''"#),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_STRING_END, "''"),
                 (TOKEN_WHITESPACE, " ")
             ]
         );
@@ -614,11 +708,15 @@ mod tests {
             tokenize(r#" "${hello} ${world}" "#),
             tokens![
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTERPOL_START, r#""${"#),
+                (TOKEN_STRING_START, "\""),
+                (TOKEN_INTERPOL_START, "${"),
                     (TOKEN_IDENT, "hello"),
-                (TOKEN_INTERPOL_END_START, r#"} ${"#),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_STRING_CONTENT, " "),
+                (TOKEN_INTERPOL_START, "${"),
                     (TOKEN_IDENT, "world"),
-                (TOKEN_INTERPOL_END, r#"}""#),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_STRING_END, "\""),
                 (TOKEN_WHITESPACE, " ")
             ]
         );
@@ -626,11 +724,15 @@ mod tests {
             tokenize(r#" ''${"${var}"}'' "#),
             tokens![
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTERPOL_START, r#"''${"#),
-                    (TOKEN_INTERPOL_START, r#""${"#),
+                (TOKEN_STRING_START, "''"),
+                (TOKEN_INTERPOL_START, "${"),
+                    (TOKEN_STRING_START, "\""),
+                    (TOKEN_INTERPOL_START, "${"),
                         (TOKEN_IDENT, "var"),
-                    (TOKEN_INTERPOL_END, r#"}""#),
-                (TOKEN_INTERPOL_END, r#"}''"#),
+                    (TOKEN_INTERPOL_END, "}"),
+                    (TOKEN_STRING_END, "\""),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_STRING_END, "''"),
                 (TOKEN_WHITESPACE, " ")
             ]
         );
@@ -772,7 +874,9 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "3"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_STRING, r#""lol""#),
+                (TOKEN_STRING_START, "\""),
+                (TOKEN_STRING_CONTENT, r#"lol"#),
+                (TOKEN_STRING_END, "\""),
                 (TOKEN_SQUARE_B_CLOSE, "]")
             ]
         );
@@ -830,7 +934,9 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_QUESTION, "?"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_STRING, r#""default""#),
+                (TOKEN_STRING_START, "\""),
+                (TOKEN_STRING_CONTENT, "default"),
+                (TOKEN_STRING_END, "\""),
                 (TOKEN_COMMA, ","),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_ELLIPSIS, "..."),
@@ -999,9 +1105,11 @@ mod tests {
                     (TOKEN_WHITESPACE, " "),
                     (TOKEN_ASSIGN, "="),
                     (TOKEN_WHITESPACE, " "),
-                    (TOKEN_INTERPOL_START, r#""${"#),
+                    (TOKEN_STRING_START, "\""),
+                    (TOKEN_INTERPOL_START, "${"),
                         (TOKEN_IDENT, "test"),
-                    (TOKEN_INTERPOL_END, r#"}""#),
+                    (TOKEN_INTERPOL_END, "}"),
+                    (TOKEN_STRING_END, "\""),
                     (TOKEN_SEMICOLON, ";"),
                     (TOKEN_WHITESPACE, " "),
                     (TOKEN_CURLY_B_CLOSE, "}"),

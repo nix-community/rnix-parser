@@ -2,7 +2,7 @@
 
 use crate::{
     parser::nodes::*,
-    value::{self, Value as ParsedValue, ValueError}
+    value::{self, StrPart, Value as ParsedValue, ValueError}
 };
 
 use rowan::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken, TransparentNewType, TreeArc, WalkEvent};
@@ -26,7 +26,7 @@ macro_rules! typed {
             impl TypedNode for $name {
                 fn cast(from: &SyntaxNode) -> Option<&Self> {
                     if from.kind() == $kind.into() {
-                        Some(Self::from_repr(from.into_repr()))
+                        Some(Self::from_repr(from))
                     } else {
                         None
                     }
@@ -116,12 +116,6 @@ impl UnaryOpKind {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum InterpolPart<'a> {
-    Literal(String),
-    Ast(&'a SyntaxNode)
-}
-
 /// A struct that prints out the textual representation of a node in a
 /// stable format. See TypedNode::dump.
 pub struct TextDump<'a>(&'a SyntaxNode);
@@ -162,6 +156,18 @@ impl fmt::Display for TextDump<'_> {
     }
 }
 
+/// Internal function to get an iterator over non-trivia tokens
+pub(crate) fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
+    node.children_with_tokens().filter_map(|elem| {
+        if let SyntaxElement::Token(token) = elem {
+            if !token_helpers::is_trivia(token.kind()) {
+                return Some(token);
+            }
+        }
+        None
+    })
+}
+
 /// A TypedNode is simply a wrapper around an untyped node to provide a type
 /// system in some sense.
 pub trait TypedNode: TransparentNewType<Repr = SyntaxNode> + ToOwned + Sized {
@@ -186,15 +192,7 @@ pub trait TypedNode: TransparentNewType<Repr = SyntaxNode> + ToOwned + Sized {
     }
     /// Return the first non-trivia token
     fn first_token(&self) -> Option<SyntaxToken> {
-        let mut cursor = self.node().first_child_or_token()?;
-        loop {
-            if let SyntaxElement::Token(token) = cursor {
-                if !token_helpers::is_trivia(token.kind()) {
-                    break Some(token);
-                }
-            }
-            cursor = cursor.next_sibling_or_token()?;
-        }
+        tokens(self.node()).next()
     }
     /// Return a dump of the AST. One of the goals is to be a stable
     /// format that can be used in tests.
@@ -305,88 +303,12 @@ typed! [
         }
     },
     NODE_INHERIT_FROM => InheritFrom: Wrapper,
-    NODE_INTERPOL => Interpol: {
+    NODE_STRING => Str: {
         /// Parse the interpolation into a series of parts
-        pub fn parts(&self) -> Vec<InterpolPart> {
-            let mut parts = Vec::new();
-            let mut literals = 0;
-            let mut common = std::usize::MAX;
-            let mut multiline = false;
-
-            for child in self.node().children() {
-                if let Some(literal) = InterpolLiteral::cast(child) {
-                    let token = literal.first_token().unwrap();
-                    let mut text: &str = token.text();
-
-                    let start = token.kind() == TOKEN_INTERPOL_START
-                        || token.kind() == TOKEN_INTERPOL_END_START;
-                    let end = token.kind() == TOKEN_INTERPOL_END
-                        || token.kind() == TOKEN_INTERPOL_END_START;
-
-                    match token.kind() {
-                        TOKEN_INTERPOL_START => {
-                            multiline = if text.starts_with('"') {
-                                text = &text[1..];
-                                false
-                            } else if text.starts_with("''") {
-                                text = &text[2..];
-                                true
-                            } else { false };
-                        },
-                        TOKEN_INTERPOL_END_START => (),
-                        TOKEN_INTERPOL_END => {
-                            let len = text.len();
-                            if text.ends_with('"') {
-                                text = &text[..len-1];
-                            } else if text.ends_with("''") {
-                                text = &text[..len-2];
-                            }
-                        },
-                        _ => continue
-                    }
-                    if end && text.starts_with("}") {
-                        text = &text[1..];
-                    }
-                    if start && text.ends_with("${") {
-                        let len = text.len();
-                        text = &text[..len-2];
-                    }
-                    let line_count = text.lines().count();
-                    for (i, line) in text.lines().enumerate().skip(if end { 1 } else { 0 }) {
-                        let indent: usize = value::indention(line).count();
-                        if (i != line_count-1 || !start) && indent == line.chars().count() {
-                            // line is empty and not the start of an
-                            // interpolation, ignore indention
-                            continue;
-                        }
-                        common = common.min(indent);
-                    }
-                    parts.push(InterpolPart::Literal(text.to_string()));
-                    literals += 1;
-                } else {
-                    parts.push(InterpolPart::Ast(child));
-                }
-            }
-
-            let mut i = 0;
-            for part in parts.iter_mut() {
-                if let InterpolPart::Literal(ref mut text) = part {
-                    if multiline {
-                        *text = value::remove_indent(text, i == 0, common);
-                        if i == literals-1 {
-                            // Last index
-                            value::remove_trailing(text);
-                        }
-                    }
-                    *text = value::unescape(text, multiline);
-                    i += 1;
-                }
-            }
-
-            parts
+        pub fn parts(&self) -> Vec<StrPart> {
+            value::string_parts(self)
         }
     },
-    NODE_INTERPOL_LITERAL => InterpolLiteral: Wrapper,
     NODE_LAMBDA => Lambda: {
         /// Return the argument of the lambda
         pub fn arg(&self) -> &SyntaxNode {

@@ -6,21 +6,25 @@ NODE_ROOT 0..33 {
           TOKEN_IDENT("test") 0..4
         }
         TOKEN_DOT(".") 4..5
-        NODE_VALUE 5..20 {
-          TOKEN_STRING("\"invalid ident\"") 5..20
+        NODE_STRING 5..20 {
+          TOKEN_STRING_START("\"") 5..6
+          NODE_STRING_LITERAL 6..19 {
+            TOKEN_STRING_CONTENT("invalid ident") 6..19
+          }
+          TOKEN_STRING_END("\"") 19..20
         }
       }
       TOKEN_DOT(".") 20..21
-      NODE_INTERPOL 21..28 {
-        NODE_INTERPOL_LITERAL 21..24 {
-          TOKEN_INTERPOL_START("\"${") 21..24
+      NODE_STRING 21..28 {
+        TOKEN_STRING_START("\"") 21..22
+        NODE_STRING_INTERPOL 22..27 {
+          TOKEN_INTERPOL_START("${") 22..24
+          NODE_IDENT 24..26 {
+            TOKEN_IDENT("hi") 24..26
+          }
+          TOKEN_INTERPOL_END("}") 26..27
         }
-        NODE_IDENT 24..26 {
-          TOKEN_IDENT("hi") 24..26
-        }
-        NODE_INTERPOL_LITERAL 26..28 {
-          TOKEN_INTERPOL_END("}\"") 26..28
-        }
+        TOKEN_STRING_END("\"") 27..28
       }
     }
     TOKEN_DOT(".") 28..29

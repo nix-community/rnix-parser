@@ -4,7 +4,7 @@ use crate::types::{Root, TypedNode};
 
 use rowan::{GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TreeArc, Checkpoint};
 use failure::Fail;
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
 const OR: &'static str = "or";
 
@@ -15,8 +15,8 @@ pub enum ParseError {
     Unexpected(TextRange),
     #[fail(display = "unexpected eof")]
     UnexpectedEOF,
-    #[fail(display = "unexpected eof, wanted {:?}", _0)]
-    UnexpectedEOFWanted(SyntaxKind),
+    #[fail(display = "unexpected eof, wanted any of {:?}", _0)]
+    UnexpectedEOFWanted(Box<[SyntaxKind]>),
 }
 
 /// The type of a node in the AST
@@ -43,8 +43,9 @@ pub mod nodes {
         NODE_INDEX_SET
         NODE_INHERIT
         NODE_INHERIT_FROM
-        NODE_INTERPOL
-        NODE_INTERPOL_LITERAL
+        NODE_STRING
+        NODE_STRING_LITERAL
+        NODE_STRING_INTERPOL
         NODE_LAMBDA
         NODE_LET
         NODE_LET_IN
@@ -190,17 +191,34 @@ impl<I> Parser<I>
     fn peek(&mut self) -> Option<SyntaxKind> {
         self.peek_data().map(|&(t, _)| t)
     }
-    fn expect(&mut self, expected: SyntaxKind) {
-        if let Some(actual) = self.peek() {
-            if actual != expected {
+    fn expect_peek_any(&mut self, allowed_slice: &[SyntaxKind]) -> Option<SyntaxKind> {
+        // TODO: Use another set structure here, such as
+        // https://gitlab.redox-os.org/redox-os/cbitset
+        let allowed: HashSet<SyntaxKind> = allowed_slice.iter().map(|k| *k).collect(); // TODO .copied()
+
+        let next = match self.peek() {
+            None => None,
+            Some(token) if allowed.contains(&token) => Some(token),
+            Some(_) => {
                 self.start_node(NODE_ERROR);
-                while { self.bump(); self.peek().map(|actual| actual != expected).unwrap_or(false) } {}
+                loop {
+                    self.bump();
+                    if self.peek().map(|t| allowed.contains(&t)).unwrap_or(true) {
+                        break;
+                    }
+                }
                 self.builder.finish_node();
-            } else {
-                self.bump();
+                self.peek()
             }
-        } else {
-            self.errors.push(ParseError::UnexpectedEOFWanted(expected));
+        };
+        if next.is_none() {
+            self.errors.push(ParseError::UnexpectedEOFWanted(allowed_slice.to_vec().into_boxed_slice()));
+        }
+        next
+    }
+    fn expect(&mut self, expected: SyntaxKind) {
+        if self.expect_peek_any(&[expected]).is_some() {
+            self.bump();
         }
     }
 
@@ -213,41 +231,36 @@ impl<I> Parser<I>
         self.bump();
         self.builder.finish_node();
     }
-    fn parse_interpol(&mut self) {
-        self.start_node(NODE_INTERPOL);
-
-        self.start_node(NODE_INTERPOL_LITERAL);
-        self.bump();
-        self.builder.finish_node();
+    fn parse_string(&mut self) {
+        self.start_node(NODE_STRING);
+        self.expect(TOKEN_STRING_START);
 
         loop {
-            match self.peek() {
-                None | Some(TOKEN_INTERPOL_END) => {
-                    self.start_node(NODE_INTERPOL_LITERAL);
-                    self.bump();
-                    self.builder.finish_node();
-                    break;
-                },
-                Some(TOKEN_INTERPOL_END_START) => {
-                    self.start_node(NODE_INTERPOL_LITERAL);
+            match self.expect_peek_any(&[TOKEN_STRING_END, TOKEN_STRING_CONTENT, TOKEN_INTERPOL_START]) {
+                Some(TOKEN_STRING_CONTENT) => {
+                    self.start_node(NODE_STRING_LITERAL);
                     self.bump();
                     self.builder.finish_node();
                 },
-                Some(_) => self.parse_expr()
+                Some(TOKEN_INTERPOL_START) => {
+                    self.start_node(NODE_STRING_INTERPOL);
+                    self.bump();
+                    self.parse_expr();
+                    self.expect(TOKEN_INTERPOL_END);
+                    self.builder.finish_node();
+                },
+                // handled by expect_peek_any
+                _ => break
             }
         }
+        self.expect(TOKEN_STRING_END);
 
         self.builder.finish_node();
     }
     fn next_attr(&mut self) {
         match self.peek() {
             Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
-            Some(TOKEN_INTERPOL_START) => self.parse_interpol(),
-            Some(TOKEN_STRING) => {
-                self.start_node(NODE_VALUE);
-                self.bump();
-                self.builder.finish_node();
-            },
+            Some(TOKEN_STRING_START) => self.parse_string(),
             _ => {
                 self.start_node(NODE_IDENT);
                 self.expect(TOKEN_IDENT);
@@ -273,7 +286,7 @@ impl<I> Parser<I>
             self.bump();
         } else {
             loop {
-                match self.peek() {
+                match self.expect_peek_any(&[TOKEN_CURLY_B_CLOSE, TOKEN_ELLIPSIS, TOKEN_IDENT]) {
                     Some(TOKEN_CURLY_B_CLOSE) => {
                         self.bump();
                         break;
@@ -304,15 +317,8 @@ impl<I> Parser<I>
                             },
                         }
                     },
-                    None => {
-                        self.errors.push(ParseError::UnexpectedEOFWanted(TOKEN_IDENT));
-                        break;
-                    },
-                    Some(_) => {
-                        self.start_node(NODE_ERROR);
-                        self.bump();
-                        self.builder.finish_node();
-                    }
+                    // handled by expect_peek_any
+                    _ => break
                 }
             }
         }
@@ -438,7 +444,7 @@ impl<I> Parser<I>
                 self.builder.finish_node();
             },
             Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
-            Some(TOKEN_INTERPOL_START) => self.parse_interpol(),
+            Some(TOKEN_STRING_START) => self.parse_string(),
             Some(t) if token_helpers::is_value(t) => {
                 self.start_node(NODE_VALUE);
                 self.bump();

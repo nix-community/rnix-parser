@@ -17,8 +17,12 @@ NODE_ROOT 0..28 {
         TOKEN_WHITESPACE(" ") 6..7
         TOKEN_QUESTION("?") 7..8
         TOKEN_WHITESPACE(" ") 8..9
-        NODE_VALUE 9..18 {
-          TOKEN_STRING("\"default\"") 9..18
+        NODE_STRING 9..18 {
+          TOKEN_STRING_START("\"") 9..10
+          NODE_STRING_LITERAL 10..17 {
+            TOKEN_STRING_CONTENT("default") 10..17
+          }
+          TOKEN_STRING_END("\"") 17..18
         }
       }
       TOKEN_COMMA(",") 18..19

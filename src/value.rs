@@ -1,7 +1,10 @@
 //! The types: Such as strings or integers
 
-use crate::tokenizer::tokens::*;
-use rowan::SyntaxKind;
+use crate::{
+    parser::nodes::*,
+    types::{self, TypedNode}
+};
+use rowan::{SyntaxNode, SyntaxKind};
 use failure::Fail;
 
 /// An anchor point for a path, such as if it's relative or absolute
@@ -19,11 +22,7 @@ pub enum Anchor {
 pub enum Value {
     Float(f64),
     Integer(i64),
-    Path(Anchor, String),
-    Str {
-        multiline: bool,
-        content: String
-    }
+    Path(Anchor, String)
 }
 
 impl From<i64> for Value {
@@ -34,19 +33,6 @@ impl From<i64> for Value {
 impl From<f64> for Value {
     fn from(val: f64) -> Value {
         Value::Float(val)
-    }
-}
-impl From<String> for Value {
-    fn from(val: String) -> Value {
-        Value::Str {
-            multiline: false,
-            content: val
-        }
-    }
-}
-impl<'a> From<&'a str> for Value {
-    fn from(val: &'a str) -> Value {
-        Value::from(String::from(val))
     }
 }
 
@@ -167,8 +153,6 @@ pub enum ValueError {
     Float(#[cause] std::num::ParseFloatError),
     #[fail(display = "failed to parse int: {}", _0)]
     Integer(#[cause] std::num::ParseIntError),
-    #[fail(display = "failed to parse string")]
-    String,
     #[fail(display = "failed to parse store path")]
     StorePath,
     #[fail(display = "unknown value kind")]
@@ -206,29 +190,65 @@ impl Value {
             } else {
                 Ok(Value::Path(Anchor::Relative, String::from(s)))
             },
-            (TOKEN_STRING, s) => if s.starts_with('"') {
-                let len = s.len();
-                if len < 2 || !s.ends_with('"') {
-                    return Err(ValueError::String);
-                }
-                let content = unescape(&s[1..len-1], false);
-                Ok(Value::Str { multiline: false, content })
-            } else if s.starts_with("''") {
-                let len = s.len();
-                if len < 4 || !s.ends_with("''") {
-                    return Err(ValueError::String);
-                }
-                let content = unescape(&s[2..len-2], true);
-                let mut content = remove_common_indent(&content);
-                remove_trailing(&mut content);
-                Ok(Value::Str { multiline: true, content })
-            } else {
-                Err(ValueError::String)
-            },
             _ => Err(ValueError::Unknown)
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum StrPart<'a> {
+    Literal(String),
+    Ast(&'a SyntaxNode)
+}
+pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
+    let mut parts = Vec::new();
+    let mut literals = 0;
+    let mut common = std::usize::MAX;
+    let multiline = string.first_token().map(|t| t.text().as_str()) == Some("''");
+    let mut last_was_ast = false;
+
+    for child in string.node().children() {
+        let next_is_ast = child.next_sibling().map(|child| child.kind() == NODE_STRING_INTERPOL).unwrap_or(false);
+        if child.kind() == NODE_STRING_LITERAL {
+            let token = types::tokens(child).next().unwrap();
+            let text: &str = token.text();
+
+            let line_count = text.lines().count();
+            for (i, line) in text.lines().enumerate().skip(if last_was_ast { 1 } else { 0 }) {
+                let indent: usize = indention(line).count();
+                if (i != line_count-1 || !next_is_ast) && indent == line.chars().count() {
+                    // line is empty and not the start of an
+                    // interpolation, ignore indention
+                    continue;
+                }
+                common = common.min(indent);
+            }
+            parts.push(StrPart::Literal(text.to_string()));
+            literals += 1;
+        } else {
+            parts.push(StrPart::Ast(child));
+            last_was_ast = true;
+        }
+    }
+
+    let mut i = 0;
+    for part in parts.iter_mut() {
+        if let StrPart::Literal(ref mut text) = part {
+            if multiline {
+                *text = remove_indent(text, i == 0, common);
+                if i == literals-1 {
+                    // Last index
+                    remove_trailing(text);
+                }
+            }
+            *text = unescape(text, multiline);
+            i += 1;
+        }
+    }
+
+    parts
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -255,9 +275,25 @@ mod tests {
         );
     }
     #[test]
-    fn string_both() {
+    fn parts() {
+        use rowan::{GreenNodeBuilder, SmolStr, SyntaxNode, TreeArc};
+        use crate::types::Str;
+
+        fn string_node(content: &str) -> TreeArc<Str> {
+            let mut builder = GreenNodeBuilder::new();
+            builder.start_node(NODE_STRING);
+            builder.token(TOKEN_STRING_START, SmolStr::new("''"));
+            builder.start_node(NODE_STRING_LITERAL);
+            builder.token(TOKEN_STRING_CONTENT, SmolStr::new(content));
+            builder.finish_node();
+            builder.token(TOKEN_STRING_END, SmolStr::new("''"));
+            builder.finish_node();
+
+            TreeArc::cast(SyntaxNode::new(builder.finish(), None))
+        }
+
         assert_eq!(
-            unescape(&remove_common_indent(
+            string_parts(&string_node(
                 r#"
                         
                               
@@ -268,18 +304,17 @@ mod tests {
                     two single quotes: '''
                     three single quotes: ''''
                 "#
-            ), true),
-            // Get the below with nix repl
-            "    \n          \nThis is a multiline string :D\n  indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\ntwo single quotes: ''\nthree single quotes: '''\n"
+            )),
+            vec![
+                StrPart::Literal(String::from(
+                    // Get the below with nix repl
+                    "    \n          \nThis is a multiline string :D\n  indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\ntwo single quotes: ''\nthree single quotes: '''\n"
+                ))
+            ]
         );
     }
     #[test]
     fn values() {
-        assert_eq!(Value::from_token(TOKEN_STRING, r#""""#), Ok(Value::Str { multiline: false, content: "".into() }));
-        assert_eq!(Value::from_token(TOKEN_STRING, r#"''''"#), Ok(Value::Str { multiline: true, content: "".into() }));
-        assert_eq!(Value::from_token(TOKEN_STRING, r#""\"""#), Ok(Value::Str { multiline: false, content: "\"".into() }));
-        assert_eq!(Value::from_token(TOKEN_STRING, "'''''''"), Ok(Value::Str { multiline: true, content: "''".into() }));
-
         assert_eq!(Value::from_token(TOKEN_PATH, "<nixpkgs>"), Ok(Value::Path(Anchor::Store, "nixpkgs".into())));
         assert_eq!(Value::from_token(TOKEN_PATH, "~/path/to/thing"), Ok(Value::Path(Anchor::Home, "path/to/thing".into())));
         assert_eq!(Value::from_token(TOKEN_PATH, "/path/to/thing"), Ok(Value::Path(Anchor::Absolute, "/path/to/thing".into())));
