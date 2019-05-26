@@ -2,9 +2,10 @@
 
 use crate::types::{Root, TypedNode};
 
+use cbitset::BitSet256;
 use rowan::{GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TreeArc, Checkpoint};
 use failure::Fail;
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 
 const OR: &'static str = "or";
 
@@ -192,18 +193,16 @@ impl<I> Parser<I>
         self.peek_data().map(|&(t, _)| t)
     }
     fn expect_peek_any(&mut self, allowed_slice: &[SyntaxKind]) -> Option<SyntaxKind> {
-        // TODO: Use another set structure here, such as
-        // https://gitlab.redox-os.org/redox-os/cbitset
-        let allowed: HashSet<SyntaxKind> = allowed_slice.iter().map(|k| *k).collect(); // TODO .copied()
+        let allowed: BitSet256 = allowed_slice.iter().map(|k| k.0).collect();
 
         let next = match self.peek() {
             None => None,
-            Some(token) if allowed.contains(&token) => Some(token),
+            Some(kind) if allowed.contains(kind.0 as usize) => Some(kind),
             Some(_) => {
                 self.start_node(NODE_ERROR);
                 loop {
                     self.bump();
-                    if self.peek().map(|t| allowed.contains(&t)).unwrap_or(true) {
+                    if self.peek().map(|kind| allowed.contains(kind.0 as usize)).unwrap_or(true) {
                         break;
                     }
                 }

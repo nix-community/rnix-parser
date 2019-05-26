@@ -1,4 +1,4 @@
-use criterion::{Criterion, Benchmark, Throughput};
+use criterion::{Criterion, Benchmark, Throughput, criterion_group, criterion_main};
 use rnix::parse;
 
 fn all_packages(c: &mut Criterion) {
