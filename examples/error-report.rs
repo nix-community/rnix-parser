@@ -44,7 +44,7 @@ fn main() {
 
         let i = start_row.saturating_sub(1);
         for (i, line) in content.lines().enumerate().skip(i).take(end_row - i + 1) {
-            println!("{:line_len$} {}", i+1, line, line_len = line_len);
+            println!("{:line_len$} {}", i + 1, line, line_len = line_len);
             if i >= start_row && i <= end_row {
                 print!("{:line_len$} ", "", line_len = line_len);
                 let mut end_col = if i == end_row { end_col } else { line.chars().count() };

@@ -1,4 +1,4 @@
-use failure::{Error, format_err};
+use failure::{format_err, Error};
 use rnix::{parser::nodes::*, types::*};
 use rowan::{SyntaxElement, SyntaxNode};
 use std::{env, fs};
@@ -57,17 +57,15 @@ fn find_comment(node: &SyntaxNode) -> Option<String> {
 
         match node.kind() {
             TOKEN_COMMENT => match node {
-                SyntaxElement::Token(token) => doc.push(
-                    token.text().as_str().trim_start_matches('#').trim()
-                ),
-                SyntaxElement::Node(_) => unreachable!()
+                SyntaxElement::Token(token) => {
+                    doc.push(token.text().as_str().trim_start_matches('#').trim())
+                }
+                SyntaxElement::Node(_) => unreachable!(),
             },
             t if token_helpers::is_trivia(t) => (),
-            _ => break
+            _ => break,
         }
     }
     doc.reverse();
-    return Some(doc)
-        .filter(|lines| !lines.is_empty())
-        .map(|lines| lines.join("\n        "));
+    return Some(doc).filter(|lines| !lines.is_empty()).map(|lines| lines.join("\n        "));
 }

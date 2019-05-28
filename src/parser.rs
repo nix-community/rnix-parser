@@ -3,8 +3,8 @@
 use crate::types::{Root, TypedNode};
 
 use cbitset::BitSet256;
-use rowan::{GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TreeArc, Checkpoint};
 use failure::Fail;
+use rowan::{Checkpoint, GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TreeArc};
 use std::collections::VecDeque;
 
 const OR: &'static str = "or";
@@ -71,7 +71,7 @@ use self::nodes::*;
 #[derive(Clone)]
 pub struct AST {
     node: TreeArc<SyntaxNode>,
-    errors: Vec<ParseError>
+    errors: Vec<ParseError>,
 }
 impl AST {
     /// Return the root node
@@ -99,8 +99,7 @@ impl AST {
     pub fn errors(&self) -> Vec<ParseError> {
         let mut errors = self.errors.clone();
         errors.extend(
-            self.root().errors().into_iter()
-                .map(|node| ParseError::Unexpected(node.range()))
+            self.root().errors().into_iter().map(|node| ParseError::Unexpected(node.range())),
         );
 
         errors
@@ -118,17 +117,19 @@ impl AST {
 }
 
 struct Parser<I>
-    where I: Iterator<Item = (SyntaxKind, SmolStr)>
+where
+    I: Iterator<Item = (SyntaxKind, SmolStr)>,
 {
     builder: GreenNodeBuilder,
     errors: Vec<ParseError>,
 
     trivia_buffer: Vec<I::Item>,
     buffer: VecDeque<I::Item>,
-    iter: I
+    iter: I,
 }
 impl<I> Parser<I>
-    where I: Iterator<Item = (SyntaxKind, SmolStr)>
+where
+    I: Iterator<Item = (SyntaxKind, SmolStr)>,
 {
     fn new(iter: I) -> Self {
         Self {
@@ -151,11 +152,10 @@ impl<I> Parser<I>
     }
     fn eat_trivia(&mut self) {
         self.peek();
-        self.trivia_buffer.drain(..)
-            .for_each({
-                let builder = &mut self.builder;
-                move |(t, s)| builder.token(t, s)
-            });
+        self.trivia_buffer.drain(..).for_each({
+            let builder = &mut self.builder;
+            move |(t, s)| builder.token(t, s)
+        });
     }
     fn start_node(&mut self, kind: SyntaxKind) {
         self.eat_trivia();
@@ -172,15 +172,14 @@ impl<I> Parser<I>
                 if token_helpers::is_trivia(token) {
                     self.trivia_buffer.push((token, s))
                 } else {
-                    self.trivia_buffer.drain(..)
-                        .for_each({
-                            let builder = &mut self.builder;
-                            move |(t, s)| builder.token(t, s)
-                        });
+                    self.trivia_buffer.drain(..).for_each({
+                        let builder = &mut self.builder;
+                        move |(t, s)| builder.token(t, s)
+                    });
                     self.builder.token(token, s)
                 }
-            },
-            None => self.errors.push(ParseError::UnexpectedEOF)
+            }
+            None => self.errors.push(ParseError::UnexpectedEOF),
         }
     }
     fn peek_data(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
@@ -211,7 +210,8 @@ impl<I> Parser<I>
             }
         };
         if next.is_none() {
-            self.errors.push(ParseError::UnexpectedEOFWanted(allowed_slice.to_vec().into_boxed_slice()));
+            self.errors
+                .push(ParseError::UnexpectedEOFWanted(allowed_slice.to_vec().into_boxed_slice()));
         }
         next
     }
@@ -235,21 +235,25 @@ impl<I> Parser<I>
         self.expect(TOKEN_STRING_START);
 
         loop {
-            match self.expect_peek_any(&[TOKEN_STRING_END, TOKEN_STRING_CONTENT, TOKEN_INTERPOL_START]) {
+            match self.expect_peek_any(&[
+                TOKEN_STRING_END,
+                TOKEN_STRING_CONTENT,
+                TOKEN_INTERPOL_START,
+            ]) {
                 Some(TOKEN_STRING_CONTENT) => {
                     self.start_node(NODE_STRING_LITERAL);
                     self.bump();
                     self.builder.finish_node();
-                },
+                }
                 Some(TOKEN_INTERPOL_START) => {
                     self.start_node(NODE_STRING_INTERPOL);
                     self.bump();
                     self.parse_expr();
                     self.expect(TOKEN_INTERPOL_END);
                     self.builder.finish_node();
-                },
+                }
                 // handled by expect_peek_any
-                _ => break
+                _ => break,
             }
         }
         self.expect(TOKEN_STRING_END);
@@ -289,12 +293,12 @@ impl<I> Parser<I>
                     Some(TOKEN_CURLY_B_CLOSE) => {
                         self.bump();
                         break;
-                    },
+                    }
                     Some(TOKEN_ELLIPSIS) => {
                         self.bump();
                         self.expect(TOKEN_CURLY_B_CLOSE);
                         break;
-                    },
+                    }
                     Some(TOKEN_IDENT) => {
                         self.start_node(NODE_PAT_ENTRY);
 
@@ -313,11 +317,11 @@ impl<I> Parser<I>
                             _ => {
                                 self.expect(TOKEN_CURLY_B_CLOSE);
                                 break;
-                            },
+                            }
                         }
-                    },
+                    }
                     // handled by expect_peek_any
-                    _ => break
+                    _ => break,
                 }
             }
         }
@@ -357,7 +361,7 @@ impl<I> Parser<I>
 
                     self.expect(TOKEN_SEMICOLON);
                     self.builder.finish_node();
-                },
+                }
                 Some(_) => {
                     self.start_node(NODE_SET_ENTRY);
                     self.parse_attr();
@@ -379,14 +383,14 @@ impl<I> Parser<I>
                 self.parse_expr();
                 self.bump();
                 self.builder.finish_node();
-            },
+            }
             Some(TOKEN_REC) => {
                 self.start_node(NODE_SET);
                 self.bump();
                 self.expect(TOKEN_CURLY_B_OPEN);
                 self.parse_set(TOKEN_CURLY_B_CLOSE);
                 self.builder.finish_node();
-            },
+            }
             Some(TOKEN_CURLY_B_OPEN) => {
                 // Do a lookahead:
                 let mut peek = [None, None];
@@ -423,7 +427,7 @@ impl<I> Parser<I>
                         self.parse_expr();
 
                         self.builder.finish_node();
-                    },
+                    }
                     _ => {
                         // This looks like a set
                         self.start_node(NODE_SET);
@@ -432,7 +436,7 @@ impl<I> Parser<I>
                         self.builder.finish_node();
                     }
                 }
-            },
+            }
             Some(TOKEN_SQUARE_B_OPEN) => {
                 self.start_node(NODE_LIST);
                 self.bump();
@@ -441,14 +445,14 @@ impl<I> Parser<I>
                 }
                 self.bump();
                 self.builder.finish_node();
-            },
+            }
             Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
             Some(TOKEN_STRING_START) => self.parse_string(),
             Some(t) if token_helpers::is_value(t) => {
                 self.start_node(NODE_VALUE);
                 self.bump();
                 self.builder.finish_node();
-            },
+            }
             Some(TOKEN_IDENT) => {
                 let checkpoint = self.checkpoint();
                 self.start_node(NODE_IDENT);
@@ -461,7 +465,7 @@ impl<I> Parser<I>
                         self.bump();
                         self.parse_expr();
                         self.builder.finish_node();
-                    },
+                    }
                     Some(TOKEN_AT) => {
                         self.builder.start_node_at(checkpoint, NODE_LAMBDA);
                         self.builder.start_node_at(checkpoint, NODE_PATTERN);
@@ -476,10 +480,10 @@ impl<I> Parser<I>
                         self.expect(TOKEN_COLON);
                         self.parse_expr();
                         self.builder.finish_node(); // Lambda
-                    },
-                    _ => ()
+                    }
+                    _ => (),
                 }
-            },
+            }
             _ => {
                 self.start_node(NODE_ERROR);
                 self.bump();
@@ -559,7 +563,11 @@ impl<I> Parser<I>
         self.handle_operation(false, Self::parse_invert, &[TOKEN_MERGE])
     }
     fn parse_compare(&mut self) {
-        self.handle_operation(true, Self::parse_merge, &[TOKEN_LESS, TOKEN_LESS_OR_EQ, TOKEN_MORE, TOKEN_MORE_OR_EQ])
+        self.handle_operation(
+            true,
+            Self::parse_merge,
+            &[TOKEN_LESS, TOKEN_LESS_OR_EQ, TOKEN_MORE, TOKEN_MORE_OR_EQ],
+        )
     }
     fn parse_equal(&mut self) {
         self.handle_operation(true, Self::parse_compare, &[TOKEN_EQUAL, TOKEN_NOT_EQUAL])
@@ -596,7 +604,7 @@ impl<I> Parser<I>
                     self.parse_expr();
                     self.builder.finish_node();
                 }
-            },
+            }
             Some(TOKEN_WITH) => {
                 self.start_node(NODE_WITH);
                 self.bump();
@@ -604,7 +612,7 @@ impl<I> Parser<I>
                 self.expect(TOKEN_SEMICOLON);
                 self.parse_expr();
                 self.builder.finish_node();
-            },
+            }
             Some(TOKEN_IF) => {
                 self.start_node(NODE_IF_ELSE);
                 self.bump();
@@ -614,7 +622,7 @@ impl<I> Parser<I>
                 self.expect(TOKEN_ELSE);
                 self.parse_expr();
                 self.builder.finish_node();
-            },
+            }
             Some(TOKEN_ASSERT) => {
                 self.start_node(NODE_ASSERT);
                 self.bump();
@@ -622,15 +630,16 @@ impl<I> Parser<I>
                 self.expect(TOKEN_SEMICOLON);
                 self.parse_expr();
                 self.builder.finish_node();
-            },
-            _ => self.parse_math()
+            }
+            _ => self.parse_math(),
         }
     }
 }
 
 /// Parse tokens into an AST
 pub fn parse<I>(iter: I) -> AST
-    where I: IntoIterator<Item = (SyntaxKind, SmolStr)>
+where
+    I: IntoIterator<Item = (SyntaxKind, SmolStr)>,
 {
     let mut parser = Parser::new(iter.into_iter());
     parser.builder.start_node(NODE_ROOT);
@@ -644,22 +653,14 @@ pub fn parse<I>(iter: I) -> AST
     }
     parser.eat_trivia();
     parser.builder.finish_node();
-    AST {
-        node: SyntaxNode::new(parser.builder.finish(), None),
-        errors: parser.errors
-    }
+    AST { node: SyntaxNode::new(parser.builder.finish(), None), errors: parser.errors }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use std::{
-        ffi::OsStr,
-        fmt::Write,
-        fs,
-        path::PathBuf
-    };
+    use std::{ffi::OsStr, fmt::Write, fs, path::PathBuf};
 
     fn test_dir(name: &str) {
         let dir: PathBuf = ["test_data", "parser", name].iter().collect();
@@ -697,20 +698,68 @@ mod tests {
         }
     }
 
-    #[test] fn set() { test_dir("set"); }
-    #[test] fn math() { test_dir("math"); }
-    #[test] fn let_in() { test_dir("let_in"); }
-    #[test] fn let_legacy_syntax() { test_dir("let_legacy_syntax"); }
-    #[test] fn interpolation() { test_dir("interpolation"); }
-    #[test] fn index_set() { test_dir("index_set"); }
-    #[test] fn isset() { test_dir("isset"); }
-    #[test] fn merge() { test_dir("merge"); }
-    #[test] fn with() { test_dir("with"); }
-    #[test] fn assert() { test_dir("assert"); }
-    #[test] fn inherit() { test_dir("inherit"); }
-    #[test] fn ifs() { test_dir("ifs"); }
-    #[test] fn list() { test_dir("list"); }
-    #[test] fn lambda() { test_dir("lambda"); }
-    #[test] fn patterns() { test_dir("patterns"); }
-    #[test] fn dynamic() { test_dir("dynamic"); }
+    #[test]
+    fn set() {
+        test_dir("set");
+    }
+    #[test]
+    fn math() {
+        test_dir("math");
+    }
+    #[test]
+    fn let_in() {
+        test_dir("let_in");
+    }
+    #[test]
+    fn let_legacy_syntax() {
+        test_dir("let_legacy_syntax");
+    }
+    #[test]
+    fn interpolation() {
+        test_dir("interpolation");
+    }
+    #[test]
+    fn index_set() {
+        test_dir("index_set");
+    }
+    #[test]
+    fn isset() {
+        test_dir("isset");
+    }
+    #[test]
+    fn merge() {
+        test_dir("merge");
+    }
+    #[test]
+    fn with() {
+        test_dir("with");
+    }
+    #[test]
+    fn assert() {
+        test_dir("assert");
+    }
+    #[test]
+    fn inherit() {
+        test_dir("inherit");
+    }
+    #[test]
+    fn ifs() {
+        test_dir("ifs");
+    }
+    #[test]
+    fn list() {
+        test_dir("list");
+    }
+    #[test]
+    fn lambda() {
+        test_dir("lambda");
+    }
+    #[test]
+    fn patterns() {
+        test_dir("patterns");
+    }
+    #[test]
+    fn dynamic() {
+        test_dir("dynamic");
+    }
 }

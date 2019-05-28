@@ -23,14 +23,13 @@ pub mod types;
 pub mod value;
 
 pub use self::{
-    parser::{AST, nodes},
-    value::{StrPart, Value as NixValue}
+    parser::{nodes, AST},
+    value::{StrPart, Value as NixValue},
 };
 
 pub use rowan::{
-    TextUnit, TextRange, SmolStr,
-    SyntaxElement, SyntaxNode, SyntaxToken, SyntaxKind, TreeArc,
-    TokenAtOffset, WalkEvent, SyntaxNodeChildren, SyntaxElementChildren,
+    SmolStr, SyntaxElement, SyntaxElementChildren, SyntaxKind, SyntaxNode, SyntaxNodeChildren,
+    SyntaxToken, TextRange, TextUnit, TokenAtOffset, TreeArc, WalkEvent,
 };
 
 use self::tokenizer::Tokenizer;
@@ -42,7 +41,7 @@ pub fn parse(input: &str) -> AST {
 
 #[cfg(test)]
 mod tests {
-    use super::{NixValue, parse, types::*, value::StrPart};
+    use super::{parse, types::*, value::StrPart, NixValue};
 
     fn test(code: &str) {
         parse(code).as_result().expect("parsing error");

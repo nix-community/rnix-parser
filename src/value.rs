@@ -2,10 +2,10 @@
 
 use crate::{
     parser::nodes::*,
-    types::{self, TypedNode}
+    types::{self, TypedNode},
 };
-use rowan::{SyntaxNode, SyntaxKind};
 use failure::Fail;
+use rowan::{SyntaxKind, SyntaxNode};
 
 /// An anchor point for a path, such as if it's relative or absolute
 #[derive(Clone, Debug, PartialEq)]
@@ -14,7 +14,7 @@ pub enum Anchor {
     Relative,
     Home,
     Store,
-    Uri
+    Uri,
 }
 
 /// A value, such as a string or integer
@@ -22,7 +22,7 @@ pub enum Anchor {
 pub enum Value {
     Float(f64),
     Integer(i64),
-    Path(Anchor, String)
+    Path(Anchor, String),
 }
 
 impl From<i64> for Value {
@@ -49,7 +49,7 @@ pub fn unescape(input: &str, multiline: bool) -> String {
                 Some('n') => output.push('\n'),
                 Some('r') => output.push('\r'),
                 Some('t') => output.push('\t'),
-                Some(c) => output.push(c)
+                Some(c) => output.push(c),
             },
             Some('\'') if multiline => match input.next() {
                 None => break,
@@ -57,11 +57,11 @@ pub fn unescape(input: &str, multiline: bool) -> String {
                     Some('\'') => {
                         input.next().unwrap();
                         output.push_str("''");
-                    },
+                    }
                     Some('$') => {
                         input.next().unwrap();
                         output.push('$');
-                    },
+                    }
                     Some('\\') => {
                         input.next().unwrap();
                         match input.next() {
@@ -69,17 +69,17 @@ pub fn unescape(input: &str, multiline: bool) -> String {
                             Some('n') => output.push('\n'),
                             Some('r') => output.push('\r'),
                             Some('t') => output.push('\t'),
-                            Some(c) => output.push(c)
+                            Some(c) => output.push(c),
                         }
-                    },
-                    _ => break
+                    }
+                    _ => break,
                 },
                 Some(c) => {
                     output.push('\'');
                     output.push(c);
                 }
-            }
-            Some(c) => output.push(c)
+            },
+            Some(c) => output.push(c),
         }
     }
     output
@@ -131,19 +131,21 @@ pub fn remove_indent(input: &str, initial: bool, indent: usize) -> String {
         }
         start = match end {
             Some(end) => end,
-            None => break
+            None => break,
         };
     }
     output
 }
 /// Remove any trailing whitespace from a string
 pub fn remove_trailing(string: &mut String) {
-    let trailing: usize = string.chars().rev()
+    let trailing: usize = string
+        .chars()
+        .rev()
         .take_while(|&c| c != '\n' && c.is_whitespace())
         .map(char::len_utf8)
         .sum();
     let len = string.len();
-    string.drain(len-trailing..);
+    string.drain(len - trailing..);
 }
 
 /// An error that occured when parsing a value from a string
@@ -156,7 +158,7 @@ pub enum ValueError {
     #[fail(display = "failed to parse store path")]
     StorePath,
     #[fail(display = "unknown value kind")]
-    Unknown
+    Unknown,
 }
 impl From<std::num::ParseFloatError> for ValueError {
     fn from(err: std::num::ParseFloatError) -> Self {
@@ -175,22 +177,24 @@ impl Value {
         match (token, s) {
             (TOKEN_FLOAT, s) => Ok(Value::Float(s.parse()?)),
             (TOKEN_INTEGER, s) => Ok(Value::Integer(s.parse()?)),
-            (TOKEN_PATH, s) => if s.starts_with('<') {
-                let len = s.len();
-                if len < 2 || !s.ends_with('>') {
-                    return Err(ValueError::StorePath);
+            (TOKEN_PATH, s) => {
+                if s.starts_with('<') {
+                    let len = s.len();
+                    if len < 2 || !s.ends_with('>') {
+                        return Err(ValueError::StorePath);
+                    }
+                    Ok(Value::Path(Anchor::Store, String::from(&s[1..len - 1])))
+                } else if s.starts_with("~/") {
+                    Ok(Value::Path(Anchor::Home, String::from(&s[2..])))
+                } else if s.starts_with('/') {
+                    Ok(Value::Path(Anchor::Absolute, String::from(s)))
+                } else if s.contains(':') {
+                    Ok(Value::Path(Anchor::Uri, String::from(s)))
+                } else {
+                    Ok(Value::Path(Anchor::Relative, String::from(s)))
                 }
-                Ok(Value::Path(Anchor::Store, String::from(&s[1..len-1])))
-            } else if s.starts_with("~/") {
-                Ok(Value::Path(Anchor::Home, String::from(&s[2..])))
-            } else if s.starts_with('/') {
-                Ok(Value::Path(Anchor::Absolute, String::from(s)))
-            } else if s.contains(':') {
-                Ok(Value::Path(Anchor::Uri, String::from(s)))
-            } else {
-                Ok(Value::Path(Anchor::Relative, String::from(s)))
-            },
-            _ => Err(ValueError::Unknown)
+            }
+            _ => Err(ValueError::Unknown),
         }
     }
 }
@@ -198,7 +202,7 @@ impl Value {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StrPart<'a> {
     Literal(String),
-    Ast(&'a SyntaxNode)
+    Ast(&'a SyntaxNode),
 }
 pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
     let mut parts = Vec::new();
@@ -208,7 +212,8 @@ pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
     let mut last_was_ast = false;
 
     for child in string.node().children() {
-        let next_is_ast = child.next_sibling().map(|child| child.kind() == NODE_STRING_INTERPOL).unwrap_or(false);
+        let next_is_ast =
+            child.next_sibling().map(|child| child.kind() == NODE_STRING_INTERPOL).unwrap_or(false);
         if child.kind() == NODE_STRING_LITERAL {
             let token = types::tokens(child).next().unwrap();
             let text: &str = token.text();
@@ -216,7 +221,7 @@ pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
             let line_count = text.lines().count();
             for (i, line) in text.lines().enumerate().skip(if last_was_ast { 1 } else { 0 }) {
                 let indent: usize = indention(line).count();
-                if (i != line_count-1 || !next_is_ast) && indent == line.chars().count() {
+                if (i != line_count - 1 || !next_is_ast) && indent == line.chars().count() {
                     // line is empty and not the start of an
                     // interpolation, ignore indention
                     continue;
@@ -236,7 +241,7 @@ pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
         if let StrPart::Literal(ref mut text) = part {
             if multiline {
                 *text = remove_indent(text, i == 0, common);
-                if i == literals-1 {
+                if i == literals - 1 {
                     // Last index
                     remove_trailing(text);
                 }
@@ -249,7 +254,6 @@ pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
     parts
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261,23 +265,14 @@ mod tests {
     }
     #[test]
     fn string_remove_common_indent() {
-        assert_eq!(
-            remove_common_indent("\n  \n    \n \n "),
-            "\n\n\n"
-        );
-        assert_eq!(
-            remove_common_indent("\n  \n    \n a\n"),
-            " \n   \na\n"
-        );
-        assert_eq!(
-            remove_common_indent("  \n    \n a\n"),
-            "   \na\n"
-        );
+        assert_eq!(remove_common_indent("\n  \n    \n \n "), "\n\n\n");
+        assert_eq!(remove_common_indent("\n  \n    \n a\n"), " \n   \na\n");
+        assert_eq!(remove_common_indent("  \n    \n a\n"), "   \na\n");
     }
     #[test]
     fn parts() {
-        use rowan::{GreenNodeBuilder, SmolStr, SyntaxNode, TreeArc};
         use crate::types::Str;
+        use rowan::{GreenNodeBuilder, SmolStr, SyntaxNode, TreeArc};
 
         fn string_node(content: &str) -> TreeArc<Str> {
             let mut builder = GreenNodeBuilder::new();
@@ -315,11 +310,26 @@ mod tests {
     }
     #[test]
     fn values() {
-        assert_eq!(Value::from_token(TOKEN_PATH, "<nixpkgs>"), Ok(Value::Path(Anchor::Store, "nixpkgs".into())));
-        assert_eq!(Value::from_token(TOKEN_PATH, "~/path/to/thing"), Ok(Value::Path(Anchor::Home, "path/to/thing".into())));
-        assert_eq!(Value::from_token(TOKEN_PATH, "/path/to/thing"), Ok(Value::Path(Anchor::Absolute, "/path/to/thing".into())));
-        assert_eq!(Value::from_token(TOKEN_PATH, "path/to/thing"), Ok(Value::Path(Anchor::Relative, "path/to/thing".into())));
-        assert_eq!(Value::from_token(TOKEN_PATH, "https:path"), Ok(Value::Path(Anchor::Uri, "https:path".into())));
+        assert_eq!(
+            Value::from_token(TOKEN_PATH, "<nixpkgs>"),
+            Ok(Value::Path(Anchor::Store, "nixpkgs".into()))
+        );
+        assert_eq!(
+            Value::from_token(TOKEN_PATH, "~/path/to/thing"),
+            Ok(Value::Path(Anchor::Home, "path/to/thing".into()))
+        );
+        assert_eq!(
+            Value::from_token(TOKEN_PATH, "/path/to/thing"),
+            Ok(Value::Path(Anchor::Absolute, "/path/to/thing".into()))
+        );
+        assert_eq!(
+            Value::from_token(TOKEN_PATH, "path/to/thing"),
+            Ok(Value::Path(Anchor::Relative, "path/to/thing".into()))
+        );
+        assert_eq!(
+            Value::from_token(TOKEN_PATH, "https:path"),
+            Ok(Value::Path(Anchor::Uri, "https:path".into()))
+        );
 
         assert_eq!(Value::from_token(TOKEN_INTEGER, "123"), Ok(Value::Integer(123)));
         assert_eq!(Value::from_token(TOKEN_FLOAT, "1.234"), Ok(Value::Float(1.234)));

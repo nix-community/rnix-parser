@@ -1,9 +1,10 @@
-use failure::{Error, bail, format_err};
+use failure::{bail, format_err, Error};
 use std::{env, fs, path::Path};
 
 fn main() -> Result<(), Error> {
     let path = env::var("NIX_PATH")?;
-    let nixpkgs = path.split(':')
+    let nixpkgs = path
+        .split(':')
         .find(|s| s.starts_with("nixpkgs="))
         .ok_or_else(|| format_err!("no store path found"))?;
 

@@ -2,10 +2,12 @@
 
 use crate::{
     parser::nodes::*,
-    value::{self, StrPart, Value as ParsedValue, ValueError}
+    value::{self, StrPart, Value as ParsedValue, ValueError},
 };
 
-use rowan::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken, TransparentNewType, TreeArc, WalkEvent};
+use rowan::{
+    SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken, TransparentNewType, TreeArc, WalkEvent,
+};
 use std::fmt;
 
 macro_rules! typed {
@@ -70,7 +72,7 @@ pub enum OpKind {
     More,
     MoreOrEq,
     NotEqual,
-    Or
+    Or,
 }
 impl OpKind {
     /// Get the operation kind from a token in the AST
@@ -95,7 +97,7 @@ impl OpKind {
             TOKEN_NOT_EQUAL => Some(OpKind::NotEqual),
             TOKEN_OR => Some(OpKind::Or),
 
-            _ => None
+            _ => None,
         }
     }
 }
@@ -103,7 +105,7 @@ impl OpKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum UnaryOpKind {
     Invert,
-    Negate
+    Negate,
 }
 impl UnaryOpKind {
     /// Get the operation kind from a token in the AST
@@ -111,7 +113,7 @@ impl UnaryOpKind {
         match token {
             TOKEN_INVERT => Some(UnaryOpKind::Invert),
             TOKEN_SUB => Some(UnaryOpKind::Negate),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -132,7 +134,13 @@ impl fmt::Display for TextDump<'_> {
             }
             match event {
                 WalkEvent::Enter(enter) => {
-                    write!(f, "{:i$}{}", "", syntax_name(enter.kind()).expect("invalid ast"), i=indent)?;
+                    write!(
+                        f,
+                        "{:i$}{}",
+                        "",
+                        syntax_name(enter.kind()).expect("invalid ast"),
+                        i = indent
+                    )?;
                     if let SyntaxElement::Token(token) = enter {
                         write!(f, "(\"{}\")", token.text().escape_default())?
                     }
@@ -141,11 +149,11 @@ impl fmt::Display for TextDump<'_> {
                         write!(f, " {{")?;
                     }
                     indent += 2;
-                },
+                }
                 WalkEvent::Leave(leave) => {
                     indent -= 2;
                     if let SyntaxElement::Node(_) = leave {
-                        write!(f, "{:i$}}}", "", i=indent)?;
+                        write!(f, "{:i$}}}", "", i = indent)?;
                     } else {
                         skip_newline = true;
                     }
@@ -183,7 +191,9 @@ pub trait TypedNode: TransparentNewType<Repr = SyntaxNode> + ToOwned + Sized {
             if let WalkEvent::Enter(node) = event {
                 // Empty errors can happen if it encounteres EOF while
                 // creating them, which in case a root error is added.
-                if !node.range().is_empty() && (node.kind() == NODE_ERROR || node.kind() == TOKEN_ERROR) {
+                if !node.range().is_empty()
+                    && (node.kind() == NODE_ERROR || node.kind() == TOKEN_ERROR)
+                {
                     bucket.push(node);
                 }
             }
