@@ -7,7 +7,7 @@ enum IdentType {
     Ident,
     Path,
     Store,
-    Uri
+    Uri,
 }
 
 pub mod tokens {
@@ -91,7 +91,7 @@ pub mod tokens {
         pub fn is_value(token: SyntaxKind) -> bool {
             match token {
                 TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH => true,
-                _ => false
+                _ => false,
             }
         }
         /// Returns true if this token should be used as a function argument.
@@ -107,8 +107,8 @@ pub mod tokens {
         pub fn is_fn_arg(token: SyntaxKind) -> bool {
             match token {
                 TOKEN_REC | TOKEN_CURLY_B_OPEN | TOKEN_SQUARE_B_OPEN | TOKEN_PAREN_OPEN
-                    | TOKEN_STRING_START | TOKEN_IDENT => true,
-                _ => token_helpers::is_value(token)
+                | TOKEN_STRING_START | TOKEN_IDENT => true,
+                _ => token_helpers::is_value(token),
             }
         }
         /// Returns true if this token is a comment, whitespace, or similar, and
@@ -116,7 +116,7 @@ pub mod tokens {
         pub fn is_trivia(token: SyntaxKind) -> bool {
             match token {
                 TOKEN_COMMENT | TOKEN_ERROR | TOKEN_WHITESPACE => true,
-                _ => false
+                _ => false,
             }
         }
     }
@@ -126,7 +126,7 @@ use self::tokens::*;
 fn is_valid_path_char(c: char) -> bool {
     match c {
         'a'..='z' | 'A'..='Z' | '0'..='9' | '/' | '_' | '.' | '+' | '-' => true,
-        _ => false
+        _ => false,
     }
 }
 
@@ -134,20 +134,18 @@ fn is_valid_path_char(c: char) -> bool {
 struct Interpol {
     brackets: u32,
     string: bool,
-    multiline: bool
+    multiline: bool,
 }
 #[derive(Clone, Copy)]
 enum Todo {
-    StringBody {
-        multiline: bool
-    },
+    StringBody { multiline: bool },
     StringEnd,
-    InterpolStart
+    InterpolStart,
 }
 #[derive(Clone, Copy, Default)]
 struct Context {
     interpol: Option<Interpol>,
-    todo: Option<Todo>
+    todo: Option<Todo>,
 }
 
 #[derive(Clone, Copy)]
@@ -165,18 +163,12 @@ impl Eq for State<'_> {}
 /// The tokenizer. You may want to use the `tokenize` convenience function from this module instead.
 pub struct Tokenizer<'a> {
     ctx: Vec<Context>,
-    state: State<'a>
+    state: State<'a>,
 }
 impl<'a> Tokenizer<'a> {
     /// Create a new instance
     pub fn new(input: &'a str) -> Self {
-        Self {
-            ctx: vec![Context::default()],
-            state: State {
-                input,
-                offset: 0,
-            },
-        }
+        Self { ctx: vec![Context::default()], state: State { input, offset: 0 } }
     }
 
     fn remaining(&self) -> &str {
@@ -204,7 +196,8 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn consume<F>(&mut self, mut f: F) -> usize
-        where F: FnMut(char) -> bool
+    where
+        F: FnMut(char) -> bool,
     {
         let mut len = 0;
         while self.peek().map(|c| f(c)).unwrap_or(false) {
@@ -218,39 +211,45 @@ impl<'a> Tokenizer<'a> {
             let start = self.state;
             match self.next() {
                 None => return TOKEN_ERROR,
-                Some('"') if !multiline => { self.state = start; return TOKEN_STRING_CONTENT; },
+                Some('"') if !multiline => {
+                    self.state = start;
+                    return TOKEN_STRING_CONTENT;
+                }
                 Some('\\') if !multiline => match self.next() {
                     None => return TOKEN_ERROR,
-                    Some(_) => ()
+                    Some(_) => (),
                 },
 
                 Some('\'') if multiline => match self.next() {
                     None => return TOKEN_ERROR,
                     Some('\'') => match self.peek() {
-                        Some('\'') | Some('\\') | Some('$') => { self.next().unwrap(); },
-                        _ => { self.state = start; return TOKEN_STRING_CONTENT; }
+                        Some('\'') | Some('\\') | Some('$') => {
+                            self.next().unwrap();
+                        }
+                        _ => {
+                            self.state = start;
+                            return TOKEN_STRING_CONTENT;
+                        }
                     },
-                    Some(_) => ()
+                    Some(_) => (),
                 },
 
                 Some('$') => match self.peek() {
-                    Some('$') => { self.next().unwrap(); },
+                    Some('$') => {
+                        self.next().unwrap();
+                    }
                     Some('{') => {
                         self.state = start;
                         self.ctx.push(Context {
-                            interpol: Some(Interpol {
-                                brackets: 0,
-                                string: true,
-                                multiline
-                            }),
+                            interpol: Some(Interpol { brackets: 0, string: true, multiline }),
                             todo: Some(Todo::InterpolStart),
                             ..Default::default()
                         });
                         return TOKEN_STRING_CONTENT;
-                    },
-                    _ => ()
-                }
-                Some(_) => ()
+                    }
+                    _ => (),
+                },
+                Some(_) => (),
             }
         }
     }
@@ -269,7 +268,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     if self.starts_with_bump("${") {
                         return Some((TOKEN_INTERPOL_START, self.string_since(start)));
                     }
-                },
+                }
                 Some(Todo::StringBody { multiline }) => {
                     *todo = Some(Todo::StringEnd);
                     let token = self.next_string(multiline);
@@ -277,23 +276,32 @@ impl<'a> Iterator for Tokenizer<'a> {
                         continue;
                     }
                     return Some((token, self.string_since(start)));
-                },
+                }
                 Some(Todo::StringEnd) => {
                     let status = match self.peek() {
-                        Some('"') => { self.next().unwrap(); true },
-                        Some('\'') => match { self.next().unwrap(); self.peek() } {
-                            Some('\'') => { self.next().unwrap(); true },
-                            _ => false
+                        Some('"') => {
+                            self.next().unwrap();
+                            true
+                        }
+                        Some('\'') => match {
+                            self.next().unwrap();
+                            self.peek()
+                        } {
+                            Some('\'') => {
+                                self.next().unwrap();
+                                true
+                            }
+                            _ => false,
                         },
-                        _ => false
+                        _ => false,
                     };
                     if !status {
                         return Some((TOKEN_ERROR, self.string_since(start)));
                     }
 
                     return Some((TOKEN_STRING_END, self.string_since(start)));
-                },
-                _ => ()
+                }
+                _ => (),
             }
             break;
         }
@@ -315,8 +323,8 @@ impl<'a> Iterator for Tokenizer<'a> {
                     Some('/') => {
                         self.next().unwrap();
                         return Some((TOKEN_COMMENT, self.string_since(start)));
-                    },
-                    _ => ()
+                    }
+                    _ => (),
                 }
             }
         }
@@ -331,7 +339,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             let mut lookahead = self.remaining().chars().skip_while(|c| match c {
                 'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' | '+' | '-' => true,
                 '<' | '/' => store_path,
-                _ => false
+                _ => false,
             });
             match (lookahead.next(), lookahead.next()) {
                 // a//b parses as Merge(a, b)
@@ -340,7 +348,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
                 (Some('>'), _) => Some(IdentType::Store),
                 (Some(':'), Some(c)) if !c.is_whitespace() => Some(IdentType::Uri),
-                _ => None
+                _ => None,
             }
         };
 
@@ -359,33 +367,44 @@ impl<'a> Iterator for Tokenizer<'a> {
         }
 
         match c {
-            '=' if self.peek() == Some('=') => { self.next().unwrap(); Some((TOKEN_EQUAL, self.string_since(start))) },
-            '!' if self.peek() == Some('=') => { self.next().unwrap(); Some((TOKEN_NOT_EQUAL, self.string_since(start))) },
+            '=' if self.peek() == Some('=') => {
+                self.next().unwrap();
+                Some((TOKEN_EQUAL, self.string_since(start)))
+            }
+            '!' if self.peek() == Some('=') => {
+                self.next().unwrap();
+                Some((TOKEN_NOT_EQUAL, self.string_since(start)))
+            }
             '!' => Some((TOKEN_INVERT, self.string_since(start))),
             '{' => {
-                if let Some(Interpol { ref mut brackets, .. }) = self.ctx.last_mut().unwrap().interpol {
+                if let Some(Interpol { ref mut brackets, .. }) =
+                    self.ctx.last_mut().unwrap().interpol
+                {
                     *brackets += 1;
                 }
                 Some((TOKEN_CURLY_B_OPEN, self.string_since(start)))
-            },
+            }
             '}' => {
-                if let Some(Interpol { ref mut brackets, string, multiline }) = self.ctx.last_mut().unwrap().interpol {
+                if let Some(Interpol { ref mut brackets, string, multiline }) =
+                    self.ctx.last_mut().unwrap().interpol
+                {
                     match brackets.checked_sub(1) {
                         Some(new) => *brackets = new,
                         None => {
                             self.ctx.pop().unwrap();
 
                             if string {
-                                self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline });
+                                self.ctx.last_mut().unwrap().todo =
+                                    Some(Todo::StringBody { multiline });
                                 return Some((TOKEN_INTERPOL_END, self.string_since(start)));
                             } else {
-                                return Some((TOKEN_DYNAMIC_END, self.string_since(start)))
+                                return Some((TOKEN_DYNAMIC_END, self.string_since(start)));
                             }
                         }
                     }
                 }
                 Some((TOKEN_CURLY_B_CLOSE, self.string_since(start)))
-            },
+            }
             '[' => Some((TOKEN_SQUARE_B_OPEN, self.string_since(start))),
             ']' => Some((TOKEN_SQUARE_B_CLOSE, self.string_since(start))),
             '@' => Some((TOKEN_AT, self.string_since(start))),
@@ -397,9 +416,18 @@ impl<'a> Iterator for Tokenizer<'a> {
             ';' => Some((TOKEN_SEMICOLON, self.string_since(start))),
             '(' => Some((TOKEN_PAREN_OPEN, self.string_since(start))),
             ')' => Some((TOKEN_PAREN_CLOSE, self.string_since(start))),
-            '+' if self.peek() == Some('+') => { self.next().unwrap(); Some((TOKEN_CONCAT, self.string_since(start))) },
-            '-' if self.peek() == Some('>') => { self.next().unwrap(); Some((TOKEN_IMPLICATION, self.string_since(start))) },
-            '/' if self.peek() == Some('/') => { self.next().unwrap(); Some((TOKEN_MERGE, self.string_since(start))) },
+            '+' if self.peek() == Some('+') => {
+                self.next().unwrap();
+                Some((TOKEN_CONCAT, self.string_since(start)))
+            }
+            '-' if self.peek() == Some('>') => {
+                self.next().unwrap();
+                Some((TOKEN_IMPLICATION, self.string_since(start)))
+            }
+            '/' if self.peek() == Some('/') => {
+                self.next().unwrap();
+                Some((TOKEN_MERGE, self.string_since(start)))
+            }
             '+' => Some((TOKEN_ADD, self.string_since(start))),
             '-' => Some((TOKEN_SUB, self.string_since(start))),
             '*' => Some((TOKEN_MUL, self.string_since(start))),
@@ -410,25 +438,33 @@ impl<'a> Iterator for Tokenizer<'a> {
                     return Some((TOKEN_ERROR, self.string_since(start)));
                 }
                 Some((TOKEN_PATH, self.string_since(start)))
-            },
-            '&' if self.peek() == Some('&') => { self.next().unwrap(); Some((TOKEN_AND, self.string_since(start))) },
-            '|' if self.peek() == Some('|') => { self.next().unwrap(); Some((TOKEN_OR, self.string_since(start))) },
-            '<' if self.peek() == Some('=') => { self.next().unwrap(); Some((TOKEN_LESS_OR_EQ, self.string_since(start))) },
+            }
+            '&' if self.peek() == Some('&') => {
+                self.next().unwrap();
+                Some((TOKEN_AND, self.string_since(start)))
+            }
+            '|' if self.peek() == Some('|') => {
+                self.next().unwrap();
+                Some((TOKEN_OR, self.string_since(start)))
+            }
+            '<' if self.peek() == Some('=') => {
+                self.next().unwrap();
+                Some((TOKEN_LESS_OR_EQ, self.string_since(start)))
+            }
             '<' => Some((TOKEN_LESS, self.string_since(start))),
-            '>' if self.peek() == Some('=') => { self.next().unwrap(); Some((TOKEN_MORE_OR_EQ, self.string_since(start))) },
+            '>' if self.peek() == Some('=') => {
+                self.next().unwrap();
+                Some((TOKEN_MORE_OR_EQ, self.string_since(start)))
+            }
             '>' => Some((TOKEN_MORE, self.string_since(start))),
             '$' if self.peek() == Some('{') => {
                 self.next().unwrap();
                 self.ctx.push(Context {
-                    interpol: Some(Interpol {
-                        brackets: 0,
-                        string: false,
-                        multiline: false
-                    }),
+                    interpol: Some(Interpol { brackets: 0, string: false, multiline: false }),
                     ..Default::default()
                 });
                 Some((TOKEN_DYNAMIC_START, self.string_since(start)))
-            },
+            }
             'a'..='z' | 'A'..='Z' | '_' => {
                 let kind = match kind {
                     // It's detected as store if it ends with >, but if it
@@ -439,37 +475,41 @@ impl<'a> Iterator for Tokenizer<'a> {
                 assert_ne!(kind, IdentType::Path, "paths are checked earlier");
                 self.consume(|c| match c {
                     'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '\'' => true,
-                    ':' | '?' | '@' | '&' | '=' | '$' | ',' | '!'
-                        | '~' | '*' | '%' => kind == IdentType::Uri,
+                    ':' | '?' | '@' | '&' | '=' | '$' | ',' | '!' | '~' | '*' | '%' => {
+                        kind == IdentType::Uri
+                    }
                     c => kind == IdentType::Uri && is_valid_path_char(c),
                 });
                 let ident = self.string_since(start);
                 if kind == IdentType::Ident {
-                    Some((match &*ident {
-                        "assert" => TOKEN_ASSERT,
-                        "else" => TOKEN_ELSE,
-                        "if" => TOKEN_IF,
-                        "in" => TOKEN_IN,
-                        "inherit" => TOKEN_INHERIT,
-                        "let" => TOKEN_LET,
-                        "rec" => TOKEN_REC,
-                        "then" => TOKEN_THEN,
-                        "with" => TOKEN_WITH,
-                        _ => TOKEN_IDENT,
-                    }, ident))
+                    Some((
+                        match &*ident {
+                            "assert" => TOKEN_ASSERT,
+                            "else" => TOKEN_ELSE,
+                            "if" => TOKEN_IF,
+                            "in" => TOKEN_IN,
+                            "inherit" => TOKEN_INHERIT,
+                            "let" => TOKEN_LET,
+                            "rec" => TOKEN_REC,
+                            "then" => TOKEN_THEN,
+                            "with" => TOKEN_WITH,
+                            _ => TOKEN_IDENT,
+                        },
+                        ident,
+                    ))
                 } else {
                     Some((TOKEN_PATH, ident))
                 }
-            },
+            }
             '"' => {
                 self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: false });
                 Some((TOKEN_STRING_START, self.string_since(start)))
-            },
+            }
             '\'' if self.peek() == Some('\'') => {
                 self.next().unwrap();
                 self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: true });
                 Some((TOKEN_STRING_START, self.string_since(start)))
-            },
+            }
             '0'..='9' => {
                 self.consume(|c| c >= '0' && c <= '9');
                 if self.peek() == Some('.') {
@@ -481,15 +521,15 @@ impl<'a> Iterator for Tokenizer<'a> {
                 } else {
                     Some((TOKEN_INTEGER, self.string_since(start)))
                 }
-            },
-            _ => Some((TOKEN_ERROR, self.string_since(start)))
+            }
+            _ => Some((TOKEN_ERROR, self.string_since(start))),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{SyntaxKind, Tokenizer, tokens::*};
+    use super::{tokens::*, SyntaxKind, Tokenizer};
     use rowan::SmolStr;
 
     fn tokenize(input: &str) -> Vec<(SyntaxKind, SmolStr)> {
@@ -561,7 +601,8 @@ mod tests {
     #[test]
     fn multiline() {
         assert_eq!(
-            tokenize(r#"{
+            tokenize(
+                r#"{
     multiline = ''
             
                   
@@ -572,7 +613,8 @@ mod tests {
         two single quotes: '''
         three single quotes: ''''
     '';
-}"#),
+}"#
+            ),
             tokens![
                 (TOKEN_CURLY_B_OPEN, "{"),
                 (TOKEN_WHITESPACE, "\n    "),
@@ -581,7 +623,9 @@ mod tests {
                 (TOKEN_ASSIGN, "="),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "''"),
-                (TOKEN_STRING_CONTENT, r#"
+                (
+                    TOKEN_STRING_CONTENT,
+                    r#"
             
                   
         This is a multiline string :D
@@ -590,7 +634,8 @@ mod tests {
         ''${ interpolation was escaped }
         two single quotes: '''
         three single quotes: ''''
-    "#),
+    "#
+                ),
                 (TOKEN_STRING_END, "''"),
                 (TOKEN_SEMICOLON, ";"),
                 (TOKEN_WHITESPACE, "\n"),
@@ -630,22 +675,22 @@ mod tests {
                 (TOKEN_STRING_START, "\""),
                 (TOKEN_STRING_CONTENT, "Hello, "),
                 (TOKEN_INTERPOL_START, "${"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_CURLY_B_OPEN, "{"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_IDENT, "world"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_ASSIGN, "="),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_STRING_START, "\""),
-                    (TOKEN_STRING_CONTENT, r#"World"#),
-                    (TOKEN_STRING_END, "\""),
-                    (TOKEN_SEMICOLON, ";"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_CURLY_B_CLOSE, "}"),
-                    (TOKEN_DOT, "."),
-                    (TOKEN_IDENT, "world"),
-                    (TOKEN_WHITESPACE, " "),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "world"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_STRING_START, "\""),
+                (TOKEN_STRING_CONTENT, r#"World"#),
+                (TOKEN_STRING_END, "\""),
+                (TOKEN_SEMICOLON, ";"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_CURLY_B_CLOSE, "}"),
+                (TOKEN_DOT, "."),
+                (TOKEN_IDENT, "world"),
+                (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_CONTENT, "!"),
                 (TOKEN_STRING_END, "\""),
@@ -659,7 +704,7 @@ mod tests {
                 (TOKEN_STRING_START, "\""),
                 (TOKEN_STRING_CONTENT, "\\$"),
                 (TOKEN_INTERPOL_START, "${"),
-                    (TOKEN_IDENT, "test"),
+                (TOKEN_IDENT, "test"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "\""),
                 (TOKEN_WHITESPACE, " ")
@@ -672,7 +717,7 @@ mod tests {
                 (TOKEN_STRING_START, "''"),
                 (TOKEN_STRING_CONTENT, "''$"),
                 (TOKEN_INTERPOL_START, "${"),
-                    (TOKEN_IDENT, "test"),
+                (TOKEN_IDENT, "test"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "''"),
                 (TOKEN_WHITESPACE, " ")
@@ -684,7 +729,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "\""),
                 (TOKEN_INTERPOL_START, "${"),
-                    (TOKEN_IDENT, "test"),
+                (TOKEN_IDENT, "test"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_CONTENT, "#123"),
                 (TOKEN_STRING_END, "\""),
@@ -698,7 +743,7 @@ mod tests {
                 (TOKEN_STRING_START, "''"),
                 (TOKEN_STRING_CONTENT, "\n"),
                 (TOKEN_INTERPOL_START, "${"),
-                    (TOKEN_IDENT, "test"),
+                (TOKEN_IDENT, "test"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "''"),
                 (TOKEN_WHITESPACE, " ")
@@ -710,11 +755,11 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "\""),
                 (TOKEN_INTERPOL_START, "${"),
-                    (TOKEN_IDENT, "hello"),
+                (TOKEN_IDENT, "hello"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_CONTENT, " "),
                 (TOKEN_INTERPOL_START, "${"),
-                    (TOKEN_IDENT, "world"),
+                (TOKEN_IDENT, "world"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "\""),
                 (TOKEN_WHITESPACE, " ")
@@ -726,11 +771,11 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "''"),
                 (TOKEN_INTERPOL_START, "${"),
-                    (TOKEN_STRING_START, "\""),
-                    (TOKEN_INTERPOL_START, "${"),
-                        (TOKEN_IDENT, "var"),
-                    (TOKEN_INTERPOL_END, "}"),
-                    (TOKEN_STRING_END, "\""),
+                (TOKEN_STRING_START, "\""),
+                (TOKEN_INTERPOL_START, "${"),
+                (TOKEN_IDENT, "var"),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_STRING_END, "\""),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "''"),
                 (TOKEN_WHITESPACE, " ")
@@ -739,16 +784,12 @@ mod tests {
     }
     #[test]
     fn comments() {
+        assert_eq!(tokenize("/**/"), tokens![(TOKEN_COMMENT, "/**/")]);
+        assert_eq!(tokenize("/***/"), tokens![(TOKEN_COMMENT, "/***/")]);
         assert_eq!(
-            tokenize("/**/"),
-            tokens![(TOKEN_COMMENT, "/**/")]
-        );
-        assert_eq!(
-            tokenize("/***/"),
-            tokens![(TOKEN_COMMENT, "/***/")]
-        );
-        assert_eq!(
-            tokenize("{ a = /* multiline * comment */ 123;# single line\n} # single line at the end"),
+            tokenize(
+                "{ a = /* multiline * comment */ 123;# single line\n} # single line at the end"
+            ),
             tokens![
                 (TOKEN_CURLY_B_OPEN, "{"),
                 (TOKEN_WHITESPACE, " "),
@@ -850,10 +891,10 @@ mod tests {
         fn path(path: &str) -> Vec<(SyntaxKind, SmolStr)> {
             tokens![(TOKEN_PATH, path)]
         }
-        assert_eq!(tokenize("/hello/world"),  path("/hello/world"));
-        assert_eq!(tokenize("hello/world"),   path("hello/world"));
-        assert_eq!(tokenize("a+3/5+b"),       path("a+3/5+b"));
-        assert_eq!(tokenize("1-2/3"),         path("1-2/3"));
+        assert_eq!(tokenize("/hello/world"), path("/hello/world"));
+        assert_eq!(tokenize("hello/world"), path("hello/world"));
+        assert_eq!(tokenize("a+3/5+b"), path("a+3/5+b"));
+        assert_eq!(tokenize("1-2/3"), path("1-2/3"));
         assert_eq!(tokenize("./hello/world"), path("./hello/world"));
         assert_eq!(tokenize("~/hello/world"), path("~/hello/world"));
         assert_eq!(tokenize("<hello/world>"), path("<hello/world>"));
@@ -953,11 +994,7 @@ mod tests {
     fn combine() {
         assert_eq!(
             tokenize("a//b"),
-            tokens![
-                (TOKEN_IDENT, "a"),
-                (TOKEN_MERGE, "//"),
-                (TOKEN_IDENT, "b")
-            ]
+            tokens![(TOKEN_IDENT, "a"), (TOKEN_MERGE, "//"), (TOKEN_IDENT, "b")]
         );
     }
     #[test]
@@ -993,31 +1030,25 @@ mod tests {
                 (TOKEN_LESS, "<"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
-
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
-
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_LESS_OR_EQ, "<="),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
-
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
-
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_MORE, ">"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "1"),
-
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
-
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_MORE_OR_EQ, ">="),
@@ -1051,31 +1082,27 @@ mod tests {
                 (TOKEN_IDENT, "false"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_THEN, "then"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_INTEGER, "1"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "1"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_ELSE, "else"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_IF, "if"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_IDENT, "true"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_THEN, "then"),
-                        (TOKEN_WHITESPACE, " "),
-                        (TOKEN_INTEGER, "2"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_ELSE, "else"),
-                        (TOKEN_WHITESPACE, " "),
-                        (TOKEN_INTEGER, "3")
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IF, "if"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "true"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_THEN, "then"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "2"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ELSE, "else"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_INTEGER, "3")
             ]
         );
         assert_eq!(
             tokenize("x>=y"), // <- could be confused with store path because of the '>'
-            tokens![
-                (TOKEN_IDENT, "x"),
-                (TOKEN_MORE_OR_EQ, ">="),
-                (TOKEN_IDENT, "y")
-            ]
+            tokens![(TOKEN_IDENT, "x"), (TOKEN_MORE_OR_EQ, ">="), (TOKEN_IDENT, "y")]
         );
     }
     #[test]
@@ -1086,7 +1113,7 @@ mod tests {
                 (TOKEN_IDENT, "a"),
                 (TOKEN_DOT, "."),
                 (TOKEN_DYNAMIC_START, "${"),
-                    (TOKEN_IDENT, "b"),
+                (TOKEN_IDENT, "b"),
                 (TOKEN_DYNAMIC_END, "}"),
                 (TOKEN_DOT, "."),
                 (TOKEN_IDENT, "c")
@@ -1098,24 +1125,24 @@ mod tests {
                 (TOKEN_IDENT, "a"),
                 (TOKEN_DOT, "."),
                 (TOKEN_DYNAMIC_START, "${"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_CURLY_B_OPEN, "{"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_IDENT, "b"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_ASSIGN, "="),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_STRING_START, "\""),
-                    (TOKEN_INTERPOL_START, "${"),
-                        (TOKEN_IDENT, "test"),
-                    (TOKEN_INTERPOL_END, "}"),
-                    (TOKEN_STRING_END, "\""),
-                    (TOKEN_SEMICOLON, ";"),
-                    (TOKEN_WHITESPACE, " "),
-                    (TOKEN_CURLY_B_CLOSE, "}"),
-                    (TOKEN_DOT, "."),
-                    (TOKEN_IDENT, "b"),
-                    (TOKEN_WHITESPACE, " "),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "b"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_STRING_START, "\""),
+                (TOKEN_INTERPOL_START, "${"),
+                (TOKEN_IDENT, "test"),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_STRING_END, "\""),
+                (TOKEN_SEMICOLON, ";"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_CURLY_B_CLOSE, "}"),
+                (TOKEN_DOT, "."),
+                (TOKEN_IDENT, "b"),
+                (TOKEN_WHITESPACE, " "),
                 (TOKEN_DYNAMIC_END, "}"),
                 (TOKEN_DOT, "."),
                 (TOKEN_IDENT, "c")
