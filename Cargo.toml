@@ -13,7 +13,6 @@ harness = false
 name = "all-packages"
 
 [dependencies]
-failure = "0.1.5"
 rowan = "0.5.1"
 cbitset = "0.2.0"
 

@@ -1,9 +1,9 @@
-use failure::{format_err, Error};
+use std::{env, error::Error, fs};
+
 use rnix::{parser::nodes::*, types::*};
 use rowan::{SyntaxElement, SyntaxNode};
-use std::{env, fs};
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), Box<dyn Error>> {
     let file = match env::args().skip(1).next() {
         Some(file) => file,
         None => {
@@ -13,7 +13,7 @@ fn main() -> Result<(), Error> {
     };
     let content = fs::read_to_string(&file)?;
     let ast = rnix::parse(&content).as_result()?;
-    let set = Set::cast(ast.root().inner()).ok_or(format_err!("root isn't a set"))?;
+    let set = Set::cast(ast.root().inner()).ok_or("root isn't a set")?;
 
     for entry in set.entries() {
         if let Some(lambda) = Lambda::cast(entry.value()) {

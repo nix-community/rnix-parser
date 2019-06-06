@@ -1,11 +1,12 @@
 //! The types: Such as strings or integers
+use std::fmt;
+
+use rowan::{SyntaxKind, SyntaxNode};
 
 use crate::{
     parser::nodes::*,
     types::{self, TypedNode},
 };
-use failure::Fail;
-use rowan::{SyntaxKind, SyntaxNode};
 
 /// An anchor point for a path, such as if it's relative or absolute
 #[derive(Clone, Debug, PartialEq)]
@@ -149,15 +150,11 @@ pub fn remove_trailing(string: &mut String) {
 }
 
 /// An error that occured when parsing a value from a string
-#[derive(Clone, Debug, Fail, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ValueError {
-    #[fail(display = "failed to parse float: {}", _0)]
-    Float(#[cause] std::num::ParseFloatError),
-    #[fail(display = "failed to parse int: {}", _0)]
-    Integer(#[cause] std::num::ParseIntError),
-    #[fail(display = "failed to parse store path")]
+    Float(std::num::ParseFloatError),
+    Integer(std::num::ParseIntError),
     StorePath,
-    #[fail(display = "unknown value kind")]
     Unknown,
 }
 impl From<std::num::ParseFloatError> for ValueError {
@@ -168,6 +165,27 @@ impl From<std::num::ParseFloatError> for ValueError {
 impl From<std::num::ParseIntError> for ValueError {
     fn from(err: std::num::ParseIntError) -> Self {
         ValueError::Integer(err)
+    }
+}
+
+impl fmt::Display for ValueError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValueError::Float(err) => write!(f, "failed to parse float: {}", err),
+            ValueError::Integer(err) => write!(f, "failed to parse int: {}", err),
+            ValueError::StorePath => write!(f, "failed to parse store path"),
+            ValueError::Unknown => write!(f, "unknown value kind"),
+        }
+    }
+}
+
+impl std::error::Error for ValueError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ValueError::Float(err) => Some(err),
+            ValueError::Integer(err) => Some(err),
+            ValueError::StorePath | ValueError::Unknown => None,
+        }
     }
 }
 

@@ -1,24 +1,35 @@
 //! The parser: turns a series of tokens into an AST
 
-use crate::types::{Root, TypedNode};
+use std::{collections::VecDeque, fmt};
 
 use cbitset::BitSet256;
-use failure::Fail;
 use rowan::{Checkpoint, GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TreeArc};
-use std::collections::VecDeque;
+
+use crate::types::{Root, TypedNode};
 
 const OR: &'static str = "or";
 
-/// An error that occured during parsing
-#[derive(Clone, Debug, Fail, PartialEq)]
+/// An error that occurred during parsing
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParseError {
-    #[fail(display = "unexpected input")]
     Unexpected(TextRange),
-    #[fail(display = "unexpected eof")]
     UnexpectedEOF,
-    #[fail(display = "unexpected eof, wanted any of {:?}", _0)]
     UnexpectedEOFWanted(Box<[SyntaxKind]>),
 }
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParseError::Unexpected(_range) => write!(f, "unexpected input"),
+            ParseError::UnexpectedEOF => write!(f, "unexpected eof"),
+            ParseError::UnexpectedEOFWanted(kinds) => {
+                write!(f, "unexpected eof, wanted any of {:?}", kinds)
+            }
+        }
+    }
+}
+
+impl std::error::Error for ParseError {}
 
 /// The type of a node in the AST
 pub mod nodes {
