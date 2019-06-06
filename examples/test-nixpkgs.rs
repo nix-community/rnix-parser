@@ -1,18 +1,17 @@
-use failure::{bail, format_err, Error};
-use std::{env, fs, path::Path};
+use std::{env, error::Error, fs, path::Path};
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), Box<dyn Error>> {
     let path = env::var("NIX_PATH")?;
     let nixpkgs = path
         .split(':')
         .find(|s| s.starts_with("nixpkgs="))
-        .ok_or_else(|| format_err!("no store path found"))?;
+        .ok_or("no store path found")?;
 
     println!("Nix store path: {}", nixpkgs);
 
     recurse(Path::new(&nixpkgs["nixpkgs=".len()..]))
 }
-fn recurse(path: &Path) -> Result<(), Error> {
+fn recurse(path: &Path) -> Result<(), Box<dyn Error>> {
     if path.metadata()?.is_file() {
         if path.extension().and_then(|s| s.to_str()) != Some("nix") {
             return Ok(());
@@ -35,7 +34,7 @@ fn recurse(path: &Path) -> Result<(), Error> {
             println!("----------");
             println!("{}", parsed);
             println!("----------");
-            bail!("parsing error");
+            Err("parsing error")?;
         }
         return Ok(());
     } else {
