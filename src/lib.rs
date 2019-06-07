@@ -1,22 +1,5 @@
-macro_rules! magic {
-    (start $init:expr; lookup $fn:ident; $($ident:ident)*) => {
-        magic!(def start $init; $($ident)*);
-        pub fn $fn(val: SyntaxKind) -> Option<&'static str> {
-            match val {
-                // Depending on stringify! is bad, but how else can I
-                // get the identifier name?
-                $($ident => Some(stringify!($ident)),)*
-                _ => None
-            }
-        }
-    };
-    (def start $init:expr; $ident:ident $($remaining:tt)*) => {
-        pub const $ident: SyntaxKind = SyntaxKind($init);
-        magic!(def start $init+1; $($remaining)*);
-    };
-    (def start $init:expr;) => {};
-}
-
+#[macro_use]
+mod macros;
 pub mod parser;
 pub mod tokenizer;
 pub mod types;
