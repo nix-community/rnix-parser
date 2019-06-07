@@ -308,15 +308,15 @@ mod tests {
         assert_eq!(
             string_parts(&string_node(
                 r#"
-                        
-                              
+                        |trailing-whitespace
+                              |trailing-whitespace
                     This is a multiline string :D
                       indented by two
                     \'\'\'\'\
                     ''${ interpolation was escaped }
                     two single quotes: '''
                     three single quotes: ''''
-                "#
+                "#.replace("|trailing-whitespace", "").as_str()
             )),
             vec![
                 StrPart::Literal(String::from(

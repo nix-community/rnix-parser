@@ -604,8 +604,6 @@ mod tests {
             tokenize(
                 r#"{
     multiline = ''
-            
-                  
         This is a multiline string :D
           indented by two
         \'\'\'\'\
@@ -626,8 +624,6 @@ mod tests {
                 (
                     TOKEN_STRING_CONTENT,
                     r#"
-            
-                  
         This is a multiline string :D
           indented by two
         \'\'\'\'\
