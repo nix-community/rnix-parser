@@ -229,6 +229,76 @@ pub trait Wrapper: TypedNode {
     }
 }
 
+pub struct ParsedTypeError(SyntaxKind);
+
+pub enum ParsedType<'a> {
+    Apply(&'a Apply),
+    Assert(&'a Assert),
+    Attribute(&'a Attribute),
+    Dynamic(&'a Dynamic),
+    Error(&'a Error),
+    Ident(&'a Ident),
+    IfElse(&'a IfElse),
+    IndexSet(&'a IndexSet),
+    Inherit(&'a Inherit),
+    InheritFrom(&'a InheritFrom),
+    Lambda(&'a Lambda),
+    Let(&'a Let),
+    LetIn(&'a LetIn),
+    List(&'a List),
+    Operation(&'a Operation),
+    OrDefault(&'a OrDefault),
+    Paren(&'a Paren),
+    PatBind(&'a PatBind),
+    PatEntry(&'a PatEntry),
+    Pattern(&'a Pattern),
+    Root(&'a Root),
+    Set(&'a Set),
+    SetEntry(&'a SetEntry),
+    Str(&'a Str),
+    TextDump(&'a TextDump<'a>),
+    Unary(&'a Unary),
+    Value(&'a Value),
+    With(&'a With)
+}
+
+impl<'a> core::convert::TryFrom<&'a SyntaxNode> for ParsedType<'a> {
+    type Error = ParsedTypeError;
+
+    fn try_from(node: &'a SyntaxNode) -> Result<Self, ParsedTypeError> {
+        match node.kind() {
+            NODE_APPLY => Ok(ParsedType::Apply(Apply::cast(node).unwrap())),
+            NODE_ASSERT => Ok(ParsedType::Assert(Assert::cast(node).unwrap())),
+            NODE_ATTRIBUTE => Ok(ParsedType::Attribute(Attribute::cast(node).unwrap())),
+            NODE_DYNAMIC => Ok(ParsedType::Dynamic(Dynamic::cast(node).unwrap())),
+            NODE_ERROR => Ok(ParsedType::Error(Error::cast(node).unwrap())),
+            NODE_IDENT => Ok(ParsedType::Ident(Ident::cast(node).unwrap())),
+            NODE_IF_ELSE => Ok(ParsedType::IfElse(IfElse::cast(node).unwrap())),
+            NODE_INDEX_SET => Ok(ParsedType::IndexSet(IndexSet::cast(node).unwrap())),
+            NODE_INHERIT => Ok(ParsedType::Inherit(Inherit::cast(node).unwrap())),
+            NODE_INHERIT_FROM => Ok(ParsedType::InheritFrom(InheritFrom::cast(node).unwrap())),
+            NODE_STRING => Ok(ParsedType::Str(Str::cast(node).unwrap())),
+            NODE_LAMBDA => Ok(ParsedType::Lambda(Lambda::cast(node).unwrap())),
+            NODE_LET => Ok(ParsedType::Let(Let::cast(node).unwrap())),
+            NODE_LET_IN => Ok(ParsedType::LetIn(LetIn::cast(node).unwrap())),
+            NODE_LIST => Ok(ParsedType::List(List::cast(node).unwrap())),
+            NODE_OPERATION => Ok(ParsedType::Operation(Operation::cast(node).unwrap())),
+            NODE_OR_DEFAULT => Ok(ParsedType::OrDefault(OrDefault::cast(node).unwrap())),
+            NODE_PAREN => Ok(ParsedType::Paren(Paren::cast(node).unwrap())),
+            NODE_PATTERN => Ok(ParsedType::Pattern(Pattern::cast(node).unwrap())),
+            NODE_PAT_BIND => Ok(ParsedType::PatBind(PatBind::cast(node).unwrap())),
+            NODE_PAT_ENTRY => Ok(ParsedType::PatEntry(PatEntry::cast(node).unwrap())),
+            NODE_ROOT => Ok(ParsedType::Root(Root::cast(node).unwrap())),
+            NODE_SET => Ok(ParsedType::Set(Set::cast(node).unwrap())),
+            NODE_SET_ENTRY => Ok(ParsedType::SetEntry(SetEntry::cast(node).unwrap())),
+            NODE_UNARY => Ok(ParsedType::Unary(Unary::cast(node).unwrap())),
+            NODE_VALUE => Ok(ParsedType::Value(Value::cast(node).unwrap())),
+            NODE_WITH => Ok(ParsedType::With(With::cast(node).unwrap())),
+            other => Err(ParsedTypeError(other))
+        }
+    }
+}
+
 typed! [
     NODE_IDENT => Ident: {
         /// Return the identifier as a string
