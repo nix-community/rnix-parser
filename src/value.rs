@@ -1,7 +1,7 @@
 //! The types: Such as strings or integers
 use std::fmt;
 
-use rowan::{SyntaxKind, SyntaxNode};
+use rowan::{SyntaxElement, SyntaxKind, SyntaxNode};
 
 use crate::{
     parser::nodes::*,
@@ -229,28 +229,35 @@ pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
     let multiline = string.first_token().map(|t| t.text().as_str()) == Some("''");
     let mut last_was_ast = false;
 
-    for child in string.node().children() {
-        let next_is_ast =
-            child.next_sibling().map(|child| child.kind() == NODE_STRING_INTERPOL).unwrap_or(false);
-        if child.kind() == NODE_STRING_LITERAL {
-            let token = types::tokens(child).next().unwrap();
-            let text: &str = token.text();
+    for child in string.node().children_with_tokens() {
+        match child {
+            SyntaxElement::Token(token) if token.kind() == TOKEN_STRING_CONTENT => {
+                let text: &str = token.text();
 
-            let line_count = text.lines().count();
-            for (i, line) in text.lines().enumerate().skip(if last_was_ast { 1 } else { 0 }) {
-                let indent: usize = indention(line).count();
-                if (i != line_count - 1 || !next_is_ast) && indent == line.chars().count() {
-                    // line is empty and not the start of an
-                    // interpolation, ignore indention
-                    continue;
+                let line_count = text.lines().count();
+                let next_is_ast = child
+                    .next_sibling_or_token()
+                    .map_or(false, |child| child.kind() == NODE_STRING_INTERPOL);
+                for (i, line) in text.lines().enumerate().skip(if last_was_ast { 1 } else { 0 }) {
+                    let indent: usize = indention(line).count();
+                    if (i != line_count - 1 || !next_is_ast) && indent == line.chars().count() {
+                        // line is empty and not the start of an
+                        // interpolation, ignore indention
+                        continue;
+                    }
+                    common = common.min(indent);
                 }
-                common = common.min(indent);
+                parts.push(StrPart::Literal(text.to_string()));
+                literals += 1;
             }
-            parts.push(StrPart::Literal(text.to_string()));
-            literals += 1;
-        } else {
-            parts.push(StrPart::Ast(child));
-            last_was_ast = true;
+            SyntaxElement::Token(token) => {
+                assert!(token.kind() == TOKEN_STRING_START || token.kind() == TOKEN_STRING_END)
+            }
+            SyntaxElement::Node(node) => {
+                assert_eq!(node.kind(), NODE_STRING_INTERPOL);
+                parts.push(StrPart::Ast(node));
+                last_was_ast = true;
+            }
         }
     }
 
@@ -296,9 +303,7 @@ mod tests {
             let mut builder = GreenNodeBuilder::new();
             builder.start_node(NODE_STRING);
             builder.token(TOKEN_STRING_START, SmolStr::new("''"));
-            builder.start_node(NODE_STRING_LITERAL);
             builder.token(TOKEN_STRING_CONTENT, SmolStr::new(content));
-            builder.finish_node();
             builder.token(TOKEN_STRING_END, SmolStr::new("''"));
             builder.finish_node();
 

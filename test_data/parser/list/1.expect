@@ -15,9 +15,7 @@ NODE_ROOT 0..13 {
     TOKEN_WHITESPACE(" ") 6..7
     NODE_STRING 7..12 {
       TOKEN_STRING_START("\"") 7..8
-      NODE_STRING_LITERAL 8..11 {
-        TOKEN_STRING_CONTENT("lol") 8..11
-      }
+      TOKEN_STRING_CONTENT("lol") 8..11
       TOKEN_STRING_END("\"") 11..12
     }
     TOKEN_SQUARE_B_CLOSE("]") 12..13
