@@ -56,7 +56,6 @@ pub mod nodes {
         NODE_INHERIT
         NODE_INHERIT_FROM
         NODE_STRING
-        NODE_STRING_LITERAL
         NODE_STRING_INTERPOL
         NODE_LAMBDA
         NODE_LET
@@ -251,11 +250,7 @@ where
                 TOKEN_STRING_CONTENT,
                 TOKEN_INTERPOL_START,
             ]) {
-                Some(TOKEN_STRING_CONTENT) => {
-                    self.start_node(NODE_STRING_LITERAL);
-                    self.bump();
-                    self.builder.finish_node();
-                }
+                Some(TOKEN_STRING_CONTENT) => self.bump(),
                 Some(TOKEN_INTERPOL_START) => {
                     self.start_node(NODE_STRING_INTERPOL);
                     self.bump();

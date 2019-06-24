@@ -8,9 +8,7 @@ NODE_ROOT 0..33 {
         TOKEN_DOT(".") 4..5
         NODE_STRING 5..20 {
           TOKEN_STRING_START("\"") 5..6
-          NODE_STRING_LITERAL 6..19 {
-            TOKEN_STRING_CONTENT("invalid ident") 6..19
-          }
+          TOKEN_STRING_CONTENT("invalid ident") 6..19
           TOKEN_STRING_END("\"") 19..20
         }
       }
