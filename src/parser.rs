@@ -768,4 +768,12 @@ mod tests {
     fn dynamic() {
         test_dir("dynamic");
     }
+    #[test]
+    fn paths() {
+        test_dir("paths");
+    }
+    #[test]
+    fn strings() {
+        test_dir("strings");
+    }
 }

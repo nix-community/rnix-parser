@@ -15,7 +15,6 @@ pub enum Anchor {
     Relative,
     Home,
     Store,
-    Uri,
 }
 
 /// A value, such as a string or integer
@@ -23,6 +22,7 @@ pub enum Anchor {
 pub enum Value {
     Float(f64),
     Integer(i64),
+    String(String),
     Path(Anchor, String),
 }
 
@@ -192,28 +192,28 @@ impl std::error::Error for ValueError {
 impl Value {
     /// Parse a token kind and string into a typed value
     pub fn from_token(token: SyntaxKind, s: &str) -> Result<Self, ValueError> {
-        match (token, s) {
-            (TOKEN_FLOAT, s) => Ok(Value::Float(s.parse()?)),
-            (TOKEN_INTEGER, s) => Ok(Value::Integer(s.parse()?)),
-            (TOKEN_PATH, s) => {
+        let value = match token {
+            TOKEN_FLOAT => Value::Float(s.parse()?),
+            TOKEN_INTEGER => Value::Integer(s.parse()?),
+            TOKEN_PATH => {
                 if s.starts_with('<') {
                     let len = s.len();
                     if len < 2 || !s.ends_with('>') {
                         return Err(ValueError::StorePath);
                     }
-                    Ok(Value::Path(Anchor::Store, String::from(&s[1..len - 1])))
+                    Value::Path(Anchor::Store, String::from(&s[1..len - 1]))
                 } else if s.starts_with("~/") {
-                    Ok(Value::Path(Anchor::Home, String::from(&s[2..])))
+                    Value::Path(Anchor::Home, String::from(&s[2..]))
                 } else if s.starts_with('/') {
-                    Ok(Value::Path(Anchor::Absolute, String::from(s)))
-                } else if s.contains(':') {
-                    Ok(Value::Path(Anchor::Uri, String::from(s)))
+                    Value::Path(Anchor::Absolute, String::from(s))
                 } else {
-                    Ok(Value::Path(Anchor::Relative, String::from(s)))
+                    Value::Path(Anchor::Relative, String::from(s))
                 }
             }
-            _ => Err(ValueError::Unknown),
-        }
+            TOKEN_URI => Value::String(String::from(s)),
+            _ => return Err(ValueError::Unknown),
+        };
+        Ok(value)
     }
 }
 
@@ -350,8 +350,8 @@ mod tests {
             Ok(Value::Path(Anchor::Relative, "path/to/thing".into()))
         );
         assert_eq!(
-            Value::from_token(TOKEN_PATH, "https:path"),
-            Ok(Value::Path(Anchor::Uri, "https:path".into()))
+            Value::from_token(TOKEN_URI, "https:path"),
+            Ok(Value::String("https:path".into()))
         );
 
         assert_eq!(Value::from_token(TOKEN_INTEGER, "123"), Ok(Value::Integer(123)));

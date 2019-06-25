@@ -1,0 +1,67 @@
+NODE_ROOT 0..107 {
+  NODE_SET 0..107 {
+    TOKEN_CURLY_B_OPEN("{") 0..1
+    TOKEN_WHITESPACE("\n  ") 1..4
+    NODE_SET_ENTRY 4..21 {
+      NODE_ATTRIBUTE 4..7 {
+        NODE_IDENT 4..7 {
+          TOKEN_IDENT("abs") 4..7
+        }
+      }
+      TOKEN_WHITESPACE(" ") 7..8
+      TOKEN_ASSIGN("=") 8..9
+      TOKEN_WHITESPACE(" ") 9..10
+      NODE_VALUE 10..20 {
+        TOKEN_PATH("/nix/store") 10..20
+      }
+      TOKEN_SEMICOLON(";") 20..21
+    }
+    TOKEN_WHITESPACE("\n  ") 21..24
+    NODE_SET_ENTRY 24..50 {
+      NODE_ATTRIBUTE 24..28 {
+        NODE_IDENT 24..28 {
+          TOKEN_IDENT("home") 24..28
+        }
+      }
+      TOKEN_WHITESPACE(" ") 28..29
+      TOKEN_ASSIGN("=") 29..30
+      TOKEN_WHITESPACE(" ") 30..31
+      NODE_VALUE 31..49 {
+        TOKEN_PATH("~/.nix-profile/bin") 31..49
+      }
+      TOKEN_SEMICOLON(";") 49..50
+    }
+    TOKEN_WHITESPACE("\n  ") 50..53
+    NODE_SET_ENTRY 53..79 {
+      NODE_ATTRIBUTE 53..56 {
+        NODE_IDENT 53..56 {
+          TOKEN_IDENT("rel") 53..56
+        }
+      }
+      TOKEN_WHITESPACE(" ") 56..57
+      TOKEN_ASSIGN("=") 57..58
+      TOKEN_WHITESPACE(" ") 58..59
+      NODE_VALUE 59..78 {
+        TOKEN_PATH("./configuration.nix") 59..78
+      }
+      TOKEN_SEMICOLON(";") 78..79
+    }
+    TOKEN_WHITESPACE("\n  ") 79..82
+    NODE_SET_ENTRY 82..105 {
+      NODE_ATTRIBUTE 82..87 {
+        NODE_IDENT 82..87 {
+          TOKEN_IDENT("store") 82..87
+        }
+      }
+      TOKEN_WHITESPACE(" ") 87..88
+      TOKEN_ASSIGN("=") 88..89
+      TOKEN_WHITESPACE(" ") 89..90
+      NODE_VALUE 90..104 {
+        TOKEN_PATH("<nixpkgs/pkgs>") 90..104
+      }
+      TOKEN_SEMICOLON(";") 104..105
+    }
+    TOKEN_WHITESPACE("\n") 105..106
+    TOKEN_CURLY_B_CLOSE("}") 106..107
+  }
+}

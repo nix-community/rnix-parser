@@ -79,6 +79,7 @@ pub mod tokens {
         TOKEN_INTERPOL_END
         TOKEN_INTERPOL_START
         TOKEN_PATH
+        TOKEN_URI
         TOKEN_STRING_CONTENT
         TOKEN_STRING_END
         TOKEN_STRING_START
@@ -90,7 +91,7 @@ pub mod tokens {
         /// Returns true if this token is a value, such as an integer or a string
         pub fn is_value(token: SyntaxKind) -> bool {
             match token {
-                TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH => true,
+                TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI => true,
                 _ => false,
             }
         }
@@ -481,25 +482,23 @@ impl<'a> Iterator for Tokenizer<'a> {
                     c => kind == IdentType::Uri && is_valid_path_char(c),
                 });
                 let ident = self.string_since(start);
-                if kind == IdentType::Ident {
-                    Some((
-                        match &*ident {
-                            "assert" => TOKEN_ASSERT,
-                            "else" => TOKEN_ELSE,
-                            "if" => TOKEN_IF,
-                            "in" => TOKEN_IN,
-                            "inherit" => TOKEN_INHERIT,
-                            "let" => TOKEN_LET,
-                            "rec" => TOKEN_REC,
-                            "then" => TOKEN_THEN,
-                            "with" => TOKEN_WITH,
-                            _ => TOKEN_IDENT,
-                        },
-                        ident,
-                    ))
-                } else {
-                    Some((TOKEN_PATH, ident))
-                }
+                let syntax_kind = match kind {
+                    IdentType::Ident => match &*ident {
+                        "assert" => TOKEN_ASSERT,
+                        "else" => TOKEN_ELSE,
+                        "if" => TOKEN_IF,
+                        "in" => TOKEN_IN,
+                        "inherit" => TOKEN_INHERIT,
+                        "let" => TOKEN_LET,
+                        "rec" => TOKEN_REC,
+                        "then" => TOKEN_THEN,
+                        "with" => TOKEN_WITH,
+                        _ => TOKEN_IDENT,
+                    },
+                    IdentType::Path | IdentType::Store => TOKEN_PATH,
+                    IdentType::Uri => TOKEN_URI,
+                };
+                Some((syntax_kind, ident))
             }
             '"' => {
                 self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: false });
@@ -894,9 +893,12 @@ mod tests {
         assert_eq!(tokenize("./hello/world"), path("./hello/world"));
         assert_eq!(tokenize("~/hello/world"), path("~/hello/world"));
         assert_eq!(tokenize("<hello/world>"), path("<hello/world>"));
+    }
+    #[test]
+    fn uri() {
         assert_eq!(
             tokenize("https://google.com/?q=Hello+World"),
-            path("https://google.com/?q=Hello+World")
+            tokens![(TOKEN_URI, "https://google.com/?q=Hello+World")]
         );
     }
     #[test]
