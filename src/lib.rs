@@ -50,10 +50,10 @@ mod tests {
     fn interpolation() {
         let ast = parse(include_str!("../test_data/interpolation.nix"));
 
-        let let_in = LetIn::cast(ast.root().inner()).unwrap();
-        let set = Set::cast(let_in.body()).unwrap();
+        let let_in = ast.root().inner().and_then(LetIn::cast).unwrap();
+        let set = let_in.body().and_then(Set::cast).unwrap();
         let entry = set.entries().nth(1).unwrap();
-        let value = Str::cast(entry.value()).unwrap();
+        let value = entry.value().and_then(Str::cast).unwrap();
 
         match &*value.parts() {
             &[
@@ -73,11 +73,11 @@ mod tests {
     fn inherit() {
         let ast = parse(include_str!("../test_data/inherit.nix"));
 
-        let let_in = LetIn::cast(ast.root().inner()).unwrap();
-        let set = Set::cast(let_in.body()).unwrap();
+        let let_in = ast.root().inner().and_then(LetIn::cast).unwrap();
+        let set = let_in.body().and_then(Set::cast).unwrap();
         let inherit = set.inherits().nth(1).unwrap();
 
-        let from = Ident::cast(inherit.from().unwrap().inner()).unwrap();
+        let from = inherit.from().unwrap().inner().and_then(Ident::cast).unwrap();
         assert_eq!(from.as_str(), "set");
         let mut children = inherit.idents();
         assert_eq!(children.next().unwrap().as_str(), "z");
@@ -87,13 +87,13 @@ mod tests {
     #[test]
     fn math() {
         let ast = parse(include_str!("../test_data/math.nix"));
-        let root = Operation::cast(ast.root().inner()).unwrap();
-        let operation = Operation::cast(root.value1()).unwrap();
+        let root = ast.root().inner().and_then(Operation::cast).unwrap();
+        let operation = root.value1().and_then(Operation::cast).unwrap();
 
         assert_eq!(root.operator(), OpKind::Add);
         assert_eq!(operation.operator(), OpKind::Add);
 
-        let value = Value::cast(operation.value1()).unwrap();
+        let value = operation.value1().and_then(Value::cast).unwrap();
         assert_eq!(value.to_value(), Ok(NixValue::Integer(1)));
     }
     // #[test]

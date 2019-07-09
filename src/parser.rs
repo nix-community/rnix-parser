@@ -490,11 +490,12 @@ where
                     _ => (),
                 }
             }
-            _ => {
+            Some(_) => {
                 self.start_node(NODE_ERROR);
                 self.bump();
                 self.builder.finish_node();
             }
+            None => self.errors.push(ParseError::UnexpectedEOF),
         }
 
         while self.peek() == Some(TOKEN_DOT) {

@@ -13,29 +13,30 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let content = fs::read_to_string(&file)?;
     let ast = rnix::parse(&content).as_result()?;
-    let set = Set::cast(ast.root().inner()).ok_or("root isn't a set")?;
+    let set = ast.root().inner().and_then(Set::cast).ok_or("root isn't a set")?;
 
     for entry in set.entries() {
-        if let Some(lambda) = Lambda::cast(entry.value()) {
-            let attr = entry.key();
-            let ident = attr.path().last().and_then(Ident::cast);
-            let s = ident.map(Ident::as_str).unwrap_or("error");
-            println!("Function name: {}", s);
-            if let Some(comment) = find_comment(entry.key().node()) {
-                println!("-> Doc: {}", comment);
-            }
-
-            let mut value = Some(lambda);
-            while let Some(lambda) = value {
-                let ident = Ident::cast(lambda.arg());
+        if let Some(lambda) = entry.value().and_then(Lambda::cast) {
+            if let Some(attr) = entry.key() {
+                let ident = attr.path().last().and_then(Ident::cast);
                 let s = ident.map(Ident::as_str).unwrap_or("error");
-                println!("-> Arg: {}", s);
-                if let Some(comment) = find_comment(lambda.arg()) {
-                    println!("--> Doc: {}", comment);
+                println!("Function name: {}", s);
+                if let Some(comment) = find_comment(attr.node()) {
+                    println!("-> Doc: {}", comment);
                 }
-                value = Lambda::cast(lambda.body());
+
+                let mut value = Some(lambda);
+                while let Some(lambda) = value {
+                    let ident = lambda.arg().and_then(Ident::cast);
+                    let s = ident.map(Ident::as_str).unwrap_or("error");
+                    println!("-> Arg: {}", s);
+                    if let Some(comment) = lambda.arg().and_then(find_comment) {
+                        println!("--> Doc: {}", comment);
+                    }
+                    value = lambda.body().and_then(Lambda::cast);
+                }
+                println!();
             }
-            println!();
         }
     }
 
