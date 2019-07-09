@@ -46,10 +46,9 @@ macro_rules! nth {
     ($self:expr; $index:expr) => {
         $self.node().children()
             .nth($index)
-            .expect("invalid ast")
     };
     ($self:expr; ($kind:ident) $index:expr) => {
-        $kind::cast(nth!($self; $index)).expect("invalid ast")
+        nth!($self; $index).and_then($kind::cast)
     };
 }
 
@@ -224,7 +223,7 @@ pub trait EntryHolder: TypedNode {
 /// Provides the function `.inner()` for wrapping types like parenthensis
 pub trait Wrapper: TypedNode {
     /// Return the inner value
-    fn inner(&self) -> &SyntaxNode {
+    fn inner(&self) -> Option<&SyntaxNode> {
         nth!(self; 0)
     }
 }
@@ -320,21 +319,21 @@ typed! [
 
     NODE_APPLY => Apply: {
         /// Return the lambda being applied
-        pub fn lambda(&self) -> &SyntaxNode {
+        pub fn lambda(&self) -> Option<&SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the value which the lambda is being applied with
-        pub fn value(&self) -> &SyntaxNode {
+        pub fn value(&self) -> Option<&SyntaxNode> {
             nth!(self; 1)
         }
     },
     NODE_ASSERT => Assert: {
         /// Return the assert condition
-        pub fn condition(&self) -> &SyntaxNode {
+        pub fn condition(&self) -> Option<&SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the success body
-        pub fn body(&self) -> &SyntaxNode {
+        pub fn body(&self) -> Option<&SyntaxNode> {
             nth!(self; 1)
         }
     },
@@ -348,25 +347,25 @@ typed! [
     NODE_ERROR => Error,
     NODE_IF_ELSE => IfElse: {
         /// Return the condition
-        pub fn condition(&self) -> &SyntaxNode {
+        pub fn condition(&self) -> Option<&SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the success body
-        pub fn body(&self) -> &SyntaxNode {
+        pub fn body(&self) -> Option<&SyntaxNode> {
             nth!(self; 1)
         }
         /// Return the else body
-        pub fn else_body(&self) -> &SyntaxNode {
+        pub fn else_body(&self) -> Option<&SyntaxNode> {
             nth!(self; 2)
         }
     },
     NODE_INDEX_SET => IndexSet: {
         /// Return the set being indexed
-        pub fn set(&self) -> &SyntaxNode {
+        pub fn set(&self) -> Option<&SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the index
-        pub fn index(&self) -> &SyntaxNode {
+        pub fn index(&self) -> Option<&SyntaxNode> {
             nth!(self; 1)
         }
     },
@@ -374,8 +373,7 @@ typed! [
         /// Return the set where keys are being inherited from, if any
         pub fn from(&self) -> Option<&InheritFrom> {
             self.node().children()
-                .filter_map(InheritFrom::cast)
-                .next()
+                .find_map(InheritFrom::cast)
         }
         /// Return all the identifiers being inherited
         pub fn idents(&self) -> impl Iterator<Item = &Ident> {
@@ -391,19 +389,19 @@ typed! [
     },
     NODE_LAMBDA => Lambda: {
         /// Return the argument of the lambda
-        pub fn arg(&self) -> &SyntaxNode {
+        pub fn arg(&self) -> Option<&SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the body of the lambda
-        pub fn body(&self) -> &SyntaxNode {
+        pub fn body(&self) -> Option<&SyntaxNode> {
             nth!(self; 1)
         }
     },
     NODE_LET => Let: EntryHolder,
     NODE_LET_IN => LetIn: EntryHolder: {
         /// Return the body
-        pub fn body(&self) -> &SyntaxNode {
-            self.node().last_child().expect("invalid ast")
+        pub fn body(&self) -> Option<&SyntaxNode> {
+            self.node().last_child()
         }
     },
     NODE_LIST => List: {
@@ -414,7 +412,7 @@ typed! [
     },
     NODE_OPERATION => Operation: {
         /// Return the first value in the operation
-        pub fn value1(&self) -> &SyntaxNode {
+        pub fn value1(&self) -> Option<&SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the operator
@@ -422,30 +420,30 @@ typed! [
             self.first_token().and_then(|t| OpKind::from_token(t.kind())).expect("invalid ast")
         }
         /// Return the second value in the operation
-        pub fn value2(&self) -> &SyntaxNode {
+        pub fn value2(&self) -> Option<&SyntaxNode> {
             nth!(self; 1)
         }
     },
     NODE_OR_DEFAULT => OrDefault: {
         /// Return the indexing operation
-        pub fn index(&self) -> &IndexSet {
+        pub fn index(&self) -> Option<&IndexSet> {
             nth!(self; (IndexSet) 0)
         }
         /// Return the default value
-        pub fn default(&self) -> &SyntaxNode {
+        pub fn default(&self) -> Option<&SyntaxNode> {
             nth!(self; 1)
         }
     },
     NODE_PAREN => Paren: Wrapper,
     NODE_PAT_BIND => PatBind: {
         /// Return the identifier the set is being bound as
-        pub fn name(&self) -> &Ident {
+        pub fn name(&self) -> Option<&Ident> {
             nth!(self; (Ident) 0)
         }
     },
     NODE_PAT_ENTRY => PatEntry: {
         /// Return the identifier the argument is being bound as
-        pub fn name(&self) -> &Ident {
+        pub fn name(&self) -> Option<&Ident> {
             nth!(self; (Ident) 0)
         }
         /// Return the default value, if any
@@ -488,11 +486,11 @@ typed! [
     },
     NODE_SET_ENTRY => SetEntry: {
         /// Return this entry's key
-        pub fn key(&self) -> &Attribute {
+        pub fn key(&self) -> Option<&Attribute> {
             nth!(self; (Attribute) 0)
         }
         /// Return this entry's value
-        pub fn value(&self) -> &SyntaxNode {
+        pub fn value(&self) -> Option<&SyntaxNode> {
             nth!(self; 1)
         }
     },
@@ -502,17 +500,17 @@ typed! [
             self.first_token().and_then(|t| UnaryOpKind::from_token(t.kind())).expect("invalid ast")
         }
         /// Return the value in the operation
-        pub fn value(&self) -> &SyntaxNode {
+        pub fn value(&self) -> Option<&SyntaxNode> {
             nth!(self; 0)
         }
     },
     NODE_WITH => With: {
         /// Return the namespace
-        pub fn namespace(&self) -> &SyntaxNode {
+        pub fn namespace(&self) -> Option<&SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the body
-        pub fn body(&self) -> &SyntaxNode {
+        pub fn body(&self) -> Option<&SyntaxNode> {
             nth!(self; 1)
         }
     }
