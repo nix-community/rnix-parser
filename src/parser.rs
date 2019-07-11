@@ -380,24 +380,36 @@ where
         }
         self.bump(); // the final close, like '}'
     }
-    fn parse_val(&mut self) {
+    fn parse_val(&mut self) -> Checkpoint {
+        let peek = match self.peek() {
+            Some(it) => it,
+            None => {
+                self.errors.push(ParseError::UnexpectedEOF);
+                // NB: we don't use `self.checkpoint()` here in order to avoid
+                // eating the whitespace. The actual checkpoint doesn't matter
+                // in this case and, ideally, should be returning `None`, but
+                // that makes code slightly more complex for little real
+                // benefit.
+                return self.builder.checkpoint();
+            }
+        };
         let checkpoint = self.checkpoint();
-        match self.peek() {
-            Some(TOKEN_PAREN_OPEN) => {
+        match peek {
+            TOKEN_PAREN_OPEN => {
                 self.start_node(NODE_PAREN);
                 self.bump();
                 self.parse_expr();
                 self.bump();
                 self.builder.finish_node();
             }
-            Some(TOKEN_REC) => {
+            TOKEN_REC => {
                 self.start_node(NODE_SET);
                 self.bump();
                 self.expect(TOKEN_CURLY_B_OPEN);
                 self.parse_set(TOKEN_CURLY_B_CLOSE);
                 self.builder.finish_node();
             }
-            Some(TOKEN_CURLY_B_OPEN) => {
+            TOKEN_CURLY_B_OPEN => {
                 // Do a lookahead:
                 let mut peek = [None, None];
                 for i in 0..2 {
@@ -443,7 +455,7 @@ where
                     }
                 }
             }
-            Some(TOKEN_SQUARE_B_OPEN) => {
+            TOKEN_SQUARE_B_OPEN => {
                 self.start_node(NODE_LIST);
                 self.bump();
                 while self.peek().map(|t| t != TOKEN_SQUARE_B_CLOSE).unwrap_or(false) {
@@ -452,15 +464,14 @@ where
                 self.bump();
                 self.builder.finish_node();
             }
-            Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
-            Some(TOKEN_STRING_START) => self.parse_string(),
-            Some(t) if token_helpers::is_value(t) => {
+            TOKEN_DYNAMIC_START => self.parse_dynamic(),
+            TOKEN_STRING_START => self.parse_string(),
+            t if token_helpers::is_value(t) => {
                 self.start_node(NODE_VALUE);
                 self.bump();
                 self.builder.finish_node();
             }
-            Some(TOKEN_IDENT) => {
-                let checkpoint = self.checkpoint();
+            TOKEN_IDENT => {
                 self.start_node(NODE_IDENT);
                 self.bump();
                 self.builder.finish_node();
@@ -490,13 +501,12 @@ where
                     _ => (),
                 }
             }
-            Some(_) => {
+            _ => {
                 self.start_node(NODE_ERROR);
                 self.bump();
                 self.builder.finish_node();
             }
-            None => self.errors.push(ParseError::UnexpectedEOF),
-        }
+        };
 
         while self.peek() == Some(TOKEN_DOT) {
             self.builder.start_node_at(checkpoint, NODE_INDEX_SET);
@@ -510,30 +520,37 @@ where
             self.parse_val();
             self.builder.finish_node();
         }
+        checkpoint
     }
-    fn parse_fn(&mut self) {
-        let checkpoint = self.checkpoint();
-        self.parse_val();
+    fn parse_fn(&mut self) -> Checkpoint {
+        let checkpoint = self.parse_val();
 
         while self.peek().map(|t| token_helpers::is_fn_arg(t)).unwrap_or(false) {
             self.builder.start_node_at(checkpoint, NODE_APPLY);
             self.parse_val();
             self.builder.finish_node();
         }
+        checkpoint
     }
-    fn parse_negate(&mut self) {
+    fn parse_negate(&mut self) -> Checkpoint {
         if self.peek() == Some(TOKEN_SUB) {
+            let checkpoint = self.checkpoint();
             self.start_node(NODE_UNARY);
             self.bump();
             self.parse_negate();
             self.builder.finish_node();
+            checkpoint
         } else {
             self.parse_fn()
         }
     }
-    fn handle_operation(&mut self, once: bool, next: fn(&mut Self), ops: &[SyntaxKind]) {
-        let checkpoint = self.checkpoint();
-        next(self);
+    fn handle_operation(
+        &mut self,
+        once: bool,
+        next: fn(&mut Self) -> Checkpoint,
+        ops: &[SyntaxKind],
+    ) -> Checkpoint {
+        let checkpoint = next(self);
         while self.peek().map(|t| ops.contains(&t)).unwrap_or(false) {
             self.builder.start_node_at(checkpoint, NODE_OPERATION);
             self.bump();
@@ -543,58 +560,61 @@ where
                 break;
             }
         }
+        checkpoint
     }
-    fn parse_isset(&mut self) {
+    fn parse_isset(&mut self) -> Checkpoint {
         self.handle_operation(false, Self::parse_negate, &[TOKEN_QUESTION])
     }
-    fn parse_concat(&mut self) {
+    fn parse_concat(&mut self) -> Checkpoint {
         self.handle_operation(false, Self::parse_isset, &[TOKEN_CONCAT])
     }
-    fn parse_mul(&mut self) {
+    fn parse_mul(&mut self) -> Checkpoint {
         self.handle_operation(false, Self::parse_concat, &[TOKEN_MUL, TOKEN_DIV])
     }
-    fn parse_add(&mut self) {
+    fn parse_add(&mut self) -> Checkpoint {
         self.handle_operation(false, Self::parse_mul, &[TOKEN_ADD, TOKEN_SUB])
     }
-    fn parse_invert(&mut self) {
+    fn parse_invert(&mut self) -> Checkpoint {
         if self.peek() == Some(TOKEN_INVERT) {
+            let checkpoint = self.checkpoint();
             self.start_node(NODE_UNARY);
             self.bump();
             self.parse_invert();
             self.builder.finish_node();
+            checkpoint
         } else {
             self.parse_add()
         }
     }
-    fn parse_merge(&mut self) {
+    fn parse_merge(&mut self) -> Checkpoint {
         self.handle_operation(false, Self::parse_invert, &[TOKEN_MERGE])
     }
-    fn parse_compare(&mut self) {
+    fn parse_compare(&mut self) -> Checkpoint {
         self.handle_operation(
             true,
             Self::parse_merge,
             &[TOKEN_LESS, TOKEN_LESS_OR_EQ, TOKEN_MORE, TOKEN_MORE_OR_EQ],
         )
     }
-    fn parse_equal(&mut self) {
+    fn parse_equal(&mut self) -> Checkpoint {
         self.handle_operation(true, Self::parse_compare, &[TOKEN_EQUAL, TOKEN_NOT_EQUAL])
     }
-    fn parse_and(&mut self) {
+    fn parse_and(&mut self) -> Checkpoint {
         self.handle_operation(false, Self::parse_equal, &[TOKEN_AND])
     }
-    fn parse_or(&mut self) {
+    fn parse_or(&mut self) -> Checkpoint {
         self.handle_operation(false, Self::parse_and, &[TOKEN_OR])
     }
-    fn parse_implication(&mut self) {
+    fn parse_implication(&mut self) -> Checkpoint {
         self.handle_operation(false, Self::parse_or, &[TOKEN_IMPLICATION])
     }
     #[inline(always)]
-    fn parse_math(&mut self) {
+    fn parse_math(&mut self) -> Checkpoint {
         // Always point this to the lowest-level math function there is
         self.parse_implication()
     }
     /// Parse Nix code into an AST
-    pub fn parse_expr(&mut self) {
+    pub fn parse_expr(&mut self) -> Checkpoint {
         match self.peek() {
             Some(TOKEN_LET) => {
                 let checkpoint = self.checkpoint();
@@ -611,16 +631,20 @@ where
                     self.parse_expr();
                     self.builder.finish_node();
                 }
+                checkpoint
             }
             Some(TOKEN_WITH) => {
+                let checkpoint = self.checkpoint();
                 self.start_node(NODE_WITH);
                 self.bump();
                 self.parse_expr();
                 self.expect(TOKEN_SEMICOLON);
                 self.parse_expr();
                 self.builder.finish_node();
+                checkpoint
             }
             Some(TOKEN_IF) => {
+                let checkpoint = self.checkpoint();
                 self.start_node(NODE_IF_ELSE);
                 self.bump();
                 self.parse_expr();
@@ -629,14 +653,17 @@ where
                 self.expect(TOKEN_ELSE);
                 self.parse_expr();
                 self.builder.finish_node();
+                checkpoint
             }
             Some(TOKEN_ASSERT) => {
+                let checkpoint = self.checkpoint();
                 self.start_node(NODE_ASSERT);
                 self.bump();
                 self.parse_expr();
                 self.expect(TOKEN_SEMICOLON);
                 self.parse_expr();
                 self.builder.finish_node();
+                checkpoint
             }
             _ => self.parse_math(),
         }
@@ -668,6 +695,46 @@ mod tests {
     use super::*;
 
     use std::{ffi::OsStr, fmt::Write, fs, path::PathBuf};
+
+    #[test]
+    fn whitespace_attachment_for_incomplete_code() {
+        let code = "{
+  traceIf =
+    # predicate to check
+    pred:
+
+";
+        let ast = crate::parse(&code);
+        let actual = format!("{}", ast.root().dump());
+        // The core thing we want to check here is that `\n\n` belongs to the
+        // root node, and not to some incomplete inner node.
+        assert_eq!(actual.trim(), r##"
+NODE_ROOT 0..50 {
+  NODE_SET 0..48 {
+    TOKEN_CURLY_B_OPEN("{") 0..1
+    TOKEN_WHITESPACE("\n  ") 1..4
+    NODE_SET_ENTRY 4..48 {
+      NODE_ATTRIBUTE 4..11 {
+        NODE_IDENT 4..11 {
+          TOKEN_IDENT("traceIf") 4..11
+        }
+      }
+      TOKEN_WHITESPACE(" ") 11..12
+      TOKEN_ASSIGN("=") 12..13
+      TOKEN_WHITESPACE("\n    ") 13..18
+      TOKEN_COMMENT("# predicate to check") 18..38
+      TOKEN_WHITESPACE("\n    ") 38..43
+      NODE_LAMBDA 43..48 {
+        NODE_IDENT 43..47 {
+          TOKEN_IDENT("pred") 43..47
+        }
+        TOKEN_COLON(":") 47..48
+      }
+    }
+  }
+  TOKEN_WHITESPACE("\n\n") 48..50
+}"##.trim());
+    }
 
     fn test_dir(name: &str) {
         let dir: PathBuf = ["test_data", "parser", name].iter().collect();
