@@ -1,12 +1,6 @@
-let 
-  nixpkgs-mozilla = fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz;
-in
-
-with import <nixpkgs> {
-  overlays = [ (import nixpkgs-mozilla) ];
-};
+with import <nixpkgs> { };
 
 stdenv.mkDerivation {
   name = "rnix";
-  buildInputs = [ latest.rustChannels.nightly.rust ];
+  buildInputs = [ cargo ];
 }
