@@ -3,9 +3,14 @@
 use std::{collections::VecDeque, fmt};
 
 use cbitset::BitSet256;
-use rowan::{Checkpoint, GreenNodeBuilder, SmolStr, SyntaxKind, SyntaxNode, TextRange, TreeArc};
+use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, SmolStr, TextRange};
 
-use crate::types::{Root, TypedNode};
+use crate::{
+    types::{Root, TypedNode},
+    NixLanguage,
+    SyntaxKind::{self, *},
+    SyntaxNode,
+};
 
 const OR: &'static str = "or";
 
@@ -31,74 +36,20 @@ impl fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-/// The type of a node in the AST
-pub mod nodes {
-    pub use crate::tokenizer::tokens::*;
-    use rowan::SyntaxKind;
-
-    pub fn syntax_name(val: SyntaxKind) -> Option<&'static str> {
-        token_name(val).or_else(|| node_name(val))
-    }
-
-    // Generates the constants like an enum, see lib.rs
-    magic! {
-        start 100;
-        lookup node_name;
-
-        NODE_APPLY
-        NODE_ASSERT
-        NODE_ATTRIBUTE
-        NODE_DYNAMIC
-        NODE_ERROR
-        NODE_IDENT
-        NODE_IF_ELSE
-        NODE_INDEX_SET
-        NODE_INHERIT
-        NODE_INHERIT_FROM
-        NODE_STRING
-        NODE_STRING_INTERPOL
-        NODE_LAMBDA
-        NODE_LET
-        NODE_LET_IN
-        NODE_LIST
-        NODE_OPERATION
-        NODE_OR_DEFAULT
-        NODE_PAREN
-        NODE_PATTERN
-        NODE_PAT_BIND
-        NODE_PAT_ENTRY
-        NODE_ROOT
-        NODE_SET
-        NODE_SET_ENTRY
-        NODE_UNARY
-        NODE_VALUE
-        NODE_WITH
-    }
-}
-use self::nodes::*;
-
 /// The result of a parse
 #[derive(Clone)]
 pub struct AST {
-    node: TreeArc<SyntaxNode>,
+    node: GreenNode,
     errors: Vec<ParseError>,
 }
 impl AST {
     /// Return the root node
-    pub fn into_node(self) -> TreeArc<SyntaxNode> {
-        self.node
-    }
-    /// Return a reference to the root node
-    pub fn node(&self) -> &SyntaxNode {
-        &self.node
+    pub fn node(&self) -> SyntaxNode {
+        SyntaxNode::new_root(self.node.clone())
     }
     /// Return a borrowed typed root node
-    pub fn root(&self) -> &Root {
-        Root::cast(&self.node).unwrap()
-    }
-    /// Return an owned typed root node
-    pub fn into_root(self) -> TreeArc<Root> {
-        TreeArc::cast(self.node)
+    pub fn root(&self) -> Root {
+        Root::cast(self.node()).unwrap()
     }
     /// Return all the errors that occured while parsing - NOT
     /// including invalid stuff in the AST
@@ -109,7 +60,7 @@ impl AST {
     pub fn errors(&self) -> Vec<ParseError> {
         let mut errors = self.errors.clone();
         errors.extend(
-            self.root().errors().into_iter().map(|node| ParseError::Unexpected(node.range())),
+            self.root().errors().into_iter().map(|node| ParseError::Unexpected(node.text_range())),
         );
 
         errors
@@ -120,7 +71,7 @@ impl AST {
             return Err(err.clone());
         }
         if let Some(node) = self.root().errors().first() {
-            return Err(ParseError::Unexpected(node.range()));
+            return Err(ParseError::Unexpected(node.text_range()));
         }
         Ok(self)
     }
@@ -164,36 +115,42 @@ where
         self.peek();
         self.trivia_buffer.drain(..).for_each({
             let builder = &mut self.builder;
-            move |(t, s)| builder.token(t, s)
+            move |(t, s)| builder.token(NixLanguage::kind_to_raw(t), s)
         });
     }
     fn start_node(&mut self, kind: SyntaxKind) {
         self.eat_trivia();
-        self.builder.start_node(kind);
+        self.builder.start_node(NixLanguage::kind_to_raw(kind));
     }
     fn checkpoint(&mut self) -> Checkpoint {
         self.eat_trivia();
         self.builder.checkpoint()
     }
+    fn start_node_at(&mut self, checkpoint: Checkpoint, kind: SyntaxKind) {
+        self.builder.start_node_at(checkpoint, NixLanguage::kind_to_raw(kind));
+    }
+    fn finish_node(&mut self) {
+        self.builder.finish_node();
+    }
     fn bump(&mut self) {
         let next = self.buffer.pop_front().or_else(|| self.iter.next());
         match next {
             Some((token, s)) => {
-                if token_helpers::is_trivia(token) {
+                if token.is_trivia() {
                     self.trivia_buffer.push((token, s))
                 } else {
                     self.trivia_buffer.drain(..).for_each({
                         let builder = &mut self.builder;
-                        move |(t, s)| builder.token(t, s)
+                        move |(t, s)| builder.token(NixLanguage::kind_to_raw(t), s)
                     });
-                    self.builder.token(token, s)
+                    self.builder.token(NixLanguage::kind_to_raw(token), s)
                 }
             }
             None => self.errors.push(ParseError::UnexpectedEOF),
         }
     }
     fn peek_data(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
-        while self.peek_raw().map(|&(t, _)| token_helpers::is_trivia(t)).unwrap_or(false) {
+        while self.peek_raw().map(|&(t, _)| t.is_trivia()).unwrap_or(false) {
             self.bump();
         }
         self.peek_raw()
@@ -202,20 +159,20 @@ where
         self.peek_data().map(|&(t, _)| t)
     }
     fn expect_peek_any(&mut self, allowed_slice: &[SyntaxKind]) -> Option<SyntaxKind> {
-        let allowed: BitSet256 = allowed_slice.iter().map(|k| k.0).collect();
+        let allowed: BitSet256 = allowed_slice.iter().map(|&k| k as u16).collect();
 
         let next = match self.peek() {
             None => None,
-            Some(kind) if allowed.contains(kind.0 as usize) => Some(kind),
+            Some(kind) if allowed.contains(kind as usize) => Some(kind),
             Some(_) => {
                 self.start_node(NODE_ERROR);
                 loop {
                     self.bump();
-                    if self.peek().map(|kind| allowed.contains(kind.0 as usize)).unwrap_or(true) {
+                    if self.peek().map(|kind| allowed.contains(kind as usize)).unwrap_or(true) {
                         break;
                     }
                 }
-                self.builder.finish_node();
+                self.finish_node();
                 self.peek()
             }
         };
@@ -238,7 +195,7 @@ where
             self.parse_expr();
         }
         self.bump();
-        self.builder.finish_node();
+        self.finish_node();
     }
     fn parse_string(&mut self) {
         self.start_node(NODE_STRING);
@@ -256,7 +213,7 @@ where
                     self.bump();
                     self.parse_expr();
                     self.expect(TOKEN_INTERPOL_END);
-                    self.builder.finish_node();
+                    self.finish_node();
                 }
                 // handled by expect_peek_any
                 _ => break,
@@ -264,7 +221,7 @@ where
         }
         self.expect(TOKEN_STRING_END);
 
-        self.builder.finish_node();
+        self.finish_node();
     }
     fn next_attr(&mut self) {
         match self.peek() {
@@ -273,7 +230,7 @@ where
             _ => {
                 self.start_node(NODE_IDENT);
                 self.expect(TOKEN_IDENT);
-                self.builder.finish_node();
+                self.finish_node();
             }
         }
     }
@@ -288,7 +245,7 @@ where
                 break;
             }
         }
-        self.builder.finish_node();
+        self.finish_node();
     }
     fn parse_pattern(&mut self, bound: bool) {
         if self.peek().map(|t| t == TOKEN_CURLY_B_CLOSE).unwrap_or(true) {
@@ -310,13 +267,13 @@ where
 
                         self.start_node(NODE_IDENT);
                         self.bump();
-                        self.builder.finish_node();
+                        self.finish_node();
 
                         if let Some(TOKEN_QUESTION) = self.peek() {
                             self.bump();
                             self.parse_expr();
                         }
-                        self.builder.finish_node();
+                        self.finish_node();
 
                         match self.peek() {
                             Some(TOKEN_COMMA) => self.bump(),
@@ -338,8 +295,8 @@ where
             self.bump();
             self.start_node(NODE_IDENT);
             self.expect(TOKEN_IDENT);
-            self.builder.finish_node();
-            self.builder.finish_node();
+            self.finish_node();
+            self.finish_node();
         }
     }
     fn parse_set(&mut self, until: SyntaxKind) {
@@ -356,17 +313,17 @@ where
                         self.bump();
                         self.parse_expr();
                         self.expect(TOKEN_PAREN_CLOSE);
-                        self.builder.finish_node();
+                        self.finish_node();
                     }
 
                     while let Some(TOKEN_IDENT) = self.peek() {
                         self.start_node(NODE_IDENT);
                         self.bump();
-                        self.builder.finish_node();
+                        self.finish_node();
                     }
 
                     self.expect(TOKEN_SEMICOLON);
-                    self.builder.finish_node();
+                    self.finish_node();
                 }
                 Some(_) => {
                     self.start_node(NODE_SET_ENTRY);
@@ -374,7 +331,7 @@ where
                     self.expect(TOKEN_ASSIGN);
                     self.parse_expr();
                     self.expect(TOKEN_SEMICOLON);
-                    self.builder.finish_node();
+                    self.finish_node();
                 }
             }
         }
@@ -400,14 +357,14 @@ where
                 self.bump();
                 self.parse_expr();
                 self.bump();
-                self.builder.finish_node();
+                self.finish_node();
             }
             TOKEN_REC => {
                 self.start_node(NODE_SET);
                 self.bump();
                 self.expect(TOKEN_CURLY_B_OPEN);
                 self.parse_set(TOKEN_CURLY_B_CLOSE);
-                self.builder.finish_node();
+                self.finish_node();
             }
             TOKEN_CURLY_B_OPEN => {
                 // Do a lookahead:
@@ -420,7 +377,7 @@ where
                         if let Some(token) = token {
                             self.buffer.push_back(token);
                         }
-                        if kind.map(|t| !token_helpers::is_trivia(t)).unwrap_or(true) {
+                        if kind.map(|t| !t.is_trivia()).unwrap_or(true) {
                             break kind;
                         }
                     };
@@ -439,19 +396,19 @@ where
                         self.start_node(NODE_PATTERN);
                         self.bump();
                         self.parse_pattern(false);
-                        self.builder.finish_node();
+                        self.finish_node();
 
                         self.expect(TOKEN_COLON);
                         self.parse_expr();
 
-                        self.builder.finish_node();
+                        self.finish_node();
                     }
                     _ => {
                         // This looks like a set
                         self.start_node(NODE_SET);
                         self.bump();
                         self.parse_set(TOKEN_CURLY_B_CLOSE);
-                        self.builder.finish_node();
+                        self.finish_node();
                     }
                 }
             }
@@ -462,41 +419,41 @@ where
                     self.parse_val();
                 }
                 self.bump();
-                self.builder.finish_node();
+                self.finish_node();
             }
             TOKEN_DYNAMIC_START => self.parse_dynamic(),
             TOKEN_STRING_START => self.parse_string(),
-            t if token_helpers::is_value(t) => {
+            t if t.is_value() => {
                 self.start_node(NODE_VALUE);
                 self.bump();
-                self.builder.finish_node();
+                self.finish_node();
             }
             TOKEN_IDENT => {
                 self.start_node(NODE_IDENT);
                 self.bump();
-                self.builder.finish_node();
+                self.finish_node();
 
                 match self.peek() {
                     Some(TOKEN_COLON) => {
-                        self.builder.start_node_at(checkpoint, NODE_LAMBDA);
+                        self.start_node_at(checkpoint, NODE_LAMBDA);
                         self.bump();
                         self.parse_expr();
-                        self.builder.finish_node();
+                        self.finish_node();
                     }
                     Some(TOKEN_AT) => {
-                        self.builder.start_node_at(checkpoint, NODE_LAMBDA);
-                        self.builder.start_node_at(checkpoint, NODE_PATTERN);
-                        self.builder.start_node_at(checkpoint, NODE_PAT_BIND);
+                        self.start_node_at(checkpoint, NODE_LAMBDA);
+                        self.start_node_at(checkpoint, NODE_PATTERN);
+                        self.start_node_at(checkpoint, NODE_PAT_BIND);
                         self.bump();
-                        self.builder.finish_node(); // PatBind
+                        self.finish_node(); // PatBind
 
                         self.expect(TOKEN_CURLY_B_OPEN);
                         self.parse_pattern(true);
-                        self.builder.finish_node(); // Pattern
+                        self.finish_node(); // Pattern
 
                         self.expect(TOKEN_COLON);
                         self.parse_expr();
-                        self.builder.finish_node(); // Lambda
+                        self.finish_node(); // Lambda
                     }
                     _ => (),
                 }
@@ -504,31 +461,31 @@ where
             _ => {
                 self.start_node(NODE_ERROR);
                 self.bump();
-                self.builder.finish_node();
+                self.finish_node();
             }
         };
 
         while self.peek() == Some(TOKEN_DOT) {
-            self.builder.start_node_at(checkpoint, NODE_INDEX_SET);
+            self.start_node_at(checkpoint, NODE_INDEX_SET);
             self.bump();
             self.next_attr();
-            self.builder.finish_node();
+            self.finish_node();
         }
         if self.peek_data().map(|&(t, ref s)| t == TOKEN_IDENT && s == OR).unwrap_or(false) {
-            self.builder.start_node_at(checkpoint, NODE_OR_DEFAULT);
+            self.start_node_at(checkpoint, NODE_OR_DEFAULT);
             self.bump();
             self.parse_val();
-            self.builder.finish_node();
+            self.finish_node();
         }
         checkpoint
     }
     fn parse_fn(&mut self) -> Checkpoint {
         let checkpoint = self.parse_val();
 
-        while self.peek().map(|t| token_helpers::is_fn_arg(t)).unwrap_or(false) {
-            self.builder.start_node_at(checkpoint, NODE_APPLY);
+        while self.peek().map(|t| t.is_fn_arg()).unwrap_or(false) {
+            self.start_node_at(checkpoint, NODE_APPLY);
             self.parse_val();
-            self.builder.finish_node();
+            self.finish_node();
         }
         checkpoint
     }
@@ -538,7 +495,7 @@ where
             self.start_node(NODE_UNARY);
             self.bump();
             self.parse_negate();
-            self.builder.finish_node();
+            self.finish_node();
             checkpoint
         } else {
             self.parse_fn()
@@ -552,10 +509,10 @@ where
     ) -> Checkpoint {
         let checkpoint = next(self);
         while self.peek().map(|t| ops.contains(&t)).unwrap_or(false) {
-            self.builder.start_node_at(checkpoint, NODE_OPERATION);
+            self.start_node_at(checkpoint, NODE_OPERATION);
             self.bump();
             next(self);
-            self.builder.finish_node();
+            self.finish_node();
             if once {
                 break;
             }
@@ -580,7 +537,7 @@ where
             self.start_node(NODE_UNARY);
             self.bump();
             self.parse_invert();
-            self.builder.finish_node();
+            self.finish_node();
             checkpoint
         } else {
             self.parse_add()
@@ -621,15 +578,15 @@ where
                 self.bump();
 
                 if self.peek() == Some(TOKEN_CURLY_B_OPEN) {
-                    self.builder.start_node_at(checkpoint, NODE_LET);
+                    self.start_node_at(checkpoint, NODE_LET);
                     self.bump();
                     self.parse_set(TOKEN_CURLY_B_CLOSE);
-                    self.builder.finish_node();
+                    self.finish_node();
                 } else {
-                    self.builder.start_node_at(checkpoint, NODE_LET_IN);
+                    self.start_node_at(checkpoint, NODE_LET_IN);
                     self.parse_set(TOKEN_IN);
                     self.parse_expr();
-                    self.builder.finish_node();
+                    self.finish_node();
                 }
                 checkpoint
             }
@@ -640,7 +597,7 @@ where
                 self.parse_expr();
                 self.expect(TOKEN_SEMICOLON);
                 self.parse_expr();
-                self.builder.finish_node();
+                self.finish_node();
                 checkpoint
             }
             Some(TOKEN_IF) => {
@@ -652,7 +609,7 @@ where
                 self.parse_expr();
                 self.expect(TOKEN_ELSE);
                 self.parse_expr();
-                self.builder.finish_node();
+                self.finish_node();
                 checkpoint
             }
             Some(TOKEN_ASSERT) => {
@@ -662,7 +619,7 @@ where
                 self.parse_expr();
                 self.expect(TOKEN_SEMICOLON);
                 self.parse_expr();
-                self.builder.finish_node();
+                self.finish_node();
                 checkpoint
             }
             _ => self.parse_math(),
@@ -676,10 +633,10 @@ where
     I: IntoIterator<Item = (SyntaxKind, SmolStr)>,
 {
     let mut parser = Parser::new(iter.into_iter());
-    parser.builder.start_node(NODE_ROOT);
+    parser.builder.start_node(NixLanguage::kind_to_raw(NODE_ROOT));
     parser.parse_expr();
     if parser.peek().is_some() {
-        parser.builder.start_node(NODE_ERROR);
+        parser.builder.start_node(NixLanguage::kind_to_raw(NODE_ERROR));
         while parser.peek().is_some() {
             parser.bump();
         }
@@ -687,7 +644,7 @@ where
     }
     parser.eat_trivia();
     parser.builder.finish_node();
-    AST { node: SyntaxNode::new(parser.builder.finish(), None), errors: parser.errors }
+    AST { node: parser.builder.finish(), errors: parser.errors }
 }
 
 #[cfg(test)]
@@ -708,7 +665,9 @@ mod tests {
         let actual = format!("{}", ast.root().dump());
         // The core thing we want to check here is that `\n\n` belongs to the
         // root node, and not to some incomplete inner node.
-        assert_eq!(actual.trim(), r##"
+        assert_eq!(
+            actual.trim(),
+            r##"
 NODE_ROOT 0..50 {
   NODE_SET 0..48 {
     TOKEN_CURLY_B_OPEN("{") 0..1
@@ -733,7 +692,9 @@ NODE_ROOT 0..50 {
     }
   }
   TOKEN_WHITESPACE("\n\n") 48..50
-}"##.trim());
+}"##
+            .trim()
+        );
     }
 
     fn test_dir(name: &str) {

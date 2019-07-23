@@ -1,34 +1,23 @@
 //! Provides a type system for the AST, in some sense
+use std::fmt;
 
 use crate::{
-    parser::nodes::*,
     value::{self, StrPart, Value as ParsedValue, ValueError},
+    NodeOrToken, SyntaxElement,
+    SyntaxKind::{self, *},
+    SyntaxNode, SyntaxToken, WalkEvent,
 };
-
-use rowan::{
-    SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken, TransparentNewType, TreeArc, WalkEvent,
-};
-use std::fmt;
 
 macro_rules! typed {
     ($($kind:expr => $name:ident$(: $trait:ident)*$(: { $($block:tt)* })*),*) => {
         $(
-            #[repr(transparent)]
+            #[derive(Clone)]
             pub struct $name(SyntaxNode);
 
-            unsafe impl TransparentNewType for $name {
-                type Repr = SyntaxNode;
-            }
-            impl ToOwned for $name {
-                type Owned = TreeArc<Self>;
-                fn to_owned(&self) -> Self::Owned {
-                    TreeArc::cast(self.node().to_owned())
-                }
-            }
             impl TypedNode for $name {
-                fn cast(from: &SyntaxNode) -> Option<&Self> {
-                    if from.kind() == $kind.into() {
-                        Some(Self::from_repr(from))
+                fn cast(from: SyntaxNode) -> Option<Self> {
+                    if from.kind() == $kind {
+                        Some(Self(from))
                     } else {
                         None
                     }
@@ -119,9 +108,9 @@ impl UnaryOpKind {
 
 /// A struct that prints out the textual representation of a node in a
 /// stable format. See TypedNode::dump.
-pub struct TextDump<'a>(&'a SyntaxNode);
+pub struct TextDump(SyntaxNode);
 
-impl fmt::Display for TextDump<'_> {
+impl fmt::Display for TextDump {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut indent = 0;
         let mut skip_newline = true;
@@ -131,27 +120,21 @@ impl fmt::Display for TextDump<'_> {
             } else {
                 writeln!(f)?;
             }
-            match event {
+            match &event {
                 WalkEvent::Enter(enter) => {
-                    write!(
-                        f,
-                        "{:i$}{}",
-                        "",
-                        syntax_name(enter.kind()).expect("invalid ast"),
-                        i = indent
-                    )?;
-                    if let SyntaxElement::Token(token) = enter {
+                    write!(f, "{:i$}{:?}", "", enter.kind(), i = indent)?;
+                    if let NodeOrToken::Token(token) = enter {
                         write!(f, "(\"{}\")", token.text().escape_default())?
                     }
-                    write!(f, " {}..{}", enter.range().start(), enter.range().end())?;
-                    if let SyntaxElement::Node(_) = enter {
+                    write!(f, " {}..{}", enter.text_range().start(), enter.text_range().end())?;
+                    if let NodeOrToken::Node(_) = enter {
                         write!(f, " {{")?;
                     }
                     indent += 2;
                 }
                 WalkEvent::Leave(leave) => {
                     indent -= 2;
-                    if let SyntaxElement::Node(_) = leave {
+                    if let NodeOrToken::Node(_) = leave {
                         write!(f, "{:i$}}}", "", i = indent)?;
                     } else {
                         skip_newline = true;
@@ -165,39 +148,28 @@ impl fmt::Display for TextDump<'_> {
 
 /// Internal function to get an iterator over non-trivia tokens
 pub(crate) fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
-    node.children_with_tokens().filter_map(|elem| {
-        if let SyntaxElement::Token(token) = elem {
-            if !token_helpers::is_trivia(token.kind()) {
-                return Some(token);
-            }
-        }
-        None
-    })
+    node.children_with_tokens()
+        .filter_map(|element| element.into_token())
+        .filter(|token| !token.kind().is_trivia())
 }
 
 /// A TypedNode is simply a wrapper around an untyped node to provide a type
 /// system in some sense.
-pub trait TypedNode: TransparentNewType<Repr = SyntaxNode> + ToOwned + Sized {
+pub trait TypedNode: Clone {
     /// Cast an untyped node into this strongly-typed node. This will return
     /// None if the type was not correct.
-    fn cast(from: &SyntaxNode) -> Option<&Self>;
+    fn cast(from: SyntaxNode) -> Option<Self>;
     /// Return a reference to the inner untyped node
     fn node(&self) -> &SyntaxNode;
     /// Return all errors of all children, recursively
     fn errors(&self) -> Vec<SyntaxElement> {
-        let mut bucket = Vec::new();
-        for event in self.node().preorder_with_tokens() {
-            if let WalkEvent::Enter(node) = event {
-                // Empty errors can happen if it encounteres EOF while
-                // creating them, which in case a root error is added.
-                if !node.range().is_empty()
-                    && (node.kind() == NODE_ERROR || node.kind() == TOKEN_ERROR)
-                {
-                    bucket.push(node);
-                }
-            }
-        }
-        bucket
+        self.node()
+            .descendants_with_tokens()
+            // Empty errors can happen if it encounteres EOF while
+            // creating them, which in case a root error is added.
+            .filter(|node| node.text_range().is_empty())
+            .filter(|node| node.kind() == NODE_ERROR || node.kind() == TOKEN_ERROR)
+            .collect()
     }
     /// Return the first non-trivia token
     fn first_token(&self) -> Option<SyntaxToken> {
@@ -206,65 +178,71 @@ pub trait TypedNode: TransparentNewType<Repr = SyntaxNode> + ToOwned + Sized {
     /// Return a dump of the AST. One of the goals is to be a stable
     /// format that can be used in tests.
     fn dump(&self) -> TextDump {
-        TextDump(self.node())
+        TextDump(self.node().clone())
     }
 }
+
+pub trait TokenWrapper: TypedNode {
+    fn as_str(&self) -> &str {
+        self.node().green().children()[0].as_token().unwrap().text().as_str()
+    }
+}
+
 /// Provides the function `.entries()`
 pub trait EntryHolder: TypedNode {
     /// Return an iterator over all key=value entries
-    fn entries<'a>(&'a self) -> Box<Iterator<Item = &'a SetEntry> + 'a> {
+    fn entries(&self) -> Box<Iterator<Item = SetEntry>> {
         Box::new(self.node().children().filter_map(SetEntry::cast))
     }
     /// Return an iterator over all inherit entries
-    fn inherits<'a>(&'a self) -> Box<Iterator<Item = &'a Inherit> + 'a> {
+    fn inherits(&self) -> Box<Iterator<Item = Inherit>> {
         Box::new(self.node().children().filter_map(Inherit::cast))
     }
 }
 /// Provides the function `.inner()` for wrapping types like parenthensis
 pub trait Wrapper: TypedNode {
     /// Return the inner value
-    fn inner(&self) -> Option<&SyntaxNode> {
+    fn inner(&self) -> Option<SyntaxNode> {
         nth!(self; 0)
     }
 }
 
 pub struct ParsedTypeError(SyntaxKind);
 
-pub enum ParsedType<'a> {
-    Apply(&'a Apply),
-    Assert(&'a Assert),
-    Attribute(&'a Attribute),
-    Dynamic(&'a Dynamic),
-    Error(&'a Error),
-    Ident(&'a Ident),
-    IfElse(&'a IfElse),
-    IndexSet(&'a IndexSet),
-    Inherit(&'a Inherit),
-    InheritFrom(&'a InheritFrom),
-    Lambda(&'a Lambda),
-    Let(&'a Let),
-    LetIn(&'a LetIn),
-    List(&'a List),
-    Operation(&'a Operation),
-    OrDefault(&'a OrDefault),
-    Paren(&'a Paren),
-    PatBind(&'a PatBind),
-    PatEntry(&'a PatEntry),
-    Pattern(&'a Pattern),
-    Root(&'a Root),
-    Set(&'a Set),
-    SetEntry(&'a SetEntry),
-    Str(&'a Str),
-    TextDump(&'a TextDump<'a>),
-    Unary(&'a Unary),
-    Value(&'a Value),
-    With(&'a With)
+pub enum ParsedType {
+    Apply(Apply),
+    Assert(Assert),
+    Attribute(Attribute),
+    Dynamic(Dynamic),
+    Error(Error),
+    Ident(Ident),
+    IfElse(IfElse),
+    IndexSet(IndexSet),
+    Inherit(Inherit),
+    InheritFrom(InheritFrom),
+    Lambda(Lambda),
+    Let(Let),
+    LetIn(LetIn),
+    List(List),
+    Operation(Operation),
+    OrDefault(OrDefault),
+    Paren(Paren),
+    PatBind(PatBind),
+    PatEntry(PatEntry),
+    Pattern(Pattern),
+    Root(Root),
+    Set(Set),
+    SetEntry(SetEntry),
+    Str(Str),
+    Unary(Unary),
+    Value(Value),
+    With(With),
 }
 
-impl<'a> core::convert::TryFrom<&'a SyntaxNode> for ParsedType<'a> {
+impl core::convert::TryFrom<SyntaxNode> for ParsedType {
     type Error = ParsedTypeError;
 
-    fn try_from(node: &'a SyntaxNode) -> Result<Self, ParsedTypeError> {
+    fn try_from(node: SyntaxNode) -> Result<Self, ParsedTypeError> {
         match node.kind() {
             NODE_APPLY => Ok(ParsedType::Apply(Apply::cast(node).unwrap())),
             NODE_ASSERT => Ok(ParsedType::Assert(Assert::cast(node).unwrap())),
@@ -293,24 +271,15 @@ impl<'a> core::convert::TryFrom<&'a SyntaxNode> for ParsedType<'a> {
             NODE_UNARY => Ok(ParsedType::Unary(Unary::cast(node).unwrap())),
             NODE_VALUE => Ok(ParsedType::Value(Value::cast(node).unwrap())),
             NODE_WITH => Ok(ParsedType::With(With::cast(node).unwrap())),
-            other => Err(ParsedTypeError(other))
+            other => Err(ParsedTypeError(other)),
         }
     }
 }
 
 typed! [
-    NODE_IDENT => Ident: {
-        /// Return the identifier as a string
-        pub fn as_str(&self) -> &str {
-            self.first_token().expect("invalid ast").text()
-        }
+    NODE_IDENT => Ident: TokenWrapper: {
     },
-    NODE_VALUE => Value: {
-        /// Return the value as a string
-        pub fn as_str(&self) -> &str {
-            self.first_token().expect("invalid ast").text()
-        }
-
+    NODE_VALUE => Value: TokenWrapper: {
         /// Parse the value
         pub fn to_value(&self) -> Result<ParsedValue, ValueError> {
             ParsedValue::from_token(self.first_token().expect("invalid ast").kind(), self.as_str())
@@ -319,27 +288,27 @@ typed! [
 
     NODE_APPLY => Apply: {
         /// Return the lambda being applied
-        pub fn lambda(&self) -> Option<&SyntaxNode> {
+        pub fn lambda(&self) -> Option<SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the value which the lambda is being applied with
-        pub fn value(&self) -> Option<&SyntaxNode> {
+        pub fn value(&self) -> Option<SyntaxNode> {
             nth!(self; 1)
         }
     },
     NODE_ASSERT => Assert: {
         /// Return the assert condition
-        pub fn condition(&self) -> Option<&SyntaxNode> {
+        pub fn condition(&self) -> Option<SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the success body
-        pub fn body(&self) -> Option<&SyntaxNode> {
+        pub fn body(&self) -> Option<SyntaxNode> {
             nth!(self; 1)
         }
     },
     NODE_ATTRIBUTE => Attribute: {
         /// Return the path as an iterator of identifiers
-        pub fn path<'a>(&'a self) -> impl Iterator<Item = &SyntaxNode> + 'a {
+        pub fn path<'a>(&'a self) -> impl Iterator<Item = SyntaxNode> + 'a {
             self.node().children()
         }
     },
@@ -347,36 +316,36 @@ typed! [
     NODE_ERROR => Error,
     NODE_IF_ELSE => IfElse: {
         /// Return the condition
-        pub fn condition(&self) -> Option<&SyntaxNode> {
+        pub fn condition(&self) -> Option<SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the success body
-        pub fn body(&self) -> Option<&SyntaxNode> {
+        pub fn body(&self) -> Option<SyntaxNode> {
             nth!(self; 1)
         }
         /// Return the else body
-        pub fn else_body(&self) -> Option<&SyntaxNode> {
+        pub fn else_body(&self) -> Option<SyntaxNode> {
             nth!(self; 2)
         }
     },
     NODE_INDEX_SET => IndexSet: {
         /// Return the set being indexed
-        pub fn set(&self) -> Option<&SyntaxNode> {
+        pub fn set(&self) -> Option<SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the index
-        pub fn index(&self) -> Option<&SyntaxNode> {
+        pub fn index(&self) -> Option<SyntaxNode> {
             nth!(self; 1)
         }
     },
     NODE_INHERIT => Inherit: {
         /// Return the set where keys are being inherited from, if any
-        pub fn from(&self) -> Option<&InheritFrom> {
+        pub fn from(&self) -> Option<InheritFrom> {
             self.node().children()
                 .find_map(InheritFrom::cast)
         }
         /// Return all the identifiers being inherited
-        pub fn idents(&self) -> impl Iterator<Item = &Ident> {
+        pub fn idents(&self) -> impl Iterator<Item = Ident> {
             self.node().children().filter_map(Ident::cast)
         }
     },
@@ -389,30 +358,30 @@ typed! [
     },
     NODE_LAMBDA => Lambda: {
         /// Return the argument of the lambda
-        pub fn arg(&self) -> Option<&SyntaxNode> {
+        pub fn arg(&self) -> Option<SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the body of the lambda
-        pub fn body(&self) -> Option<&SyntaxNode> {
+        pub fn body(&self) -> Option<SyntaxNode> {
             nth!(self; 1)
         }
     },
     NODE_LET => Let: EntryHolder,
     NODE_LET_IN => LetIn: EntryHolder: {
         /// Return the body
-        pub fn body(&self) -> Option<&SyntaxNode> {
+        pub fn body(&self) -> Option<SyntaxNode> {
             self.node().last_child()
         }
     },
     NODE_LIST => List: {
         /// Return an iterator over items in the list
-        pub fn items(&self) -> impl Iterator<Item = &SyntaxNode> {
+        pub fn items(&self) -> impl Iterator<Item = SyntaxNode> {
             self.node().children()
         }
     },
     NODE_OPERATION => Operation: {
         /// Return the first value in the operation
-        pub fn value1(&self) -> Option<&SyntaxNode> {
+        pub fn value1(&self) -> Option<SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the operator
@@ -420,40 +389,40 @@ typed! [
             self.first_token().and_then(|t| OpKind::from_token(t.kind())).expect("invalid ast")
         }
         /// Return the second value in the operation
-        pub fn value2(&self) -> Option<&SyntaxNode> {
+        pub fn value2(&self) -> Option<SyntaxNode> {
             nth!(self; 1)
         }
     },
     NODE_OR_DEFAULT => OrDefault: {
         /// Return the indexing operation
-        pub fn index(&self) -> Option<&IndexSet> {
+        pub fn index(&self) -> Option<IndexSet> {
             nth!(self; (IndexSet) 0)
         }
         /// Return the default value
-        pub fn default(&self) -> Option<&SyntaxNode> {
+        pub fn default(&self) -> Option<SyntaxNode> {
             nth!(self; 1)
         }
     },
     NODE_PAREN => Paren: Wrapper,
     NODE_PAT_BIND => PatBind: {
         /// Return the identifier the set is being bound as
-        pub fn name(&self) -> Option<&Ident> {
+        pub fn name(&self) -> Option<Ident> {
             nth!(self; (Ident) 0)
         }
     },
     NODE_PAT_ENTRY => PatEntry: {
         /// Return the identifier the argument is being bound as
-        pub fn name(&self) -> Option<&Ident> {
+        pub fn name(&self) -> Option<Ident> {
             nth!(self; (Ident) 0)
         }
         /// Return the default value, if any
-        pub fn default(&self) -> Option<&SyntaxNode> {
+        pub fn default(&self) -> Option<SyntaxNode> {
             self.node().children().nth(1)
         }
     },
     NODE_PATTERN => Pattern: {
         /// Return an iterator over all pattern entries
-        pub fn entries(&self) -> impl Iterator<Item = &PatEntry> {
+        pub fn entries(&self) -> impl Iterator<Item = PatEntry> {
             self.node().children().filter_map(PatEntry::cast)
         }
         /// Returns true if this pattern is inexact (has an ellipsis, ...)
@@ -463,7 +432,7 @@ typed! [
         /// Returns a clone of the tree root but without entries where the
         /// callback function returns false
         /// { a, b, c } without b is { a, c }
-        pub fn filter_entries<F>(&self, _callback: F) -> TreeArc<Root>
+        pub fn filter_entries<F>(&self, _callback: F) -> Root
             where F: FnMut(&PatEntry) -> bool
         {
             unimplemented!("TODO: filter_entries or better editing API")
@@ -478,7 +447,7 @@ typed! [
         /// Returns a clone of the tree root but without entries where the
         /// callback function returns false
         /// { a = 2; b = 3; } without 0 is { b = 3; }
-        pub fn filter_entries<F>(&self, _callback: F) -> TreeArc<Root>
+        pub fn filter_entries<F>(&self, _callback: F) -> Root
             where F: FnMut(&SetEntry) -> bool
         {
             unimplemented!("TODO: filter_entries or better editing API")
@@ -486,11 +455,11 @@ typed! [
     },
     NODE_SET_ENTRY => SetEntry: {
         /// Return this entry's key
-        pub fn key(&self) -> Option<&Attribute> {
+        pub fn key(&self) -> Option<Attribute> {
             nth!(self; (Attribute) 0)
         }
         /// Return this entry's value
-        pub fn value(&self) -> Option<&SyntaxNode> {
+        pub fn value(&self) -> Option<SyntaxNode> {
             nth!(self; 1)
         }
     },
@@ -500,17 +469,17 @@ typed! [
             self.first_token().and_then(|t| UnaryOpKind::from_token(t.kind())).expect("invalid ast")
         }
         /// Return the value in the operation
-        pub fn value(&self) -> Option<&SyntaxNode> {
+        pub fn value(&self) -> Option<SyntaxNode> {
             nth!(self; 0)
         }
     },
     NODE_WITH => With: {
         /// Return the namespace
-        pub fn namespace(&self) -> Option<&SyntaxNode> {
+        pub fn namespace(&self) -> Option<SyntaxNode> {
             nth!(self; 0)
         }
         /// Return the body
-        pub fn body(&self) -> Option<&SyntaxNode> {
+        pub fn body(&self) -> Option<SyntaxNode> {
             nth!(self; 1)
         }
     }
