@@ -1,6 +1,8 @@
 //! The tokenizer: turns a string into tokens, such as numbers, strings, and keywords
 
-use rowan::{SmolStr, SyntaxKind};
+use rowan::SmolStr;
+
+use crate::SyntaxKind::{self, *};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum IdentType {
@@ -9,120 +11,6 @@ enum IdentType {
     Store,
     Uri,
 }
-
-pub mod tokens {
-    use rowan::SyntaxKind;
-
-    // Generates the constants like an enum, see lib.rs
-    magic! {
-        start 0;
-        lookup token_name;
-
-        // Internals
-        TOKEN_COMMENT
-        TOKEN_ERROR
-        TOKEN_WHITESPACE
-
-        // Keywords
-        TOKEN_ASSERT
-        TOKEN_ELSE
-        TOKEN_IF
-        TOKEN_IN
-        TOKEN_INHERIT
-        TOKEN_LET
-        TOKEN_REC
-        TOKEN_THEN
-        TOKEN_WITH
-
-        // Symbols
-        TOKEN_CURLY_B_OPEN
-        TOKEN_CURLY_B_CLOSE
-        TOKEN_SQUARE_B_OPEN
-        TOKEN_SQUARE_B_CLOSE
-        TOKEN_ASSIGN
-        TOKEN_AT
-        TOKEN_COLON
-        TOKEN_COMMA
-        TOKEN_DOT
-        TOKEN_ELLIPSIS
-        TOKEN_QUESTION
-        TOKEN_SEMICOLON
-
-        // Operators
-        TOKEN_PAREN_OPEN
-        TOKEN_PAREN_CLOSE
-        TOKEN_CONCAT
-        TOKEN_INVERT
-        TOKEN_MERGE
-
-        TOKEN_ADD
-        TOKEN_SUB
-        TOKEN_MUL
-        TOKEN_DIV
-
-        TOKEN_AND
-        TOKEN_EQUAL
-        TOKEN_IMPLICATION
-        TOKEN_LESS
-        TOKEN_LESS_OR_EQ
-        TOKEN_MORE
-        TOKEN_MORE_OR_EQ
-        TOKEN_NOT_EQUAL
-        TOKEN_OR
-
-        // Identifiers and values
-        TOKEN_DYNAMIC_END
-        TOKEN_DYNAMIC_START
-        TOKEN_FLOAT
-        TOKEN_IDENT
-        TOKEN_INTEGER
-        TOKEN_INTERPOL_END
-        TOKEN_INTERPOL_START
-        TOKEN_PATH
-        TOKEN_URI
-        TOKEN_STRING_CONTENT
-        TOKEN_STRING_END
-        TOKEN_STRING_START
-    }
-
-    pub mod token_helpers {
-        use super::*;
-
-        /// Returns true if this token is a value, such as an integer or a string
-        pub fn is_value(token: SyntaxKind) -> bool {
-            match token {
-                TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI => true,
-                _ => false,
-            }
-        }
-        /// Returns true if this token should be used as a function argument.
-        /// ```ignore
-        /// Example:
-        /// add 1 2 + 3
-        /// ^   ^ ^ ^
-        /// |   | | +- false
-        /// |   | +- true
-        /// |   +- true
-        /// +- true
-        /// ```
-        pub fn is_fn_arg(token: SyntaxKind) -> bool {
-            match token {
-                TOKEN_REC | TOKEN_CURLY_B_OPEN | TOKEN_SQUARE_B_OPEN | TOKEN_PAREN_OPEN
-                | TOKEN_STRING_START | TOKEN_IDENT => true,
-                _ => token_helpers::is_value(token),
-            }
-        }
-        /// Returns true if this token is a comment, whitespace, or similar, and
-        /// should be skipped over by the parser.
-        pub fn is_trivia(token: SyntaxKind) -> bool {
-            match token {
-                TOKEN_COMMENT | TOKEN_ERROR | TOKEN_WHITESPACE => true,
-                _ => false,
-            }
-        }
-    }
-}
-use self::tokens::*;
 
 fn is_valid_path_char(c: char) -> bool {
     match c {
@@ -528,7 +416,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{tokens::*, SyntaxKind, Tokenizer};
+    use super::{SyntaxKind::{self, *}, Tokenizer};
     use rowan::SmolStr;
 
     fn tokenize(input: &str) -> Vec<(SyntaxKind, SmolStr)> {

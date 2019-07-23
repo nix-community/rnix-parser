@@ -1,6 +1,11 @@
-with import <nixpkgs> { };
+{ pkgs_fn ? import <nixpkgs> }:
 
-stdenv.mkDerivation {
+let
+  mozilla_overlay = import (fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz);
+  pkgs = pkgs_fn { overlays = [ mozilla_overlay ]; };
+
+  inherit (pkgs) stdenv;
+in stdenv.mkDerivation {
   name = "rnix";
-  buildInputs = [ cargo ];
+  buildInputs = [ pkgs.latest.rustChannels.stable.rust ];
 }

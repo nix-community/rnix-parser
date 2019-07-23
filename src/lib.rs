@@ -1,21 +1,42 @@
 #[macro_use]
 mod macros;
+mod kinds;
 pub mod parser;
 pub mod tokenizer;
 pub mod types;
 pub mod value;
 
 pub use self::{
-    parser::{nodes, AST},
+    kinds::SyntaxKind,
+    parser::AST,
     value::{StrPart, Value as NixValue},
 };
 
 pub use rowan::{
-    SmolStr, SyntaxElement, SyntaxElementChildren, SyntaxKind, SyntaxNode, SyntaxNodeChildren,
-    SyntaxToken, TextRange, TextUnit, TokenAtOffset, TreeArc, WalkEvent,
+    SmolStr, SyntaxElementChildren, SyntaxNodeChildren,
+    TextRange, TextUnit, TokenAtOffset, WalkEvent, NodeOrToken,
 };
 
 use self::tokenizer::Tokenizer;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum NixLanguage {}
+
+impl rowan::Language for NixLanguage {
+    type Kind = SyntaxKind;
+    fn kind_from_raw(raw: rowan::cursor::SyntaxKind) -> Self::Kind {
+        let discriminant: u16 = raw.0;
+        assert!(discriminant <= (SyntaxKind::__LAST as u16));
+        unsafe { std::mem::transmute::<u16, SyntaxKind>(discriminant) }
+    }
+    fn kind_to_raw(kind: Self::Kind) -> rowan::cursor::SyntaxKind {
+        rowan::cursor::SyntaxKind(kind as u16)
+    }
+}
+
+pub type SyntaxNode = rowan::SyntaxNode<NixLanguage>;
+pub type SyntaxToken = rowan::SyntaxToken<NixLanguage>;
+pub type SyntaxElement = rowan::NodeOrToken<SyntaxNode, SyntaxToken>;
 
 /// A convenience function for first tokenizing and then parsing given input
 pub fn parse(input: &str) -> AST {

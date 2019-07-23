@@ -1,11 +1,11 @@
 //! The types: Such as strings or integers
 use std::fmt;
 
-use rowan::{SyntaxElement, SyntaxKind, SyntaxNode};
-
 use crate::{
-    parser::nodes::*,
     types::{self, TypedNode},
+    NodeOrToken,
+    SyntaxKind::{self, *},
+    SyntaxNode,
 };
 
 /// An anchor point for a path, such as if it's relative or absolute
@@ -218,20 +218,20 @@ impl Value {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum StrPart<'a> {
+pub enum StrPart {
     Literal(String),
-    Ast(&'a SyntaxNode),
+    Ast(SyntaxNode),
 }
 pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
     let mut parts = Vec::new();
     let mut literals = 0;
     let mut common = std::usize::MAX;
-    let multiline = string.first_token().map(|t| t.text().as_str()) == Some("''");
+    let multiline = string.first_token().map_or(false, |t| t.text().as_str() == "''");
     let mut last_was_ast = false;
 
     for child in string.node().children_with_tokens() {
-        match child {
-            SyntaxElement::Token(token) if token.kind() == TOKEN_STRING_CONTENT => {
+        match &child {
+            NodeOrToken::Token(token) if token.kind() == TOKEN_STRING_CONTENT => {
                 let text: &str = token.text();
 
                 let line_count = text.lines().count();
@@ -250,12 +250,12 @@ pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
                 parts.push(StrPart::Literal(text.to_string()));
                 literals += 1;
             }
-            SyntaxElement::Token(token) => {
+            NodeOrToken::Token(token) => {
                 assert!(token.kind() == TOKEN_STRING_START || token.kind() == TOKEN_STRING_END)
             }
-            SyntaxElement::Node(node) => {
+            NodeOrToken::Node(node) => {
                 assert_eq!(node.kind(), NODE_STRING_INTERPOL);
-                parts.push(StrPart::Ast(node));
+                parts.push(StrPart::Ast(node.clone()));
                 last_was_ast = true;
             }
         }
@@ -296,18 +296,18 @@ mod tests {
     }
     #[test]
     fn parts() {
-        use crate::types::Str;
-        use rowan::{GreenNodeBuilder, SmolStr, SyntaxNode, TreeArc};
+        use crate::{types::Str, NixLanguage, SmolStr, SyntaxNode};
+        use rowan::{GreenNodeBuilder, Language};
 
-        fn string_node(content: &str) -> TreeArc<Str> {
+        fn string_node(content: &str) -> Str {
             let mut builder = GreenNodeBuilder::new();
-            builder.start_node(NODE_STRING);
-            builder.token(TOKEN_STRING_START, SmolStr::new("''"));
-            builder.token(TOKEN_STRING_CONTENT, SmolStr::new(content));
-            builder.token(TOKEN_STRING_END, SmolStr::new("''"));
+            builder.start_node(NixLanguage::kind_to_raw(NODE_STRING));
+            builder.token(NixLanguage::kind_to_raw(TOKEN_STRING_START), SmolStr::new("''"));
+            builder.token(NixLanguage::kind_to_raw(TOKEN_STRING_CONTENT), SmolStr::new(content));
+            builder.token(NixLanguage::kind_to_raw(TOKEN_STRING_END), SmolStr::new("''"));
             builder.finish_node();
 
-            TreeArc::cast(SyntaxNode::new(builder.finish(), None))
+            Str::cast(SyntaxNode::new_root(builder.finish())).unwrap()
         }
 
         assert_eq!(
