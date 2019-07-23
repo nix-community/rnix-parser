@@ -1,7 +1,6 @@
 use std::{env, error::Error, fs};
 
-use rnix::{parser::nodes::*, types::*};
-use rowan::{SyntaxElement, SyntaxNode};
+use rnix::{types::*, NodeOrToken, SyntaxKind::*, SyntaxNode};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let file = match env::args().skip(1).next() {
@@ -19,16 +18,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(lambda) = entry.value().and_then(Lambda::cast) {
             if let Some(attr) = entry.key() {
                 let ident = attr.path().last().and_then(Ident::cast);
-                let s = ident.map(Ident::as_str).unwrap_or("error");
+                let s = ident.as_ref().map_or("error", Ident::as_str);
                 println!("Function name: {}", s);
-                if let Some(comment) = find_comment(attr.node()) {
+                if let Some(comment) = find_comment(attr.node().clone()) {
                     println!("-> Doc: {}", comment);
                 }
 
                 let mut value = Some(lambda);
                 while let Some(lambda) = value {
                     let ident = lambda.arg().and_then(Ident::cast);
-                    let s = ident.map(Ident::as_str).unwrap_or("error");
+                    let s = ident.as_ref().map_or("error", Ident::as_str);
                     println!("-> Arg: {}", s);
                     if let Some(comment) = lambda.arg().and_then(find_comment) {
                         println!("--> Doc: {}", comment);
@@ -42,31 +41,32 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-fn find_comment(node: &SyntaxNode) -> Option<String> {
-    let mut node = SyntaxElement::Node(node);
-    let mut doc = Vec::new();
+fn find_comment(node: SyntaxNode) -> Option<String> {
+    let mut node = NodeOrToken::Node(node);
+    let mut comments = Vec::new();
     loop {
         loop {
-            let new = node.prev_sibling_or_token();
-            if let Some(new) = new {
+            if let Some(new) = node.prev_sibling_or_token() {
                 node = new;
                 break;
             } else {
-                node = SyntaxElement::Node(node.parent()?);
+                node = NodeOrToken::Node(node.parent()?);
             }
         }
 
         match node.kind() {
-            TOKEN_COMMENT => match node {
-                SyntaxElement::Token(token) => {
-                    doc.push(token.text().as_str().trim_start_matches('#').trim())
-                }
-                SyntaxElement::Node(_) => unreachable!(),
+            TOKEN_COMMENT => match &node {
+                NodeOrToken::Token(token) => comments.push(token.text().clone()),
+                NodeOrToken::Node(_) => unreachable!(),
             },
-            t if token_helpers::is_trivia(t) => (),
+            t if t.is_trivia() => (),
             _ => break,
         }
     }
-    doc.reverse();
-    return Some(doc).filter(|lines| !lines.is_empty()).map(|lines| lines.join("\n        "));
+    let doc = comments
+        .iter()
+        .map(|it| it.trim_start_matches('#').trim())
+        .collect::<Vec<_>>()
+        .join("\n        ");
+    return Some(doc).filter(|it| !it.is_empty());
 }
