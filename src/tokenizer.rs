@@ -19,6 +19,13 @@ fn is_valid_path_char(c: char) -> bool {
     }
 }
 
+fn is_valid_uri_char(c: char) -> bool {
+    match c {
+        '?' | ':' | '@' | '&' | '=' | '$' | ',' | '!' | '~' | '*' | '\'' => true,
+        _ => is_valid_path_char(c),
+    }
+}
+
 #[derive(Clone, Copy)]
 struct Interpol {
     brackets: u32,
@@ -236,7 +243,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 (Some('/'), Some('*')) => None,
                 (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
                 (Some('>'), _) => Some(IdentType::Store),
-                (Some(':'), Some(c)) if !c.is_whitespace() => Some(IdentType::Uri),
+                (Some(':'), Some(c)) if is_valid_uri_char(c) => Some(IdentType::Uri),
                 _ => None,
             }
         };
@@ -364,10 +371,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 assert_ne!(kind, IdentType::Path, "paths are checked earlier");
                 self.consume(|c| match c {
                     'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '\'' => true,
-                    ':' | '?' | '@' | '&' | '=' | '$' | ',' | '!' | '~' | '*' | '%' => {
-                        kind == IdentType::Uri
-                    }
-                    c => kind == IdentType::Uri && is_valid_path_char(c),
+                    c => kind == IdentType::Uri && is_valid_uri_char(c),
                 });
                 let ident = self.string_since(start);
                 let syntax_kind = match kind {
@@ -958,6 +962,30 @@ mod tests {
                 (TOKEN_NOT_EQUAL, "!="),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "3")
+            ]
+        );
+        assert_eq!(
+            tokenize("a:[ b ]"),
+            tokens![
+                (TOKEN_IDENT, "a"),
+                (TOKEN_COLON, ":"),
+                (TOKEN_SQUARE_B_OPEN, "["),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "b"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_SQUARE_B_CLOSE, "]")
+            ]
+        );
+        assert_eq!(
+            tokenize("a:( b )"),
+            tokens![
+                (TOKEN_IDENT, "a"),
+                (TOKEN_COLON, ":"),
+                (TOKEN_PAREN_OPEN, "("),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "b"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_PAREN_CLOSE, ")")
             ]
         );
         assert_eq!(
