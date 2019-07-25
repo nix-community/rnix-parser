@@ -13,8 +13,8 @@ pub use self::{
 };
 
 pub use rowan::{
-    SmolStr, SyntaxElementChildren, SyntaxNodeChildren,
-    TextRange, TextUnit, TokenAtOffset, WalkEvent, NodeOrToken,
+    NodeOrToken, SmolStr, SyntaxElementChildren, SyntaxNodeChildren, TextRange, TextUnit,
+    TokenAtOffset, WalkEvent,
 };
 
 use self::tokenizer::Tokenizer;
@@ -45,7 +45,7 @@ pub fn parse(input: &str) -> AST {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse, types::*, value::StrPart, NixValue};
+    use super::{parse, types::*, value::StrPart, NixValue, SyntaxKind};
 
     fn test(code: &str) {
         parse(code).as_result().expect("parsing error");
@@ -116,6 +116,14 @@ mod tests {
 
         let value = operation.value1().and_then(Value::cast).unwrap();
         assert_eq!(value.to_value(), Ok(NixValue::Integer(1)));
+    }
+    #[test]
+    fn t_macro() {
+        assert_eq!(T![@], SyntaxKind::TOKEN_AT);
+        assert!(match SyntaxKind::TOKEN_PAREN_OPEN {
+            T!["("] => true,
+            _ => false,
+        });
     }
     // #[test]
     // fn remove_pattern_entry() {
