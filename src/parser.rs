@@ -635,14 +635,15 @@ where
     let mut parser = Parser::new(iter.into_iter());
     parser.builder.start_node(NixLanguage::kind_to_raw(NODE_ROOT));
     parser.parse_expr();
+    parser.eat_trivia();
     if parser.peek().is_some() {
         parser.builder.start_node(NixLanguage::kind_to_raw(NODE_ERROR));
         while parser.peek().is_some() {
             parser.bump();
         }
         parser.builder.finish_node();
+        parser.eat_trivia();
     }
-    parser.eat_trivia();
     parser.builder.finish_node();
     AST { node: parser.builder.finish(), errors: parser.errors }
 }
@@ -654,7 +655,7 @@ mod tests {
     use std::{ffi::OsStr, fmt::Write, fs, path::PathBuf};
 
     #[test]
-    fn whitespace_attachment_for_incomplete_code() {
+    fn whitespace_attachment_for_incomplete_code1() {
         let code = "{
   traceIf =
     # predicate to check
@@ -694,6 +695,29 @@ NODE_ROOT 0..50 {
   TOKEN_WHITESPACE("\n\n") 48..50
 }"##
             .trim()
+        );
+    }
+
+    #[test]
+    fn whitespace_attachment_for_incomplete_code2() {
+        let code = "{} =
+";
+        let ast = crate::parse(&code);
+        let actual = format!("{}", ast.root().dump());
+        assert_eq!(
+            actual.trim(),
+            r##"
+NODE_ROOT 0..5 {
+  NODE_SET 0..2 {
+    TOKEN_CURLY_B_OPEN("{") 0..1
+    TOKEN_CURLY_B_CLOSE("}") 1..2
+  }
+  TOKEN_WHITESPACE(" ") 2..3
+  NODE_ERROR 3..4 {
+    TOKEN_ASSIGN("=") 3..4
+  }
+  TOKEN_WHITESPACE("\n") 4..5
+}"##.trim()
         );
     }
 
