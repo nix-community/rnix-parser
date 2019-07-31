@@ -187,6 +187,13 @@ where
             self.bump();
         }
     }
+    fn expect_ident(&mut self) {
+        if self.expect_peek_any(&[TOKEN_IDENT]).is_some() {
+            self.start_node(NODE_IDENT);
+            self.bump();
+            self.finish_node()
+        }
+    }
 
     fn parse_dynamic(&mut self) {
         self.start_node(NODE_DYNAMIC);
@@ -227,11 +234,7 @@ where
         match self.peek() {
             Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
             Some(TOKEN_STRING_START) => self.parse_string(),
-            _ => {
-                self.start_node(NODE_IDENT);
-                self.expect(TOKEN_IDENT);
-                self.finish_node();
-            }
+            _ => self.expect_ident(),
         }
     }
     fn parse_attr(&mut self) {
@@ -265,9 +268,7 @@ where
                     Some(TOKEN_IDENT) => {
                         self.start_node(NODE_PAT_ENTRY);
 
-                        self.start_node(NODE_IDENT);
-                        self.bump();
-                        self.finish_node();
+                        self.expect_ident();
 
                         if let Some(TOKEN_QUESTION) = self.peek() {
                             self.bump();
@@ -293,9 +294,7 @@ where
             let kind = if bound { NODE_ERROR } else { NODE_PAT_BIND };
             self.start_node(kind);
             self.bump();
-            self.start_node(NODE_IDENT);
-            self.expect(TOKEN_IDENT);
-            self.finish_node();
+            self.expect_ident();
             self.finish_node();
         }
     }
@@ -317,9 +316,7 @@ where
                     }
 
                     while let Some(TOKEN_IDENT) = self.peek() {
-                        self.start_node(NODE_IDENT);
-                        self.bump();
-                        self.finish_node();
+                        self.expect_ident();
                     }
 
                     self.expect(TOKEN_SEMICOLON);
@@ -429,9 +426,7 @@ where
                 self.finish_node();
             }
             TOKEN_IDENT => {
-                self.start_node(NODE_IDENT);
-                self.bump();
-                self.finish_node();
+                self.expect_ident();
 
                 match self.peek() {
                     Some(TOKEN_COLON) => {
@@ -717,7 +712,8 @@ NODE_ROOT 0..5 {
     TOKEN_ASSIGN("=") 3..4
   }
   TOKEN_WHITESPACE("\n") 4..5
-}"##.trim()
+}"##
+            .trim()
         );
     }
 
@@ -757,76 +753,27 @@ NODE_ROOT 0..5 {
         }
     }
 
-    #[test]
-    fn set() {
-        test_dir("set");
-    }
-    #[test]
-    fn math() {
-        test_dir("math");
-    }
-    #[test]
-    fn let_in() {
-        test_dir("let_in");
-    }
-    #[test]
-    fn let_legacy_syntax() {
-        test_dir("let_legacy_syntax");
-    }
-    #[test]
-    fn interpolation() {
-        test_dir("interpolation");
-    }
-    #[test]
-    fn index_set() {
-        test_dir("index_set");
-    }
-    #[test]
-    fn isset() {
-        test_dir("isset");
-    }
-    #[test]
-    fn merge() {
-        test_dir("merge");
-    }
-    #[test]
-    fn with() {
-        test_dir("with");
-    }
-    #[test]
-    fn assert() {
-        test_dir("assert");
-    }
-    #[test]
-    fn inherit() {
-        test_dir("inherit");
-    }
-    #[test]
-    fn ifs() {
-        test_dir("ifs");
-    }
-    #[test]
-    fn list() {
-        test_dir("list");
-    }
-    #[test]
-    fn lambda() {
-        test_dir("lambda");
-    }
-    #[test]
-    fn patterns() {
-        test_dir("patterns");
-    }
-    #[test]
-    fn dynamic() {
-        test_dir("dynamic");
-    }
-    #[test]
-    fn paths() {
-        test_dir("paths");
-    }
-    #[test]
-    fn strings() {
-        test_dir("strings");
+    #[rustfmt::skip]
+    mod dir_tests {
+        use super::test_dir;
+        #[test] fn set() { test_dir("set"); }
+        #[test] fn math() { test_dir("math"); }
+        #[test] fn let_in() { test_dir("let_in"); }
+        #[test] fn let_legacy_syntax() { test_dir("let_legacy_syntax"); }
+        #[test] fn interpolation() { test_dir("interpolation"); }
+        #[test] fn index_set() { test_dir("index_set"); }
+        #[test] fn isset() { test_dir("isset"); }
+        #[test] fn merge() { test_dir("merge"); }
+        #[test] fn with() { test_dir("with"); }
+        #[test] fn assert() { test_dir("assert"); }
+        #[test] fn inherit() { test_dir("inherit"); }
+        #[test] fn ifs() { test_dir("ifs"); }
+        #[test] fn list() { test_dir("list"); }
+        #[test] fn lambda() { test_dir("lambda"); }
+        #[test] fn patterns() { test_dir("patterns"); }
+        #[test] fn dynamic() { test_dir("dynamic"); }
+        #[test] fn paths() { test_dir("paths"); }
+        #[test] fn strings() { test_dir("strings"); }
+        #[test] fn invalid_syntax() { test_dir("invalid_syntax"); }
     }
 }
