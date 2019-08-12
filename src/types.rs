@@ -207,7 +207,7 @@ pub trait Wrapper: TypedNode {
     }
 }
 
-pub struct ParsedTypeError(SyntaxKind);
+pub struct ParsedTypeError(pub SyntaxKind);
 
 pub enum ParsedType {
     Apply(Apply),
