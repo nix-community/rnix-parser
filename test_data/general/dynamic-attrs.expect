@@ -156,7 +156,7 @@ NODE_ROOT 0..216 {
         }
       }
       TOKEN_WHITESPACE(" ") 136..137
-      TOKEN_MERGE("//") 137..139
+      TOKEN_UPDATE("//") 137..139
       TOKEN_WHITESPACE(" ") 139..140
       NODE_SET 140..216 {
         TOKEN_CURLY_B_OPEN("{") 140..141
