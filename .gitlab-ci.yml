@@ -1,4 +1,0 @@
-image: nixos/nix
-
-test:
-  script: nix-shell --run 'cargo test --all --verbose'
