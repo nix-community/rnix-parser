@@ -238,7 +238,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 _ => false,
             });
             match (lookahead.next(), lookahead.next()) {
-                // a//b parses as Merge(a, b)
+                // a//b parses as Update(a, b)
                 (Some('/'), Some('/')) => None,
                 (Some('/'), Some('*')) => None,
                 (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
