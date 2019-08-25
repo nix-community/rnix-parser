@@ -25,7 +25,7 @@ pub enum ParseError {
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParseError::Unexpected(_range) => write!(f, "unexpected input"),
+            ParseError::Unexpected(range) => write!(f, "error node at {}..{}", range.start(), range.end()),
             ParseError::UnexpectedEOF => write!(f, "unexpected eof"),
             ParseError::UnexpectedEOFWanted(kinds) => {
                 write!(f, "unexpected eof, wanted any of {:?}", kinds)
@@ -718,7 +718,7 @@ NODE_ROOT 0..5 {
     }
 
     fn test_dir(name: &str) {
-        let dir: PathBuf = ["test_data", "parser", name].iter().collect();
+        let dir: PathBuf = ["test_data", name].iter().collect();
 
         for entry in dir.read_dir().unwrap() {
             let entry = entry.unwrap();
@@ -735,7 +735,7 @@ NODE_ROOT 0..5 {
             let expected = fs::read_to_string(&path).unwrap();
 
             let mut actual = String::new();
-            for error in ast.root_errors() {
+            for error in ast.errors() {
                 writeln!(actual, "error: {}", error).unwrap();
             }
             writeln!(actual, "{}", ast.root().dump()).unwrap();
@@ -756,24 +756,25 @@ NODE_ROOT 0..5 {
     #[rustfmt::skip]
     mod dir_tests {
         use super::test_dir;
-        #[test] fn set() { test_dir("set"); }
-        #[test] fn math() { test_dir("math"); }
-        #[test] fn let_in() { test_dir("let_in"); }
-        #[test] fn let_legacy_syntax() { test_dir("let_legacy_syntax"); }
-        #[test] fn interpolation() { test_dir("interpolation"); }
-        #[test] fn index_set() { test_dir("index_set"); }
-        #[test] fn isset() { test_dir("isset"); }
-        #[test] fn merge() { test_dir("merge"); }
-        #[test] fn with() { test_dir("with"); }
-        #[test] fn assert() { test_dir("assert"); }
-        #[test] fn inherit() { test_dir("inherit"); }
-        #[test] fn ifs() { test_dir("ifs"); }
-        #[test] fn list() { test_dir("list"); }
-        #[test] fn lambda() { test_dir("lambda"); }
-        #[test] fn patterns() { test_dir("patterns"); }
-        #[test] fn dynamic() { test_dir("dynamic"); }
-        #[test] fn paths() { test_dir("paths"); }
-        #[test] fn strings() { test_dir("strings"); }
-        #[test] fn invalid_syntax() { test_dir("invalid_syntax"); }
+        #[test] fn general() { test_dir("general"); }
+        #[test] fn set() { test_dir("parser/set"); }
+        #[test] fn math() { test_dir("parser/math"); }
+        #[test] fn let_in() { test_dir("parser/let_in"); }
+        #[test] fn let_legacy_syntax() { test_dir("parser/let_legacy_syntax"); }
+        #[test] fn interpolation() { test_dir("parser/interpolation"); }
+        #[test] fn index_set() { test_dir("parser/index_set"); }
+        #[test] fn isset() { test_dir("parser/isset"); }
+        #[test] fn merge() { test_dir("parser/merge"); }
+        #[test] fn with() { test_dir("parser/with"); }
+        #[test] fn assert() { test_dir("parser/assert"); }
+        #[test] fn inherit() { test_dir("parser/inherit"); }
+        #[test] fn ifs() { test_dir("parser/ifs"); }
+        #[test] fn list() { test_dir("parser/list"); }
+        #[test] fn lambda() { test_dir("parser/lambda"); }
+        #[test] fn patterns() { test_dir("parser/patterns"); }
+        #[test] fn dynamic() { test_dir("parser/dynamic"); }
+        #[test] fn paths() { test_dir("parser/paths"); }
+        #[test] fn strings() { test_dir("parser/strings"); }
+        #[test] fn invalid_syntax() { test_dir("parser/invalid_syntax"); }
     }
 }

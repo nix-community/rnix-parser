@@ -1,0 +1,77 @@
+NODE_ROOT 0..51 {
+  NODE_LET_IN 0..51 {
+    TOKEN_LET("let") 0..3
+    TOKEN_WHITESPACE("\n  ") 3..6
+    NODE_SET_ENTRY 6..24 {
+      NODE_ATTRIBUTE 6..9 {
+        NODE_IDENT 6..9 {
+          TOKEN_IDENT("add") 6..9
+        }
+      }
+      TOKEN_WHITESPACE(" ") 9..10
+      TOKEN_ASSIGN("=") 10..11
+      TOKEN_WHITESPACE(" ") 11..12
+      NODE_LAMBDA 12..23 {
+        NODE_IDENT 12..13 {
+          TOKEN_IDENT("x") 12..13
+        }
+        TOKEN_COLON(":") 13..14
+        TOKEN_WHITESPACE(" ") 14..15
+        NODE_LAMBDA 15..23 {
+          NODE_IDENT 15..16 {
+            TOKEN_IDENT("y") 15..16
+          }
+          TOKEN_COLON(":") 16..17
+          TOKEN_WHITESPACE(" ") 17..18
+          NODE_OPERATION 18..23 {
+            NODE_IDENT 18..19 {
+              TOKEN_IDENT("x") 18..19
+            }
+            TOKEN_WHITESPACE(" ") 19..20
+            TOKEN_ADD("+") 20..21
+            TOKEN_WHITESPACE(" ") 21..22
+            NODE_IDENT 22..23 {
+              TOKEN_IDENT("y") 22..23
+            }
+          }
+        }
+      }
+      TOKEN_SEMICOLON(";") 23..24
+    }
+    TOKEN_WHITESPACE("\n") 24..25
+    TOKEN_IN("in") 25..27
+    TOKEN_WHITESPACE(" ") 27..28
+    NODE_SET 28..51 {
+      TOKEN_CURLY_B_OPEN("{") 28..29
+      TOKEN_WHITESPACE("\n  ") 29..32
+      NODE_SET_ENTRY 32..49 {
+        NODE_ATTRIBUTE 32..38 {
+          NODE_IDENT 32..38 {
+            TOKEN_IDENT("result") 32..38
+          }
+        }
+        TOKEN_WHITESPACE(" ") 38..39
+        TOKEN_ASSIGN("=") 39..40
+        TOKEN_WHITESPACE(" ") 40..41
+        NODE_APPLY 41..48 {
+          NODE_APPLY 41..46 {
+            NODE_IDENT 41..44 {
+              TOKEN_IDENT("add") 41..44
+            }
+            TOKEN_WHITESPACE(" ") 44..45
+            NODE_VALUE 45..46 {
+              TOKEN_INTEGER("2") 45..46
+            }
+          }
+          TOKEN_WHITESPACE(" ") 46..47
+          NODE_VALUE 47..48 {
+            TOKEN_INTEGER("5") 47..48
+          }
+        }
+        TOKEN_SEMICOLON(";") 48..49
+      }
+      TOKEN_WHITESPACE("\n") 49..50
+      TOKEN_CURLY_B_CLOSE("}") 50..51
+    }
+  }
+}

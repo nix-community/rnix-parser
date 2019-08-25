@@ -167,7 +167,7 @@ pub trait TypedNode: Clone {
             .descendants_with_tokens()
             // Empty errors can happen if it encounteres EOF while
             // creating them, which in case a root error is added.
-            .filter(|node| node.text_range().is_empty())
+            .filter(|node| !node.text_range().is_empty())
             .filter(|node| node.kind() == NODE_ERROR || node.kind() == TOKEN_ERROR)
             .collect()
     }

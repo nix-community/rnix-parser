@@ -17,7 +17,7 @@ fn main() {
         };
         let ast = rnix::parse(&content);
 
-        for error in ast.root_errors() {
+        for error in ast.errors() {
             println!("error: {}", error);
         }
 

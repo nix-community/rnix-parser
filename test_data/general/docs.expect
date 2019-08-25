@@ -1,0 +1,106 @@
+NODE_ROOT 0..306 {
+  TOKEN_COMMENT("# Test used by examples/list-fns.rs") 0..35
+  TOKEN_WHITESPACE("\n") 35..36
+  NODE_SET 36..306 {
+    TOKEN_REC("rec") 36..39
+    TOKEN_WHITESPACE(" ") 39..40
+    TOKEN_CURLY_B_OPEN("{") 40..41
+    TOKEN_WHITESPACE("\n  ") 41..44
+    TOKEN_COMMENT("# Usage: add x y") 44..60
+    TOKEN_WHITESPACE("\n  ") 60..63
+    TOKEN_COMMENT("# Adds the integers x and y together and returns the result") 63..122
+    TOKEN_WHITESPACE("\n  ") 122..125
+    NODE_SET_ENTRY 125..196 {
+      NODE_ATTRIBUTE 125..128 {
+        NODE_IDENT 125..128 {
+          TOKEN_IDENT("add") 125..128
+        }
+      }
+      TOKEN_WHITESPACE(" ") 128..129
+      TOKEN_ASSIGN("=") 129..130
+      TOKEN_WHITESPACE("\n    ") 130..135
+      TOKEN_COMMENT("# First integer") 135..150
+      TOKEN_WHITESPACE("\n    ") 150..155
+      NODE_LAMBDA 155..195 {
+        NODE_IDENT 155..156 {
+          TOKEN_IDENT("x") 155..156
+        }
+        TOKEN_COLON(":") 156..157
+        TOKEN_WHITESPACE("\n    ") 157..162
+        TOKEN_COMMENT("# Second integer") 162..178
+        TOKEN_WHITESPACE("\n    ") 178..183
+        NODE_LAMBDA 183..195 {
+          NODE_IDENT 183..184 {
+            TOKEN_IDENT("y") 183..184
+          }
+          TOKEN_COLON(":") 184..185
+          TOKEN_WHITESPACE("\n    ") 185..190
+          NODE_OPERATION 190..195 {
+            NODE_IDENT 190..191 {
+              TOKEN_IDENT("x") 190..191
+            }
+            TOKEN_WHITESPACE(" ") 191..192
+            TOKEN_ADD("+") 192..193
+            TOKEN_WHITESPACE(" ") 193..194
+            NODE_IDENT 194..195 {
+              TOKEN_IDENT("y") 194..195
+            }
+          }
+        }
+      }
+      TOKEN_SEMICOLON(";") 195..196
+    }
+    TOKEN_WHITESPACE("\n  ") 196..199
+    TOKEN_COMMENT("# Usage: sum nums") 199..216
+    TOKEN_WHITESPACE("\n  ") 216..219
+    TOKEN_COMMENT("# Returns the sum of the integer array nums") 219..262
+    TOKEN_WHITESPACE("\n  ") 262..265
+    NODE_SET_ENTRY 265..304 {
+      NODE_ATTRIBUTE 265..268 {
+        NODE_IDENT 265..268 {
+          TOKEN_IDENT("sum") 265..268
+        }
+      }
+      TOKEN_WHITESPACE(" ") 268..269
+      TOKEN_ASSIGN("=") 269..270
+      TOKEN_WHITESPACE(" ") 270..271
+      NODE_LAMBDA 271..303 {
+        NODE_IDENT 271..275 {
+          TOKEN_IDENT("nums") 271..275
+        }
+        TOKEN_COLON(":") 275..276
+        TOKEN_WHITESPACE(" ") 276..277
+        NODE_APPLY 277..303 {
+          NODE_APPLY 277..298 {
+            NODE_APPLY 277..296 {
+              NODE_INDEX_SET 277..292 {
+                NODE_IDENT 277..285 {
+                  TOKEN_IDENT("builtins") 277..285
+                }
+                TOKEN_DOT(".") 285..286
+                NODE_IDENT 286..292 {
+                  TOKEN_IDENT("foldl\'") 286..292
+                }
+              }
+              TOKEN_WHITESPACE(" ") 292..293
+              NODE_IDENT 293..296 {
+                TOKEN_IDENT("add") 293..296
+              }
+            }
+            TOKEN_WHITESPACE(" ") 296..297
+            NODE_VALUE 297..298 {
+              TOKEN_INTEGER("0") 297..298
+            }
+          }
+          TOKEN_WHITESPACE(" ") 298..299
+          NODE_IDENT 299..303 {
+            TOKEN_IDENT("nums") 299..303
+          }
+        }
+      }
+      TOKEN_SEMICOLON(";") 303..304
+    }
+    TOKEN_WHITESPACE("\n") 304..305
+    TOKEN_CURLY_B_CLOSE("}") 305..306
+  }
+}

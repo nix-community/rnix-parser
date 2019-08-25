@@ -1,0 +1,212 @@
+NODE_ROOT 0..284 {
+  NODE_LAMBDA 0..284 {
+    NODE_PATTERN 0..22 {
+      TOKEN_CURLY_B_OPEN("{") 0..1
+      TOKEN_WHITESPACE(" ") 1..2
+      NODE_PAT_ENTRY 2..14 {
+        NODE_IDENT 2..7 {
+          TOKEN_IDENT("value") 2..7
+        }
+        TOKEN_WHITESPACE(" ") 7..8
+        TOKEN_QUESTION("?") 8..9
+        TOKEN_WHITESPACE(" ") 9..10
+        NODE_IDENT 10..14 {
+          TOKEN_IDENT("null") 10..14
+        }
+      }
+      TOKEN_COMMA(",") 14..15
+      TOKEN_WHITESPACE(" ") 15..16
+      NODE_PAT_ENTRY 16..20 {
+        NODE_IDENT 16..20 {
+          TOKEN_IDENT("life") 16..20
+        }
+      }
+      TOKEN_WHITESPACE(" ") 20..21
+      TOKEN_CURLY_B_CLOSE("}") 21..22
+    }
+    TOKEN_COLON(":") 22..23
+    TOKEN_WHITESPACE("\n") 23..24
+    NODE_SET 24..284 {
+      TOKEN_CURLY_B_OPEN("{") 24..25
+      TOKEN_WHITESPACE("\n  ") 25..28
+      NODE_SET_ENTRY 28..197 {
+        NODE_ATTRIBUTE 28..29 {
+          NODE_IDENT 28..29 {
+            TOKEN_IDENT("x") 28..29
+          }
+        }
+        TOKEN_WHITESPACE(" ") 29..30
+        TOKEN_ASSIGN("=") 30..31
+        TOKEN_WHITESPACE(" ") 31..32
+        NODE_IF_ELSE 32..196 {
+          TOKEN_IF("if") 32..34
+          TOKEN_WHITESPACE(" ") 34..35
+          NODE_OPERATION 35..48 {
+            NODE_IDENT 35..40 {
+              TOKEN_IDENT("value") 35..40
+            }
+            TOKEN_WHITESPACE(" ") 40..41
+            TOKEN_NOT_EQUAL("!=") 41..43
+            TOKEN_WHITESPACE(" ") 43..44
+            NODE_IDENT 44..48 {
+              TOKEN_IDENT("null") 44..48
+            }
+          }
+          TOKEN_WHITESPACE("\n        ") 48..57
+          TOKEN_THEN("then") 57..61
+          TOKEN_WHITESPACE(" ") 61..62
+          NODE_IF_ELSE 62..136 {
+            TOKEN_IF("if") 62..64
+            TOKEN_WHITESPACE(" ") 64..65
+            NODE_OPERATION 65..75 {
+              NODE_IDENT 65..70 {
+                TOKEN_IDENT("value") 65..70
+              }
+              TOKEN_WHITESPACE(" ") 70..71
+              TOKEN_LESS_OR_EQ("<=") 71..73
+              TOKEN_WHITESPACE(" ") 73..74
+              NODE_VALUE 74..75 {
+                TOKEN_INTEGER("5") 74..75
+              }
+            }
+            TOKEN_WHITESPACE("\n          ") 75..86
+            TOKEN_THEN("then") 86..90
+            TOKEN_WHITESPACE(" ") 90..91
+            NODE_PAREN 91..119 {
+              TOKEN_PAREN_OPEN("(") 91..92
+              NODE_ASSERT 92..118 {
+                TOKEN_ASSERT("assert") 92..98
+                TOKEN_WHITESPACE(" ") 98..99
+                NODE_PAREN 99..111 {
+                  TOKEN_PAREN_OPEN("(") 99..100
+                  NODE_OPERATION 100..110 {
+                    NODE_IDENT 100..105 {
+                      TOKEN_IDENT("value") 100..105
+                    }
+                    TOKEN_WHITESPACE(" ") 105..106
+                    TOKEN_MORE_OR_EQ(">=") 106..108
+                    TOKEN_WHITESPACE(" ") 108..109
+                    NODE_VALUE 109..110 {
+                      TOKEN_INTEGER("0") 109..110
+                    }
+                  }
+                  TOKEN_PAREN_CLOSE(")") 110..111
+                }
+                TOKEN_SEMICOLON(";") 111..112
+                TOKEN_WHITESPACE(" ") 112..113
+                NODE_IDENT 113..118 {
+                  TOKEN_IDENT("value") 113..118
+                }
+              }
+              TOKEN_PAREN_CLOSE(")") 118..119
+            }
+            TOKEN_WHITESPACE("\n          ") 119..130
+            TOKEN_ELSE("else") 130..134
+            TOKEN_WHITESPACE(" ") 134..135
+            NODE_VALUE 135..136 {
+              TOKEN_INTEGER("5") 135..136
+            }
+          }
+          TOKEN_WHITESPACE("\n        ") 136..145
+          TOKEN_ELSE("else") 145..149
+          TOKEN_WHITESPACE(" ") 149..150
+          NODE_IF_ELSE 150..196 {
+            TOKEN_IF("if") 150..152
+            TOKEN_WHITESPACE(" ") 152..153
+            NODE_UNARY 153..158 {
+              TOKEN_INVERT("!") 153..154
+              NODE_IDENT 154..158 {
+                TOKEN_IDENT("life") 154..158
+              }
+            }
+            TOKEN_WHITESPACE("\n          ") 158..169
+            TOKEN_THEN("then") 169..173
+            TOKEN_WHITESPACE(" ") 173..174
+            NODE_VALUE 174..178 {
+              TOKEN_INTEGER("1337") 174..178
+            }
+            TOKEN_WHITESPACE("\n          ") 178..189
+            TOKEN_ELSE("else") 189..193
+            TOKEN_WHITESPACE(" ") 193..194
+            NODE_VALUE 194..196 {
+              TOKEN_INTEGER("42") 194..196
+            }
+          }
+        }
+        TOKEN_SEMICOLON(";") 196..197
+      }
+      TOKEN_WHITESPACE("\n\n  ") 197..201
+      NODE_SET_ENTRY 201..217 {
+        NODE_ATTRIBUTE 201..208 {
+          NODE_IDENT 201..208 {
+            TOKEN_IDENT("enabled") 201..208
+          }
+        }
+        TOKEN_WHITESPACE(" ") 208..209
+        TOKEN_ASSIGN("=") 209..210
+        TOKEN_WHITESPACE(" ") 210..211
+        NODE_IDENT 211..216 {
+          TOKEN_IDENT("false") 211..216
+        }
+        TOKEN_SEMICOLON(";") 216..217
+      }
+      TOKEN_WHITESPACE("\n  ") 217..220
+      NODE_SET_ENTRY 220..233 {
+        NODE_ATTRIBUTE 220..225 {
+          NODE_IDENT 220..225 {
+            TOKEN_IDENT("value") 220..225
+          }
+        }
+        TOKEN_WHITESPACE(" ") 225..226
+        TOKEN_ASSIGN("=") 226..227
+        TOKEN_WHITESPACE(" ") 227..228
+        NODE_IDENT 228..232 {
+          TOKEN_IDENT("null") 228..232
+        }
+        TOKEN_SEMICOLON(";") 232..233
+      }
+      TOKEN_WHITESPACE("\n  ") 233..236
+      NODE_SET_ENTRY 236..282 {
+        NODE_ATTRIBUTE 236..241 {
+          NODE_IDENT 236..241 {
+            TOKEN_IDENT("valid") 236..241
+          }
+        }
+        TOKEN_WHITESPACE(" ") 241..242
+        TOKEN_ASSIGN("=") 242..243
+        TOKEN_WHITESPACE(" ") 243..244
+        NODE_ASSERT 244..281 {
+          TOKEN_ASSERT("assert") 244..250
+          TOKEN_WHITESPACE(" ") 250..251
+          NODE_OPERATION 251..275 {
+            NODE_IDENT 251..258 {
+              TOKEN_IDENT("enabled") 251..258
+            }
+            TOKEN_WHITESPACE(" ") 258..259
+            TOKEN_IMPLICATION("->") 259..261
+            TOKEN_WHITESPACE(" ") 261..262
+            NODE_OPERATION 262..275 {
+              NODE_IDENT 262..267 {
+                TOKEN_IDENT("value") 262..267
+              }
+              TOKEN_WHITESPACE(" ") 267..268
+              TOKEN_NOT_EQUAL("!=") 268..270
+              TOKEN_WHITESPACE(" ") 270..271
+              NODE_IDENT 271..275 {
+                TOKEN_IDENT("null") 271..275
+              }
+            }
+          }
+          TOKEN_SEMICOLON(";") 275..276
+          TOKEN_WHITESPACE(" ") 276..277
+          NODE_IDENT 277..281 {
+            TOKEN_IDENT("true") 277..281
+          }
+        }
+        TOKEN_SEMICOLON(";") 281..282
+      }
+      TOKEN_WHITESPACE("\n") 282..283
+      TOKEN_CURLY_B_CLOSE("}") 283..284
+    }
+  }
+}

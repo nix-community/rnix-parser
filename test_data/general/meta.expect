@@ -1,0 +1,105 @@
+NODE_ROOT 0..229 {
+  NODE_SET 0..197 {
+    TOKEN_CURLY_B_OPEN("{") 0..1
+    TOKEN_WHITESPACE("\n  ") 1..4
+    NODE_SET_ENTRY 4..67 {
+      NODE_ATTRIBUTE 4..7 {
+        NODE_IDENT 4..7 {
+          TOKEN_IDENT("add") 4..7
+        }
+      }
+      TOKEN_WHITESPACE(" ") 7..8
+      TOKEN_ASSIGN("=") 8..9
+      TOKEN_WHITESPACE(" ") 9..10
+      TOKEN_COMMENT("/* the first value */") 10..31
+      TOKEN_WHITESPACE(" ") 31..32
+      NODE_LAMBDA 32..66 {
+        NODE_IDENT 32..33 {
+          TOKEN_IDENT("x") 32..33
+        }
+        TOKEN_COLON(":") 33..34
+        TOKEN_WHITESPACE(" ") 34..35
+        TOKEN_COMMENT("/* the second value */") 35..57
+        TOKEN_WHITESPACE(" ") 57..58
+        NODE_LAMBDA 58..66 {
+          NODE_IDENT 58..59 {
+            TOKEN_IDENT("y") 58..59
+          }
+          TOKEN_COLON(":") 59..60
+          TOKEN_WHITESPACE(" ") 60..61
+          NODE_OPERATION 61..66 {
+            NODE_IDENT 61..62 {
+              TOKEN_IDENT("x") 61..62
+            }
+            TOKEN_WHITESPACE(" ") 62..63
+            TOKEN_ADD("+") 63..64
+            TOKEN_WHITESPACE(" ") 64..65
+            NODE_IDENT 65..66 {
+              TOKEN_IDENT("y") 65..66
+            }
+          }
+        }
+      }
+      TOKEN_SEMICOLON(";") 66..67
+    }
+    TOKEN_WHITESPACE("\n  ") 67..70
+    NODE_SET_ENTRY 70..106 {
+      NODE_ATTRIBUTE 70..76 {
+        NODE_IDENT 70..76 {
+          TOKEN_IDENT("string") 70..76
+        }
+      }
+      TOKEN_WHITESPACE(" ") 76..77
+      TOKEN_ASSIGN("=") 77..78
+      TOKEN_WHITESPACE(" ") 78..79
+      TOKEN_COMMENT("/* meaning of life */") 79..100
+      TOKEN_WHITESPACE(" ") 100..101
+      NODE_STRING 101..105 {
+        TOKEN_STRING_START("\"") 101..102
+        TOKEN_STRING_CONTENT("42") 102..104
+        TOKEN_STRING_END("\"") 104..105
+      }
+      TOKEN_SEMICOLON(";") 105..106
+    }
+    TOKEN_WHITESPACE("\n    ") 106..111
+    NODE_SET_ENTRY 111..126 {
+      NODE_ATTRIBUTE 111..113 {
+        NODE_IDENT 111..113 {
+          TOKEN_IDENT("hi") 111..113
+        }
+      }
+      TOKEN_WHITESPACE(" ") 113..114
+      TOKEN_ASSIGN("=") 114..115
+      TOKEN_WHITESPACE(" ") 115..116
+      NODE_VALUE 116..125 {
+        TOKEN_FLOAT("3.0000000") 116..125
+      }
+      TOKEN_SEMICOLON(";") 125..126
+    }
+    TOKEN_WHITESPACE("\n ") 126..128
+    TOKEN_COMMENT("# Store my password in plain text") 128..161
+    TOKEN_WHITESPACE("\n      ") 161..168
+    NODE_SET_ENTRY 168..195 {
+      NODE_ATTRIBUTE 168..176 {
+        NODE_IDENT 168..176 {
+          TOKEN_IDENT("password") 168..176
+        }
+      }
+      TOKEN_WHITESPACE("  ") 176..178
+      TOKEN_ASSIGN("=") 178..179
+      TOKEN_WHITESPACE("      ") 179..185
+      NODE_STRING 185..194 {
+        TOKEN_STRING_START("\"") 185..186
+        TOKEN_STRING_CONTENT("hunter2") 186..193
+        TOKEN_STRING_END("\"") 193..194
+      }
+      TOKEN_SEMICOLON(";") 194..195
+    }
+    TOKEN_WHITESPACE("\n") 195..196
+    TOKEN_CURLY_B_CLOSE("}") 196..197
+  }
+  TOKEN_WHITESPACE("\n   ") 197..201
+  TOKEN_COMMENT("# trailing") 201..211
+  TOKEN_WHITESPACE("\n       ") 211..219
+  TOKEN_COMMENT("# comments") 219..229
+}

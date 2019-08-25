@@ -1,0 +1,141 @@
+error: unexpected eof, wanted any of [TOKEN_ASSIGN]
+error: unexpected eof
+error: unexpected eof, wanted any of [TOKEN_SEMICOLON]
+error: unexpected eof
+error: unexpected eof, wanted any of [TOKEN_SEMICOLON]
+error: unexpected eof
+error: error node at 10..28
+error: error node at 78..98
+error: error node at 162..166
+NODE_ROOT 0..166 {
+  NODE_SET 0..166 {
+    TOKEN_CURLY_B_OPEN("{") 0..1
+    TOKEN_WHITESPACE("\n  ") 1..4
+    NODE_SET_ENTRY 4..33 {
+      NODE_ATTRIBUTE 4..9 {
+        NODE_IDENT 4..9 {
+          TOKEN_IDENT("hello") 4..9
+        }
+      }
+      TOKEN_WHITESPACE(" ") 9..10
+      NODE_ERROR 10..28 {
+        TOKEN_STRING_START("\"") 10..11
+        TOKEN_STRING_CONTENT("Hello \u{d9}nic\u{f6}d\u{259}") 11..27
+        TOKEN_STRING_END("\"") 27..28
+      }
+      TOKEN_WHITESPACE(" ") 28..29
+      TOKEN_ASSIGN("=") 29..30
+      TOKEN_WHITESPACE(" ") 30..31
+      NODE_VALUE 31..32 {
+        TOKEN_INTEGER("1") 31..32
+      }
+      TOKEN_SEMICOLON(";") 32..33
+    }
+    TOKEN_WHITESPACE("\n  ") 33..36
+    NODE_SET_ENTRY 36..120 {
+      NODE_ATTRIBUTE 36..40 {
+        NODE_IDENT 36..40 {
+          TOKEN_IDENT("test") 36..40
+        }
+      }
+      TOKEN_WHITESPACE(" ") 40..41
+      TOKEN_ASSIGN("=") 41..42
+      TOKEN_WHITESPACE(" ") 42..43
+      NODE_SET 43..119 {
+        TOKEN_CURLY_B_OPEN("{") 43..44
+        TOKEN_WHITESPACE("\n    ") 44..49
+        NODE_SET_ENTRY 49..65 {
+          NODE_ATTRIBUTE 49..54 {
+            NODE_IDENT 49..54 {
+              TOKEN_IDENT("valid") 49..54
+            }
+          }
+          TOKEN_WHITESPACE(" ") 54..55
+          TOKEN_ASSIGN("=") 55..56
+          TOKEN_WHITESPACE(" ") 56..57
+          NODE_STRING 57..64 {
+            TOKEN_STRING_START("\"") 57..58
+            TOKEN_STRING_CONTENT("entry") 58..63
+            TOKEN_STRING_END("\"") 63..64
+          }
+          TOKEN_SEMICOLON(";") 64..65
+        }
+        TOKEN_WHITESPACE("\n    ") 65..70
+        NODE_SET_ENTRY 70..115 {
+          NODE_ATTRIBUTE 70..77 {
+            NODE_IDENT 70..77 {
+              TOKEN_IDENT("invalid") 70..77
+            }
+          }
+          TOKEN_WHITESPACE(" ") 77..78
+          NODE_ERROR 78..98 {
+            TOKEN_STRING_START("\"") 78..79
+            TOKEN_STRING_CONTENT("entry") 79..84
+            TOKEN_STRING_END("\"") 84..85
+            TOKEN_SEMICOLON(";") 85..86
+            TOKEN_WHITESPACE("\n    ") 86..91
+            TOKEN_IDENT("another") 91..98
+          }
+          TOKEN_WHITESPACE(" ") 98..99
+          TOKEN_ASSIGN("=") 99..100
+          TOKEN_WHITESPACE(" ") 100..101
+          NODE_STRING 101..114 {
+            TOKEN_STRING_START("\"") 101..102
+            TOKEN_STRING_CONTENT("valid entry") 102..113
+            TOKEN_STRING_END("\"") 113..114
+          }
+          TOKEN_SEMICOLON(";") 114..115
+        }
+        TOKEN_WHITESPACE("\n  ") 115..118
+        TOKEN_CURLY_B_CLOSE("}") 118..119
+      }
+      TOKEN_SEMICOLON(";") 119..120
+    }
+    TOKEN_WHITESPACE("\n  ") 120..123
+    NODE_SET_ENTRY 123..166 {
+      NODE_ATTRIBUTE 123..128 {
+        NODE_IDENT 123..128 {
+          TOKEN_IDENT("test2") 123..128
+        }
+      }
+      TOKEN_WHITESPACE(" ") 128..129
+      TOKEN_ASSIGN("=") 129..130
+      TOKEN_WHITESPACE(" ") 130..131
+      NODE_SET 131..166 {
+        TOKEN_CURLY_B_OPEN("{") 131..132
+        TOKEN_WHITESPACE("\n    ") 132..137
+        NODE_SET_ENTRY 137..150 {
+          NODE_ATTRIBUTE 137..142 {
+            NODE_IDENT 137..142 {
+              TOKEN_IDENT("hello") 137..142
+            }
+          }
+          TOKEN_WHITESPACE(" ") 142..143
+          TOKEN_ASSIGN("=") 143..144
+          TOKEN_WHITESPACE(" ") 144..145
+          NODE_STRING 145..149 {
+            TOKEN_STRING_START("\"") 145..146
+            TOKEN_STRING_CONTENT("hi") 146..148
+            TOKEN_STRING_END("\"") 148..149
+          }
+          TOKEN_SEMICOLON(";") 149..150
+        }
+        TOKEN_WHITESPACE("\n    ") 150..155
+        NODE_SET_ENTRY 155..166 {
+          NODE_ATTRIBUTE 155..159 {
+            NODE_IDENT 155..159 {
+              TOKEN_IDENT("aaaa") 155..159
+            }
+          }
+          TOKEN_WHITESPACE("\n  ") 159..162
+          NODE_ERROR 162..166 {
+            TOKEN_CURLY_B_CLOSE("}") 162..163
+            TOKEN_SEMICOLON(";") 163..164
+            TOKEN_WHITESPACE("\n") 164..165
+            TOKEN_CURLY_B_CLOSE("}") 165..166
+          }
+        }
+      }
+    }
+  }
+}

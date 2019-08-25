@@ -47,29 +47,9 @@ pub fn parse(input: &str) -> AST {
 mod tests {
     use super::{parse, types::*, value::StrPart, NixValue, SyntaxKind};
 
-    fn test(code: &str) {
-        parse(code).as_result().expect("parsing error");
-    }
-
-    #[test]
-    fn all() {
-        test(include_str!("../test_data/dynamic-attrs.nix"));
-        //test(include_str!("../test_data/error.nix"));
-        test(include_str!("../test_data/ifs.nix"));
-        test(include_str!("../test_data/inherit.nix"));
-        test(include_str!("../test_data/interpolation.nix"));
-        test(include_str!("../test_data/isset.nix"));
-        test(include_str!("../test_data/lambdas.nix"));
-        test(include_str!("../test_data/lists.nix"));
-        test(include_str!("../test_data/math.nix"));
-        test(include_str!("../test_data/meta.nix"));
-        test(include_str!("../test_data/pattern.nix"));
-        test(include_str!("../test_data/simple-set.nix"));
-        test(include_str!("../test_data/with-import-let-in.nix"));
-    }
     #[test]
     fn interpolation() {
-        let ast = parse(include_str!("../test_data/interpolation.nix"));
+        let ast = parse(include_str!("../test_data/general/interpolation.nix"));
 
         let let_in = ast.root().inner().and_then(LetIn::cast).unwrap();
         let set = let_in.body().and_then(Set::cast).unwrap();
@@ -92,7 +72,7 @@ mod tests {
     }
     #[test]
     fn inherit() {
-        let ast = parse(include_str!("../test_data/inherit.nix"));
+        let ast = parse(include_str!("../test_data/general/inherit.nix"));
 
         let let_in = ast.root().inner().and_then(LetIn::cast).unwrap();
         let set = let_in.body().and_then(Set::cast).unwrap();
@@ -107,7 +87,7 @@ mod tests {
     }
     #[test]
     fn math() {
-        let ast = parse(include_str!("../test_data/math.nix"));
+        let ast = parse(include_str!("../test_data/general/math.nix"));
         let root = ast.root().inner().and_then(Operation::cast).unwrap();
         let operation = root.value1().and_then(Operation::cast).unwrap();
 
