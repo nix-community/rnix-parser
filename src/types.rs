@@ -191,11 +191,11 @@ pub trait TokenWrapper: TypedNode {
 /// Provides the function `.entries()`
 pub trait EntryHolder: TypedNode {
     /// Return an iterator over all key=value entries
-    fn entries(&self) -> Box<Iterator<Item = SetEntry>> {
+    fn entries(&self) -> Box<dyn Iterator<Item = SetEntry>> {
         Box::new(self.node().children().filter_map(SetEntry::cast))
     }
     /// Return an iterator over all inherit entries
-    fn inherits(&self) -> Box<Iterator<Item = Inherit>> {
+    fn inherits(&self) -> Box<dyn Iterator<Item = Inherit>> {
         Box::new(self.node().children().filter_map(Inherit::cast))
     }
 }
