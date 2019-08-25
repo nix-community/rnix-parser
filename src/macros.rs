@@ -28,7 +28,7 @@ macro_rules! T {
     (;)       => ($crate::SyntaxKind::TOKEN_SEMICOLON);
     (++)      => ($crate::SyntaxKind::TOKEN_CONCAT);
     (!)       => ($crate::SyntaxKind::TOKEN_INVERT);
-    ("//")    => ($crate::SyntaxKind::TOKEN_MERGE);
+    ("//")    => ($crate::SyntaxKind::TOKEN_UPDATE);
 
     (+)       => ($crate::SyntaxKind::TOKEN_ADD);
     (-)       => ($crate::SyntaxKind::TOKEN_SUB);

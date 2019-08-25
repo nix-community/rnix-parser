@@ -539,7 +539,7 @@ where
         }
     }
     fn parse_merge(&mut self) -> Checkpoint {
-        self.handle_operation(false, Self::parse_invert, &[TOKEN_MERGE])
+        self.handle_operation(false, Self::parse_invert, &[TOKEN_UPDATE])
     }
     fn parse_compare(&mut self) -> Checkpoint {
         self.handle_operation(
