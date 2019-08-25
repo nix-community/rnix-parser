@@ -45,7 +45,7 @@ macro_rules! nth {
 pub enum OpKind {
     Concat,
     IsSet,
-    Merge,
+    Update,
 
     Add,
     Sub,
@@ -68,7 +68,7 @@ impl OpKind {
         match token {
             TOKEN_CONCAT => Some(OpKind::Concat),
             TOKEN_QUESTION => Some(OpKind::IsSet),
-            TOKEN_UPDATE => Some(OpKind::Merge),
+            TOKEN_UPDATE => Some(OpKind::Update),
 
             TOKEN_ADD => Some(OpKind::Add),
             TOKEN_SUB => Some(OpKind::Sub),
