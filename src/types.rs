@@ -68,7 +68,7 @@ impl OpKind {
         match token {
             TOKEN_CONCAT => Some(OpKind::Concat),
             TOKEN_QUESTION => Some(OpKind::IsSet),
-            TOKEN_MERGE => Some(OpKind::Merge),
+            TOKEN_UPDATE => Some(OpKind::Merge),
 
             TOKEN_ADD => Some(OpKind::Add),
             TOKEN_SUB => Some(OpKind::Sub),

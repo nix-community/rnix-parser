@@ -16,7 +16,7 @@ NODE_ROOT 0..14 {
       }
       TOKEN_CURLY_B_CLOSE("}") 5..6
     }
-    TOKEN_MERGE("//") 6..8
+    TOKEN_UPDATE("//") 6..8
     NODE_SET 8..14 {
       TOKEN_CURLY_B_OPEN("{") 8..9
       NODE_SET_ENTRY 9..13 {

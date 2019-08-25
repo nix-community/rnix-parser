@@ -322,7 +322,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             }
             '/' if self.peek() == Some('/') => {
                 self.next().unwrap();
-                Some((TOKEN_MERGE, self.string_since(start)))
+                Some((TOKEN_UPDATE, self.string_since(start)))
             }
             '+' => Some((TOKEN_ADD, self.string_since(start))),
             '-' => Some((TOKEN_SUB, self.string_since(start))),
@@ -884,7 +884,7 @@ mod tests {
     fn combine() {
         assert_eq!(
             tokenize("a//b"),
-            tokens![(TOKEN_IDENT, "a"), (TOKEN_MERGE, "//"), (TOKEN_IDENT, "b")]
+            tokens![(TOKEN_IDENT, "a"), (TOKEN_UPDATE, "//"), (TOKEN_IDENT, "b")]
         );
     }
     #[test]
