@@ -1,6 +1,6 @@
-# rnix [![Crates.io](https://img.shields.io/crates/v/rnix.svg)](http://crates.io/crates/rnix)
+# rnix-parser [![Crates.io](https://img.shields.io/crates/v/rnix.svg)](http://crates.io/crates/rnix)
 
-rnix is a Nix parser written in Rust.
+rnix is a parser for the [Nix language](https://nixos.org/nix/) written in Rust.
 
 This can be used to manipulate the Nix AST and can for example be used for:
 
@@ -24,6 +24,7 @@ rnix nowadays uses [@matklad](https://github.com/matklad)'s
 
 Examples can be found in the `examples/` directory.  
 
-You may also want to see [nix-explorer](https://gitlab.com/jD91mZM2/nix-explorer):
-An example that highlights AST nodes in valid Nix code.
-This demonstrates how span information is preserved.
+You may also want to see
+[nix-explorer](https://gitlab.com/jD91mZM2/nix-explorer): An example
+that highlights AST nodes in Nix code. This demonstrates how
+whitespaces and commands are preserved.
