@@ -23,7 +23,7 @@ NODE_ROOT 0..51 {
           }
           TOKEN_COLON(":") 16..17
           TOKEN_WHITESPACE(" ") 17..18
-          NODE_OPERATION 18..23 {
+          NODE_BIN_OP 18..23 {
             NODE_IDENT 18..19 {
               TOKEN_IDENT("x") 18..19
             }

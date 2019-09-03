@@ -88,8 +88,8 @@ mod tests {
     #[test]
     fn math() {
         let ast = parse(include_str!("../test_data/general/math.nix"));
-        let root = ast.root().inner().and_then(Operation::cast).unwrap();
-        let operation = root.value1().and_then(Operation::cast).unwrap();
+        let root = ast.root().inner().and_then(BinOp::cast).unwrap();
+        let operation = root.value1().and_then(BinOp::cast).unwrap();
 
         assert_eq!(root.operator(), OpKind::Add);
         assert_eq!(operation.operator(), OpKind::Add);

@@ -1,5 +1,5 @@
 NODE_ROOT 0..9 {
-  NODE_OPERATION 0..9 {
+  NODE_BIN_OP 0..9 {
     NODE_APPLY 0..5 {
       NODE_APPLY 0..3 {
         NODE_IDENT 0..1 {

@@ -1,6 +1,6 @@
 NODE_ROOT 0..20 {
-  NODE_OPERATION 0..20 {
-    NODE_OPERATION 0..3 {
+  NODE_BIN_OP 0..20 {
+    NODE_BIN_OP 0..3 {
       NODE_VALUE 0..1 {
         TOKEN_INTEGER("1") 0..1
       }
@@ -10,9 +10,9 @@ NODE_ROOT 0..20 {
       }
     }
     TOKEN_OR("||") 3..5
-    NODE_OPERATION 5..20 {
-      NODE_OPERATION 5..14 {
-        NODE_OPERATION 5..9 {
+    NODE_BIN_OP 5..20 {
+      NODE_BIN_OP 5..14 {
+        NODE_BIN_OP 5..9 {
           NODE_VALUE 5..6 {
             TOKEN_INTEGER("2") 5..6
           }
@@ -22,7 +22,7 @@ NODE_ROOT 0..20 {
           }
         }
         TOKEN_AND("&&") 9..11
-        NODE_OPERATION 11..14 {
+        NODE_BIN_OP 11..14 {
           NODE_VALUE 11..12 {
             TOKEN_INTEGER("2") 11..12
           }
@@ -33,7 +33,7 @@ NODE_ROOT 0..20 {
         }
       }
       TOKEN_AND("&&") 14..16
-      NODE_OPERATION 16..20 {
+      NODE_BIN_OP 16..20 {
         NODE_VALUE 16..17 {
           TOKEN_INTEGER("2") 16..17
         }

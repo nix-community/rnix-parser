@@ -1,6 +1,6 @@
 NODE_ROOT 0..11 {
-  NODE_OPERATION 0..11 {
-    NODE_OPERATION 0..5 {
+  NODE_BIN_OP 0..11 {
+    NODE_BIN_OP 0..5 {
       NODE_IDENT 0..1 {
         TOKEN_IDENT("a") 0..1
       }

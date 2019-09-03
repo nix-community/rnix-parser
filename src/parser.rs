@@ -504,7 +504,7 @@ where
     ) -> Checkpoint {
         let checkpoint = next(self);
         while self.peek().map(|t| ops.contains(&t)).unwrap_or(false) {
-            self.start_node_at(checkpoint, NODE_OPERATION);
+            self.start_node_at(checkpoint, NODE_BIN_OP);
             self.bump();
             next(self);
             self.finish_node();
