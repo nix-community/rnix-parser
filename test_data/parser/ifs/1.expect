@@ -7,7 +7,7 @@ NODE_ROOT 0..33 {
     TOKEN_IMPLICATION("->") 6..8
     NODE_OPERATION 8..33 {
       NODE_OPERATION 8..27 {
-        NODE_UNARY 8..14 {
+        NODE_UNARY_OP 8..14 {
           TOKEN_INVERT("!") 8..9
           NODE_IDENT 9..14 {
             TOKEN_IDENT("false") 9..14

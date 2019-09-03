@@ -234,7 +234,7 @@ pub enum ParsedType {
     Set(Set),
     SetEntry(SetEntry),
     Str(Str),
-    Unary(Unary),
+    UnaryOp(UnaryOp),
     Value(Value),
     With(With),
 }
@@ -268,7 +268,7 @@ impl core::convert::TryFrom<SyntaxNode> for ParsedType {
             NODE_ROOT => Ok(ParsedType::Root(Root::cast(node).unwrap())),
             NODE_SET => Ok(ParsedType::Set(Set::cast(node).unwrap())),
             NODE_SET_ENTRY => Ok(ParsedType::SetEntry(SetEntry::cast(node).unwrap())),
-            NODE_UNARY => Ok(ParsedType::Unary(Unary::cast(node).unwrap())),
+            NODE_UNARY_OP => Ok(ParsedType::UnaryOp(UnaryOp::cast(node).unwrap())),
             NODE_VALUE => Ok(ParsedType::Value(Value::cast(node).unwrap())),
             NODE_WITH => Ok(ParsedType::With(With::cast(node).unwrap())),
             other => Err(ParsedTypeError(other)),
@@ -463,7 +463,7 @@ typed! [
             nth!(self; 1)
         }
     },
-    NODE_UNARY => Unary: {
+    NODE_UNARY_OP => UnaryOp: {
         /// Return the operator
         pub fn operator(&self) -> UnaryOpKind {
             self.first_token().and_then(|t| UnaryOpKind::from_token(t.kind())).expect("invalid ast")

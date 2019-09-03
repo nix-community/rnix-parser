@@ -487,7 +487,7 @@ where
     fn parse_negate(&mut self) -> Checkpoint {
         if self.peek() == Some(TOKEN_SUB) {
             let checkpoint = self.checkpoint();
-            self.start_node(NODE_UNARY);
+            self.start_node(NODE_UNARY_OP);
             self.bump();
             self.parse_negate();
             self.finish_node();
@@ -529,7 +529,7 @@ where
     fn parse_invert(&mut self) -> Checkpoint {
         if self.peek() == Some(TOKEN_INVERT) {
             let checkpoint = self.checkpoint();
-            self.start_node(NODE_UNARY);
+            self.start_node(NODE_UNARY_OP);
             self.bump();
             self.parse_invert();
             self.finish_node();
