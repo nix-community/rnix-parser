@@ -224,7 +224,7 @@ pub enum ParsedType {
     Let(Let),
     LetIn(LetIn),
     List(List),
-    Operation(Operation),
+    BinOp(BinOp),
     OrDefault(OrDefault),
     Paren(Paren),
     PatBind(PatBind),
@@ -259,7 +259,7 @@ impl core::convert::TryFrom<SyntaxNode> for ParsedType {
             NODE_LET => Ok(ParsedType::Let(Let::cast(node).unwrap())),
             NODE_LET_IN => Ok(ParsedType::LetIn(LetIn::cast(node).unwrap())),
             NODE_LIST => Ok(ParsedType::List(List::cast(node).unwrap())),
-            NODE_OPERATION => Ok(ParsedType::Operation(Operation::cast(node).unwrap())),
+            NODE_BIN_OP => Ok(ParsedType::BinOp(BinOp::cast(node).unwrap())),
             NODE_OR_DEFAULT => Ok(ParsedType::OrDefault(OrDefault::cast(node).unwrap())),
             NODE_PAREN => Ok(ParsedType::Paren(Paren::cast(node).unwrap())),
             NODE_PATTERN => Ok(ParsedType::Pattern(Pattern::cast(node).unwrap())),
@@ -379,7 +379,7 @@ typed! [
             self.node().children()
         }
     },
-    NODE_OPERATION => Operation: {
+    NODE_BIN_OP => BinOp: {
         /// Return the first value in the operation
         pub fn value1(&self) -> Option<SyntaxNode> {
             nth!(self; 0)

@@ -27,7 +27,7 @@ NODE_ROOT 0..229 {
           }
           TOKEN_COLON(":") 59..60
           TOKEN_WHITESPACE(" ") 60..61
-          NODE_OPERATION 61..66 {
+          NODE_BIN_OP 61..66 {
             NODE_IDENT 61..62 {
               TOKEN_IDENT("x") 61..62
             }

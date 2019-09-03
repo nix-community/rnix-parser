@@ -41,7 +41,7 @@ NODE_ROOT 0..284 {
         NODE_IF_ELSE 32..196 {
           TOKEN_IF("if") 32..34
           TOKEN_WHITESPACE(" ") 34..35
-          NODE_OPERATION 35..48 {
+          NODE_BIN_OP 35..48 {
             NODE_IDENT 35..40 {
               TOKEN_IDENT("value") 35..40
             }
@@ -58,7 +58,7 @@ NODE_ROOT 0..284 {
           NODE_IF_ELSE 62..136 {
             TOKEN_IF("if") 62..64
             TOKEN_WHITESPACE(" ") 64..65
-            NODE_OPERATION 65..75 {
+            NODE_BIN_OP 65..75 {
               NODE_IDENT 65..70 {
                 TOKEN_IDENT("value") 65..70
               }
@@ -79,7 +79,7 @@ NODE_ROOT 0..284 {
                 TOKEN_WHITESPACE(" ") 98..99
                 NODE_PAREN 99..111 {
                   TOKEN_PAREN_OPEN("(") 99..100
-                  NODE_OPERATION 100..110 {
+                  NODE_BIN_OP 100..110 {
                     NODE_IDENT 100..105 {
                       TOKEN_IDENT("value") 100..105
                     }
@@ -178,14 +178,14 @@ NODE_ROOT 0..284 {
         NODE_ASSERT 244..281 {
           TOKEN_ASSERT("assert") 244..250
           TOKEN_WHITESPACE(" ") 250..251
-          NODE_OPERATION 251..275 {
+          NODE_BIN_OP 251..275 {
             NODE_IDENT 251..258 {
               TOKEN_IDENT("enabled") 251..258
             }
             TOKEN_WHITESPACE(" ") 258..259
             TOKEN_IMPLICATION("->") 259..261
             TOKEN_WHITESPACE(" ") 261..262
-            NODE_OPERATION 262..275 {
+            NODE_BIN_OP 262..275 {
               NODE_IDENT 262..267 {
                 TOKEN_IDENT("value") 262..267
               }

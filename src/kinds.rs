@@ -84,7 +84,7 @@ pub enum SyntaxKind {
     NODE_LET,
     NODE_LET_IN,
     NODE_LIST,
-    NODE_OPERATION,
+    NODE_BIN_OP,
     NODE_OR_DEFAULT,
     NODE_PAREN,
     NODE_PATTERN,

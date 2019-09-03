@@ -25,7 +25,7 @@ NODE_ROOT 0..150 {
         TOKEN_WHITESPACE(" ") 38..39
         TOKEN_ASSIGN("=") 39..40
         TOKEN_WHITESPACE(" ") 40..41
-        NODE_OPERATION 41..46 {
+        NODE_BIN_OP 41..46 {
           NODE_VALUE 41..42 {
             TOKEN_INTEGER("4") 41..42
           }
@@ -53,7 +53,7 @@ NODE_ROOT 0..150 {
           TOKEN_WHITESPACE(" ") 56..57
           TOKEN_ASSIGN("=") 57..58
           TOKEN_WHITESPACE(" ") 58..59
-          NODE_OPERATION 59..64 {
+          NODE_BIN_OP 59..64 {
             NODE_IDENT 59..60 {
               TOKEN_IDENT("a") 59..60
             }

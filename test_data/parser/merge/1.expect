@@ -1,5 +1,5 @@
 NODE_ROOT 0..14 {
-  NODE_OPERATION 0..14 {
+  NODE_BIN_OP 0..14 {
     NODE_SET 0..6 {
       TOKEN_CURLY_B_OPEN("{") 0..1
       NODE_SET_ENTRY 1..5 {

@@ -1,6 +1,6 @@
 NODE_ROOT 0..15 {
-  NODE_OPERATION 0..15 {
-    NODE_OPERATION 0..10 {
+  NODE_BIN_OP 0..15 {
+    NODE_BIN_OP 0..10 {
       NODE_LIST 0..3 {
         TOKEN_SQUARE_B_OPEN("[") 0..1
         NODE_VALUE 1..2 {

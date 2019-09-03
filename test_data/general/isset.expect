@@ -13,7 +13,7 @@ NODE_ROOT 0..54 {
       TOKEN_WHITESPACE(" ") 9..10
       TOKEN_ASSIGN("=") 10..11
       TOKEN_WHITESPACE(" ") 11..12
-      NODE_OPERATION 12..26 {
+      NODE_BIN_OP 12..26 {
         NODE_SET 12..22 {
           TOKEN_CURLY_B_OPEN("{") 12..13
           TOKEN_WHITESPACE(" ") 13..14

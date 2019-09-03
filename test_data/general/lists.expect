@@ -27,7 +27,7 @@ NODE_ROOT 0..62 {
         TOKEN_WHITESPACE(" ") 18..19
         NODE_PAREN 19..26 {
           TOKEN_PAREN_OPEN("(") 19..20
-          NODE_OPERATION 20..25 {
+          NODE_BIN_OP 20..25 {
             NODE_VALUE 20..21 {
               TOKEN_INTEGER("2") 20..21
             }
@@ -54,8 +54,8 @@ NODE_ROOT 0..62 {
       TOKEN_WHITESPACE(" ") 37..38
       TOKEN_ASSIGN("=") 38..39
       TOKEN_WHITESPACE(" ") 39..40
-      NODE_OPERATION 40..59 {
-        NODE_OPERATION 40..52 {
+      NODE_BIN_OP 40..59 {
+        NODE_BIN_OP 40..52 {
           NODE_LIST 40..43 {
             TOKEN_SQUARE_B_OPEN("[") 40..41
             NODE_VALUE 41..42 {

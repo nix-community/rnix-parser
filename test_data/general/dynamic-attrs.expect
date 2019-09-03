@@ -135,7 +135,7 @@ NODE_ROOT 0..216 {
     TOKEN_WHITESPACE("\n") 110..111
     TOKEN_IN("in") 111..113
     TOKEN_WHITESPACE("\n  ") 113..116
-    NODE_OPERATION 116..216 {
+    NODE_BIN_OP 116..216 {
       NODE_APPLY 116..136 {
         NODE_APPLY 116..128 {
           NODE_IDENT 116..122 {
@@ -199,7 +199,7 @@ NODE_ROOT 0..216 {
           TOKEN_WHITESPACE(" ") 188..189
           TOKEN_ASSIGN("=") 189..190
           TOKEN_WHITESPACE(" ") 190..191
-          NODE_OPERATION 191..211 {
+          NODE_BIN_OP 191..211 {
             NODE_IDENT 191..194 {
               TOKEN_IDENT("set") 191..194
             }

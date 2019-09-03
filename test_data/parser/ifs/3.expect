@@ -1,6 +1,6 @@
 NODE_ROOT 0..10 {
-  NODE_OPERATION 0..10 {
-    NODE_OPERATION 0..4 {
+  NODE_BIN_OP 0..10 {
+    NODE_BIN_OP 0..4 {
       NODE_VALUE 0..1 {
         TOKEN_INTEGER("1") 0..1
       }
@@ -10,7 +10,7 @@ NODE_ROOT 0..10 {
       }
     }
     TOKEN_AND("&&") 4..6
-    NODE_OPERATION 6..10 {
+    NODE_BIN_OP 6..10 {
       NODE_VALUE 6..7 {
         TOKEN_INTEGER("2") 6..7
       }
