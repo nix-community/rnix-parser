@@ -113,7 +113,7 @@ NODE_ROOT 0..284 {
           NODE_IF_ELSE 150..196 {
             TOKEN_IF("if") 150..152
             TOKEN_WHITESPACE(" ") 152..153
-            NODE_UNARY 153..158 {
+            NODE_UNARY_OP 153..158 {
               TOKEN_INVERT("!") 153..154
               NODE_IDENT 154..158 {
                 TOKEN_IDENT("life") 154..158

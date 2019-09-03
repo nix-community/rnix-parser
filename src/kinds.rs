@@ -93,7 +93,7 @@ pub enum SyntaxKind {
     NODE_ROOT,
     NODE_SET,
     NODE_SET_ENTRY,
-    NODE_UNARY,
+    NODE_UNARY_OP,
     NODE_VALUE,
     NODE_WITH,
 
