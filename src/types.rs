@@ -42,7 +42,7 @@ macro_rules! nth {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum OpKind {
+pub enum BinOpKind {
     Concat,
     IsSet,
     Update,
@@ -62,28 +62,28 @@ pub enum OpKind {
     NotEqual,
     Or,
 }
-impl OpKind {
+impl BinOpKind {
     /// Get the operation kind from a token in the AST
     pub fn from_token(token: SyntaxKind) -> Option<Self> {
         match token {
-            TOKEN_CONCAT => Some(OpKind::Concat),
-            TOKEN_QUESTION => Some(OpKind::IsSet),
-            TOKEN_UPDATE => Some(OpKind::Update),
+            TOKEN_CONCAT => Some(BinOpKind::Concat),
+            TOKEN_QUESTION => Some(BinOpKind::IsSet),
+            TOKEN_UPDATE => Some(BinOpKind::Update),
 
-            TOKEN_ADD => Some(OpKind::Add),
-            TOKEN_SUB => Some(OpKind::Sub),
-            TOKEN_MUL => Some(OpKind::Mul),
-            TOKEN_DIV => Some(OpKind::Div),
+            TOKEN_ADD => Some(BinOpKind::Add),
+            TOKEN_SUB => Some(BinOpKind::Sub),
+            TOKEN_MUL => Some(BinOpKind::Mul),
+            TOKEN_DIV => Some(BinOpKind::Div),
 
-            TOKEN_AND => Some(OpKind::And),
-            TOKEN_EQUAL => Some(OpKind::Equal),
-            TOKEN_IMPLICATION => Some(OpKind::Implication),
-            TOKEN_LESS => Some(OpKind::Less),
-            TOKEN_LESS_OR_EQ => Some(OpKind::LessOrEq),
-            TOKEN_MORE => Some(OpKind::More),
-            TOKEN_MORE_OR_EQ => Some(OpKind::MoreOrEq),
-            TOKEN_NOT_EQUAL => Some(OpKind::NotEqual),
-            TOKEN_OR => Some(OpKind::Or),
+            TOKEN_AND => Some(BinOpKind::And),
+            TOKEN_EQUAL => Some(BinOpKind::Equal),
+            TOKEN_IMPLICATION => Some(BinOpKind::Implication),
+            TOKEN_LESS => Some(BinOpKind::Less),
+            TOKEN_LESS_OR_EQ => Some(BinOpKind::LessOrEq),
+            TOKEN_MORE => Some(BinOpKind::More),
+            TOKEN_MORE_OR_EQ => Some(BinOpKind::MoreOrEq),
+            TOKEN_NOT_EQUAL => Some(BinOpKind::NotEqual),
+            TOKEN_OR => Some(BinOpKind::Or),
 
             _ => None,
         }
@@ -385,8 +385,8 @@ typed! [
             nth!(self; 0)
         }
         /// Return the operator
-        pub fn operator(&self) -> OpKind {
-            self.first_token().and_then(|t| OpKind::from_token(t.kind())).expect("invalid ast")
+        pub fn operator(&self) -> BinOpKind {
+            self.first_token().and_then(|t| BinOpKind::from_token(t.kind())).expect("invalid ast")
         }
         /// Return the second value in the operation
         pub fn value2(&self) -> Option<SyntaxNode> {

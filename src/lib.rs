@@ -91,8 +91,8 @@ mod tests {
         let root = ast.root().inner().and_then(BinOp::cast).unwrap();
         let operation = root.value1().and_then(BinOp::cast).unwrap();
 
-        assert_eq!(root.operator(), OpKind::Add);
-        assert_eq!(operation.operator(), OpKind::Add);
+        assert_eq!(root.operator(), BinOpKind::Add);
+        assert_eq!(operation.operator(), BinOpKind::Add);
 
         let value = operation.value1().and_then(Value::cast).unwrap();
         assert_eq!(value.to_value(), Ok(NixValue::Integer(1)));
