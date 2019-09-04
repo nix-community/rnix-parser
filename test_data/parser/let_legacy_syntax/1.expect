@@ -1,5 +1,5 @@
 NODE_ROOT 0..17 {
-  NODE_LET 0..17 {
+  NODE_LEGACY_LET 0..17 {
     TOKEN_LET("let") 0..3
     TOKEN_CURLY_B_OPEN("{") 3..4
     NODE_SET_ENTRY 4..9 {

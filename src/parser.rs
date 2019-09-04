@@ -573,7 +573,7 @@ where
                 self.bump();
 
                 if self.peek() == Some(TOKEN_CURLY_B_OPEN) {
-                    self.start_node_at(checkpoint, NODE_LET);
+                    self.start_node_at(checkpoint, NODE_LEGACY_LET);
                     self.bump();
                     self.parse_set(TOKEN_CURLY_B_CLOSE);
                     self.finish_node();
