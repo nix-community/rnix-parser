@@ -4,7 +4,7 @@ NODE_ROOT 0..17 {
       NODE_IDENT 0..6 {
         TOKEN_IDENT("import") 0..6
       }
-      NODE_VALUE 6..15 {
+      NODE_LITERAL 6..15 {
         TOKEN_PATH("<nixpkgs>") 6..15
       }
     }

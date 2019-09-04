@@ -26,7 +26,7 @@ NODE_ROOT 0..54 {
             TOKEN_WHITESPACE(" ") 15..16
             TOKEN_ASSIGN("=") 16..17
             TOKEN_WHITESPACE(" ") 17..18
-            NODE_VALUE 18..19 {
+            NODE_LITERAL 18..19 {
               TOKEN_INTEGER("1") 18..19
             }
             TOKEN_SEMICOLON(";") 19..20
@@ -67,7 +67,7 @@ NODE_ROOT 0..54 {
               TOKEN_WHITESPACE(" ") 37..38
               TOKEN_ASSIGN("=") 38..39
               TOKEN_WHITESPACE(" ") 39..40
-              NODE_VALUE 40..41 {
+              NODE_LITERAL 40..41 {
                 TOKEN_INTEGER("2") 40..41
               }
               TOKEN_SEMICOLON(";") 41..42
@@ -83,7 +83,7 @@ NODE_ROOT 0..54 {
         TOKEN_WHITESPACE(" ") 46..47
         TOKEN_IDENT("or") 47..49
         TOKEN_WHITESPACE(" ") 49..50
-        NODE_VALUE 50..51 {
+        NODE_LITERAL 50..51 {
           TOKEN_INTEGER("5") 50..51
         }
       }

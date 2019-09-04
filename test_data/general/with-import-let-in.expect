@@ -7,7 +7,7 @@ NODE_ROOT 0..150 {
         TOKEN_IDENT("import") 5..11
       }
       TOKEN_WHITESPACE(" ") 11..12
-      NODE_VALUE 12..28 {
+      NODE_LITERAL 12..28 {
         TOKEN_PATH("./simple-set.nix") 12..28
       }
     }
@@ -26,13 +26,13 @@ NODE_ROOT 0..150 {
         TOKEN_ASSIGN("=") 39..40
         TOKEN_WHITESPACE(" ") 40..41
         NODE_BIN_OP 41..46 {
-          NODE_VALUE 41..42 {
+          NODE_LITERAL 41..42 {
             TOKEN_INTEGER("4") 41..42
           }
           TOKEN_WHITESPACE(" ") 42..43
           TOKEN_ADD("+") 43..44
           TOKEN_WHITESPACE(" ") 44..45
-          NODE_VALUE 45..46 {
+          NODE_LITERAL 45..46 {
             TOKEN_INTEGER("2") 45..46
           }
         }
@@ -60,7 +60,7 @@ NODE_ROOT 0..150 {
             TOKEN_WHITESPACE(" ") 60..61
             TOKEN_ADD("+") 61..62
             TOKEN_WHITESPACE(" ") 62..63
-            NODE_VALUE 63..64 {
+            NODE_LITERAL 63..64 {
               TOKEN_INTEGER("2") 63..64
             }
           }

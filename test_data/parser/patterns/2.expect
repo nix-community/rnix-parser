@@ -14,7 +14,7 @@ NODE_ROOT 0..13 {
     }
     TOKEN_COLON(":") 10..11
     TOKEN_WHITESPACE(" ") 11..12
-    NODE_VALUE 12..13 {
+    NODE_LITERAL 12..13 {
       TOKEN_INTEGER("1") 12..13
     }
   }

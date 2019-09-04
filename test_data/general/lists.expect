@@ -13,28 +13,28 @@ NODE_ROOT 0..62 {
       TOKEN_WHITESPACE(" ") 11..12
       NODE_LIST 12..27 {
         TOKEN_SQUARE_B_OPEN("[") 12..13
-        NODE_VALUE 13..14 {
+        NODE_LITERAL 13..14 {
           TOKEN_INTEGER("1") 13..14
         }
         TOKEN_WHITESPACE(" ") 14..15
-        NODE_VALUE 15..16 {
+        NODE_LITERAL 15..16 {
           TOKEN_INTEGER("2") 15..16
         }
         TOKEN_WHITESPACE(" ") 16..17
-        NODE_VALUE 17..18 {
+        NODE_LITERAL 17..18 {
           TOKEN_INTEGER("3") 17..18
         }
         TOKEN_WHITESPACE(" ") 18..19
         NODE_PAREN 19..26 {
           TOKEN_PAREN_OPEN("(") 19..20
           NODE_BIN_OP 20..25 {
-            NODE_VALUE 20..21 {
+            NODE_LITERAL 20..21 {
               TOKEN_INTEGER("2") 20..21
             }
             TOKEN_WHITESPACE(" ") 21..22
             TOKEN_ADD("+") 22..23
             TOKEN_WHITESPACE(" ") 23..24
-            NODE_VALUE 24..25 {
+            NODE_LITERAL 24..25 {
               TOKEN_INTEGER("2") 24..25
             }
           }
@@ -58,7 +58,7 @@ NODE_ROOT 0..62 {
         NODE_BIN_OP 40..52 {
           NODE_LIST 40..43 {
             TOKEN_SQUARE_B_OPEN("[") 40..41
-            NODE_VALUE 41..42 {
+            NODE_LITERAL 41..42 {
               TOKEN_INTEGER("1") 41..42
             }
             TOKEN_SQUARE_B_CLOSE("]") 42..43
@@ -68,11 +68,11 @@ NODE_ROOT 0..62 {
           TOKEN_WHITESPACE(" ") 46..47
           NODE_LIST 47..52 {
             TOKEN_SQUARE_B_OPEN("[") 47..48
-            NODE_VALUE 48..49 {
+            NODE_LITERAL 48..49 {
               TOKEN_INTEGER("2") 48..49
             }
             TOKEN_WHITESPACE(" ") 49..50
-            NODE_VALUE 50..51 {
+            NODE_LITERAL 50..51 {
               TOKEN_INTEGER("3") 50..51
             }
             TOKEN_SQUARE_B_CLOSE("]") 51..52
@@ -83,7 +83,7 @@ NODE_ROOT 0..62 {
         TOKEN_WHITESPACE(" ") 55..56
         NODE_LIST 56..59 {
           TOKEN_SQUARE_B_OPEN("[") 56..57
-          NODE_VALUE 57..58 {
+          NODE_LITERAL 57..58 {
             TOKEN_INTEGER("4") 57..58
           }
           TOKEN_SQUARE_B_CLOSE("]") 58..59

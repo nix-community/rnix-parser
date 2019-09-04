@@ -11,7 +11,7 @@ NODE_ROOT 0..96 {
       TOKEN_WHITESPACE(" ") 7..8
       TOKEN_ASSIGN("=") 8..9
       TOKEN_WHITESPACE(" ") 9..10
-      NODE_VALUE 10..11 {
+      NODE_LITERAL 10..11 {
         TOKEN_INTEGER("2") 10..11
       }
       TOKEN_SEMICOLON(";") 11..12
@@ -38,7 +38,7 @@ NODE_ROOT 0..96 {
           TOKEN_WHITESPACE(" ") 24..25
           TOKEN_ASSIGN("=") 25..26
           TOKEN_WHITESPACE(" ") 26..27
-          NODE_VALUE 27..28 {
+          NODE_LITERAL 27..28 {
             TOKEN_INTEGER("3") 27..28
           }
           TOKEN_SEMICOLON(";") 28..29
@@ -53,7 +53,7 @@ NODE_ROOT 0..96 {
           TOKEN_WHITESPACE(" ") 31..32
           TOKEN_ASSIGN("=") 32..33
           TOKEN_WHITESPACE(" ") 33..34
-          NODE_VALUE 34..35 {
+          NODE_LITERAL 34..35 {
             TOKEN_INTEGER("4") 34..35
           }
           TOKEN_SEMICOLON(";") 35..36
@@ -68,7 +68,7 @@ NODE_ROOT 0..96 {
           TOKEN_WHITESPACE(" ") 38..39
           TOKEN_ASSIGN("=") 39..40
           TOKEN_WHITESPACE(" ") 40..41
-          NODE_VALUE 41..42 {
+          NODE_LITERAL 41..42 {
             TOKEN_INTEGER("5") 41..42
           }
           TOKEN_SEMICOLON(";") 42..43
@@ -93,7 +93,7 @@ NODE_ROOT 0..96 {
         TOKEN_WHITESPACE(" ") 55..56
         TOKEN_ASSIGN("=") 56..57
         TOKEN_WHITESPACE(" ") 57..58
-        NODE_VALUE 58..59 {
+        NODE_LITERAL 58..59 {
           TOKEN_INTEGER("1") 58..59
         }
         TOKEN_SEMICOLON(";") 59..60

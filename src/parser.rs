@@ -420,8 +420,8 @@ where
             }
             TOKEN_DYNAMIC_START => self.parse_dynamic(),
             TOKEN_STRING_START => self.parse_string(),
-            t if t.is_value() => {
-                self.start_node(NODE_VALUE);
+            t if t.is_literal() => {
+                self.start_node(NODE_LITERAL);
                 self.bump();
                 self.finish_node();
             }

@@ -15,7 +15,7 @@ NODE_ROOT 0..33 {
       TOKEN_WHITESPACE(" ") 7..8
       TOKEN_ASSIGN("=") 8..9
       TOKEN_WHITESPACE(" ") 9..10
-      NODE_VALUE 10..11 {
+      NODE_LITERAL 10..11 {
         TOKEN_INTEGER("2") 10..11
       }
       TOKEN_SEMICOLON(";") 11..12
@@ -46,7 +46,7 @@ NODE_ROOT 0..33 {
       TOKEN_WHITESPACE(" ") 26..27
       TOKEN_ASSIGN("=") 27..28
       TOKEN_WHITESPACE(" ") 28..29
-      NODE_VALUE 29..30 {
+      NODE_LITERAL 29..30 {
         TOKEN_INTEGER("3") 29..30
       }
       TOKEN_SEMICOLON(";") 30..31

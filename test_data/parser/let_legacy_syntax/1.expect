@@ -9,7 +9,7 @@ NODE_ROOT 0..17 {
         }
       }
       TOKEN_ASSIGN("=") 5..6
-      NODE_VALUE 6..8 {
+      NODE_LITERAL 6..8 {
         TOKEN_INTEGER("42") 6..8
       }
       TOKEN_SEMICOLON(";") 8..9

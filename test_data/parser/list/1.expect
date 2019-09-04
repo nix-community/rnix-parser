@@ -5,11 +5,11 @@ NODE_ROOT 0..13 {
       TOKEN_IDENT("a") 1..2
     }
     TOKEN_WHITESPACE(" ") 2..3
-    NODE_VALUE 3..4 {
+    NODE_LITERAL 3..4 {
       TOKEN_INTEGER("2") 3..4
     }
     TOKEN_WHITESPACE(" ") 4..5
-    NODE_VALUE 5..6 {
+    NODE_LITERAL 5..6 {
       TOKEN_INTEGER("3") 5..6
     }
     TOKEN_WHITESPACE(" ") 6..7

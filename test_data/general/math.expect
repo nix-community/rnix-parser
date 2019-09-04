@@ -1,20 +1,20 @@
 NODE_ROOT 0..23 {
   NODE_BIN_OP 0..23 {
     NODE_BIN_OP 0..9 {
-      NODE_VALUE 0..1 {
+      NODE_LITERAL 0..1 {
         TOKEN_INTEGER("1") 0..1
       }
       TOKEN_WHITESPACE(" ") 1..2
       TOKEN_ADD("+") 2..3
       TOKEN_WHITESPACE(" ") 3..4
       NODE_BIN_OP 4..9 {
-        NODE_VALUE 4..5 {
+        NODE_LITERAL 4..5 {
           TOKEN_INTEGER("2") 4..5
         }
         TOKEN_WHITESPACE(" ") 5..6
         TOKEN_MUL("*") 6..7
         TOKEN_WHITESPACE(" ") 7..8
-        NODE_VALUE 8..9 {
+        NODE_LITERAL 8..9 {
           TOKEN_INTEGER("3") 8..9
         }
       }
@@ -23,7 +23,7 @@ NODE_ROOT 0..23 {
     TOKEN_ADD("+") 10..11
     TOKEN_WHITESPACE(" ") 11..12
     NODE_BIN_OP 12..23 {
-      NODE_VALUE 12..13 {
+      NODE_LITERAL 12..13 {
         TOKEN_INTEGER("4") 12..13
       }
       TOKEN_WHITESPACE(" ") 13..14
@@ -32,13 +32,13 @@ NODE_ROOT 0..23 {
       NODE_PAREN 16..23 {
         TOKEN_PAREN_OPEN("(") 16..17
         NODE_BIN_OP 17..22 {
-          NODE_VALUE 17..18 {
+          NODE_LITERAL 17..18 {
             TOKEN_INTEGER("5") 17..18
           }
           TOKEN_WHITESPACE(" ") 18..19
           TOKEN_SUB("-") 19..20
           TOKEN_WHITESPACE(" ") 20..21
-          NODE_VALUE 21..22 {
+          NODE_LITERAL 21..22 {
             TOKEN_INTEGER("6") 21..22
           }
         }

@@ -67,7 +67,7 @@ NODE_ROOT 0..51 {
       }
       TOKEN_COLON(":") 48..49
       TOKEN_WHITESPACE("\n") 49..50
-      NODE_VALUE 50..51 {
+      NODE_LITERAL 50..51 {
         TOKEN_INTEGER("1") 50..51
       }
     }

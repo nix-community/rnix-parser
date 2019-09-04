@@ -65,7 +65,7 @@ NODE_ROOT 0..284 {
               TOKEN_WHITESPACE(" ") 70..71
               TOKEN_LESS_OR_EQ("<=") 71..73
               TOKEN_WHITESPACE(" ") 73..74
-              NODE_VALUE 74..75 {
+              NODE_LITERAL 74..75 {
                 TOKEN_INTEGER("5") 74..75
               }
             }
@@ -86,7 +86,7 @@ NODE_ROOT 0..284 {
                     TOKEN_WHITESPACE(" ") 105..106
                     TOKEN_MORE_OR_EQ(">=") 106..108
                     TOKEN_WHITESPACE(" ") 108..109
-                    NODE_VALUE 109..110 {
+                    NODE_LITERAL 109..110 {
                       TOKEN_INTEGER("0") 109..110
                     }
                   }
@@ -103,7 +103,7 @@ NODE_ROOT 0..284 {
             TOKEN_WHITESPACE("\n          ") 119..130
             TOKEN_ELSE("else") 130..134
             TOKEN_WHITESPACE(" ") 134..135
-            NODE_VALUE 135..136 {
+            NODE_LITERAL 135..136 {
               TOKEN_INTEGER("5") 135..136
             }
           }
@@ -122,13 +122,13 @@ NODE_ROOT 0..284 {
             TOKEN_WHITESPACE("\n          ") 158..169
             TOKEN_THEN("then") 169..173
             TOKEN_WHITESPACE(" ") 173..174
-            NODE_VALUE 174..178 {
+            NODE_LITERAL 174..178 {
               TOKEN_INTEGER("1337") 174..178
             }
             TOKEN_WHITESPACE("\n          ") 178..189
             TOKEN_ELSE("else") 189..193
             TOKEN_WHITESPACE(" ") 193..194
-            NODE_VALUE 194..196 {
+            NODE_LITERAL 194..196 {
               TOKEN_INTEGER("42") 194..196
             }
           }

@@ -8,7 +8,7 @@ NODE_ROOT 0..44 {
     TOKEN_WHITESPACE(" ") 8..9
     TOKEN_THEN("then") 9..13
     TOKEN_WHITESPACE(" ") 13..14
-    NODE_VALUE 14..15 {
+    NODE_LITERAL 14..15 {
       TOKEN_INTEGER("1") 14..15
     }
     TOKEN_WHITESPACE(" ") 15..16
@@ -29,7 +29,7 @@ NODE_ROOT 0..44 {
       TOKEN_WHITESPACE(" ") 37..38
       TOKEN_ELSE("else") 38..42
       TOKEN_WHITESPACE(" ") 42..43
-      NODE_VALUE 43..44 {
+      NODE_LITERAL 43..44 {
         TOKEN_INTEGER("3") 43..44
       }
     }

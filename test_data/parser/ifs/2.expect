@@ -1,11 +1,11 @@
 NODE_ROOT 0..20 {
   NODE_BIN_OP 0..20 {
     NODE_BIN_OP 0..3 {
-      NODE_VALUE 0..1 {
+      NODE_LITERAL 0..1 {
         TOKEN_INTEGER("1") 0..1
       }
       TOKEN_LESS("<") 1..2
-      NODE_VALUE 2..3 {
+      NODE_LITERAL 2..3 {
         TOKEN_INTEGER("2") 2..3
       }
     }
@@ -13,32 +13,32 @@ NODE_ROOT 0..20 {
     NODE_BIN_OP 5..20 {
       NODE_BIN_OP 5..14 {
         NODE_BIN_OP 5..9 {
-          NODE_VALUE 5..6 {
+          NODE_LITERAL 5..6 {
             TOKEN_INTEGER("2") 5..6
           }
           TOKEN_LESS_OR_EQ("<=") 6..8
-          NODE_VALUE 8..9 {
+          NODE_LITERAL 8..9 {
             TOKEN_INTEGER("2") 8..9
           }
         }
         TOKEN_AND("&&") 9..11
         NODE_BIN_OP 11..14 {
-          NODE_VALUE 11..12 {
+          NODE_LITERAL 11..12 {
             TOKEN_INTEGER("2") 11..12
           }
           TOKEN_MORE(">") 12..13
-          NODE_VALUE 13..14 {
+          NODE_LITERAL 13..14 {
             TOKEN_INTEGER("1") 13..14
           }
         }
       }
       TOKEN_AND("&&") 14..16
       NODE_BIN_OP 16..20 {
-        NODE_VALUE 16..17 {
+        NODE_LITERAL 16..17 {
           TOKEN_INTEGER("2") 16..17
         }
         TOKEN_MORE_OR_EQ(">=") 17..19
-        NODE_VALUE 19..20 {
+        NODE_LITERAL 19..20 {
           TOKEN_INTEGER("2") 19..20
         }
       }
