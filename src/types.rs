@@ -221,7 +221,7 @@ pub enum ParsedType {
     Inherit(Inherit),
     InheritFrom(InheritFrom),
     Lambda(Lambda),
-    Let(Let),
+    LegacyLet(LegacyLet),
     LetIn(LetIn),
     List(List),
     BinOp(BinOp),
@@ -256,7 +256,7 @@ impl core::convert::TryFrom<SyntaxNode> for ParsedType {
             NODE_INHERIT_FROM => Ok(ParsedType::InheritFrom(InheritFrom::cast(node).unwrap())),
             NODE_STRING => Ok(ParsedType::Str(Str::cast(node).unwrap())),
             NODE_LAMBDA => Ok(ParsedType::Lambda(Lambda::cast(node).unwrap())),
-            NODE_LET => Ok(ParsedType::Let(Let::cast(node).unwrap())),
+            NODE_LEGACY_LET => Ok(ParsedType::LegacyLet(LegacyLet::cast(node).unwrap())),
             NODE_LET_IN => Ok(ParsedType::LetIn(LetIn::cast(node).unwrap())),
             NODE_LIST => Ok(ParsedType::List(List::cast(node).unwrap())),
             NODE_BIN_OP => Ok(ParsedType::BinOp(BinOp::cast(node).unwrap())),
@@ -366,7 +366,7 @@ typed! [
             nth!(self; 1)
         }
     },
-    NODE_LET => Let: EntryHolder,
+    NODE_LEGACY_LET => LegacyLet: EntryHolder,
     NODE_LET_IN => LetIn: EntryHolder: {
         /// Return the body
         pub fn body(&self) -> Option<SyntaxNode> {

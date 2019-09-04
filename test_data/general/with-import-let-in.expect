@@ -76,7 +76,7 @@ NODE_ROOT 0..150 {
           TOKEN_WHITESPACE(" ") 75..76
           TOKEN_ASSIGN("=") 76..77
           TOKEN_WHITESPACE(" ") 77..78
-          NODE_LET 78..147 {
+          NODE_LEGACY_LET 78..147 {
             TOKEN_LET("let") 78..81
             TOKEN_WHITESPACE(" ") 81..82
             TOKEN_CURLY_B_OPEN("{") 82..83
