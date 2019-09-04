@@ -64,7 +64,7 @@ NODE_ROOT 0..270 {
           NODE_STRING_INTERPOL 101..161 {
             TOKEN_INTERPOL_START("${") 101..103
             TOKEN_WHITESPACE("\n      ") 103..110
-            NODE_INDEX_SET 110..155 {
+            NODE_SELECT 110..155 {
               NODE_SET 110..153 {
                 TOKEN_CURLY_B_OPEN("{") 110..111
                 TOKEN_WHITESPACE("\n        ") 111..120

@@ -54,7 +54,7 @@ NODE_ROOT 0..54 {
       TOKEN_ASSIGN("=") 32..33
       TOKEN_WHITESPACE(" ") 33..34
       NODE_OR_DEFAULT 34..51 {
-        NODE_INDEX_SET 34..46 {
+        NODE_SELECT 34..46 {
           NODE_SET 34..44 {
             TOKEN_CURLY_B_OPEN("{") 34..35
             TOKEN_WHITESPACE(" ") 35..36

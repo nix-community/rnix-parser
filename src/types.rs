@@ -217,7 +217,7 @@ pub enum ParsedType {
     Error(Error),
     Ident(Ident),
     IfElse(IfElse),
-    IndexSet(IndexSet),
+    Select(Select),
     Inherit(Inherit),
     InheritFrom(InheritFrom),
     Lambda(Lambda),
@@ -251,7 +251,7 @@ impl core::convert::TryFrom<SyntaxNode> for ParsedType {
             NODE_ERROR => Ok(ParsedType::Error(Error::cast(node).unwrap())),
             NODE_IDENT => Ok(ParsedType::Ident(Ident::cast(node).unwrap())),
             NODE_IF_ELSE => Ok(ParsedType::IfElse(IfElse::cast(node).unwrap())),
-            NODE_INDEX_SET => Ok(ParsedType::IndexSet(IndexSet::cast(node).unwrap())),
+            NODE_SELECT => Ok(ParsedType::Select(Select::cast(node).unwrap())),
             NODE_INHERIT => Ok(ParsedType::Inherit(Inherit::cast(node).unwrap())),
             NODE_INHERIT_FROM => Ok(ParsedType::InheritFrom(InheritFrom::cast(node).unwrap())),
             NODE_STRING => Ok(ParsedType::Str(Str::cast(node).unwrap())),
@@ -328,7 +328,7 @@ typed! [
             nth!(self; 2)
         }
     },
-    NODE_INDEX_SET => IndexSet: {
+    NODE_SELECT => Select: {
         /// Return the set being indexed
         pub fn set(&self) -> Option<SyntaxNode> {
             nth!(self; 0)
@@ -395,8 +395,8 @@ typed! [
     },
     NODE_OR_DEFAULT => OrDefault: {
         /// Return the indexing operation
-        pub fn index(&self) -> Option<IndexSet> {
-            nth!(self; (IndexSet) 0)
+        pub fn index(&self) -> Option<Select> {
+            nth!(self; (Select) 0)
         }
         /// Return the default value
         pub fn default(&self) -> Option<SyntaxNode> {

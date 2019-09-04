@@ -1,7 +1,7 @@
 NODE_ROOT 0..33 {
-  NODE_INDEX_SET 0..33 {
-    NODE_INDEX_SET 0..28 {
-      NODE_INDEX_SET 0..20 {
+  NODE_SELECT 0..33 {
+    NODE_SELECT 0..28 {
+      NODE_SELECT 0..20 {
         NODE_IDENT 0..4 {
           TOKEN_IDENT("test") 0..4
         }

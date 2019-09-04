@@ -461,7 +461,7 @@ where
         };
 
         while self.peek() == Some(TOKEN_DOT) {
-            self.start_node_at(checkpoint, NODE_INDEX_SET);
+            self.start_node_at(checkpoint, NODE_SELECT);
             self.bump();
             self.next_attr();
             self.finish_node();
