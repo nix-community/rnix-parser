@@ -9,7 +9,7 @@ NODE_ROOT 0..10 {
     }
     TOKEN_COLON(":") 7..8
     TOKEN_WHITESPACE(" ") 8..9
-    NODE_VALUE 9..10 {
+    NODE_LITERAL 9..10 {
       TOKEN_INTEGER("1") 9..10
     }
   }

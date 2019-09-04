@@ -3,7 +3,7 @@ NODE_ROOT 0..15 {
     NODE_BIN_OP 0..10 {
       NODE_LIST 0..3 {
         TOKEN_SQUARE_B_OPEN("[") 0..1
-        NODE_VALUE 1..2 {
+        NODE_LITERAL 1..2 {
           TOKEN_INTEGER("1") 1..2
         }
         TOKEN_SQUARE_B_CLOSE("]") 2..3
@@ -20,7 +20,7 @@ NODE_ROOT 0..15 {
     TOKEN_CONCAT("++") 10..12
     NODE_LIST 12..15 {
       TOKEN_SQUARE_B_OPEN("[") 12..13
-      NODE_VALUE 13..14 {
+      NODE_LITERAL 13..14 {
         TOKEN_INTEGER("3") 13..14
       }
       TOKEN_SQUARE_B_CLOSE("]") 14..15

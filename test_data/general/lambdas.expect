@@ -59,12 +59,12 @@ NODE_ROOT 0..51 {
               TOKEN_IDENT("add") 41..44
             }
             TOKEN_WHITESPACE(" ") 44..45
-            NODE_VALUE 45..46 {
+            NODE_LITERAL 45..46 {
               TOKEN_INTEGER("2") 45..46
             }
           }
           TOKEN_WHITESPACE(" ") 46..47
-          NODE_VALUE 47..48 {
+          NODE_LITERAL 47..48 {
             TOKEN_INTEGER("5") 47..48
           }
         }

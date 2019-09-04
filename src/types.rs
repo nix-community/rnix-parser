@@ -269,7 +269,7 @@ impl core::convert::TryFrom<SyntaxNode> for ParsedType {
             NODE_SET => Ok(ParsedType::Set(Set::cast(node).unwrap())),
             NODE_SET_ENTRY => Ok(ParsedType::SetEntry(SetEntry::cast(node).unwrap())),
             NODE_UNARY_OP => Ok(ParsedType::UnaryOp(UnaryOp::cast(node).unwrap())),
-            NODE_VALUE => Ok(ParsedType::Value(Value::cast(node).unwrap())),
+            NODE_LITERAL => Ok(ParsedType::Value(Value::cast(node).unwrap())),
             NODE_WITH => Ok(ParsedType::With(With::cast(node).unwrap())),
             other => Err(ParsedTypeError(other)),
         }
@@ -279,7 +279,7 @@ impl core::convert::TryFrom<SyntaxNode> for ParsedType {
 typed! [
     NODE_IDENT => Ident: TokenWrapper: {
     },
-    NODE_VALUE => Value: TokenWrapper: {
+    NODE_LITERAL => Value: TokenWrapper: {
         /// Parse the value
         pub fn to_value(&self) -> Result<ParsedValue, ValueError> {
             ParsedValue::from_token(self.first_token().expect("invalid ast").kind(), self.as_str())

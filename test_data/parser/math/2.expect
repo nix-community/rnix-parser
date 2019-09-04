@@ -1,6 +1,6 @@
 NODE_ROOT 0..8 {
   NODE_BIN_OP 0..8 {
-    NODE_VALUE 0..1 {
+    NODE_LITERAL 0..1 {
       TOKEN_INTEGER("5") 0..1
     }
     TOKEN_MUL("*") 1..2
@@ -9,11 +9,11 @@ NODE_ROOT 0..8 {
       NODE_PAREN 3..8 {
         TOKEN_PAREN_OPEN("(") 3..4
         NODE_BIN_OP 4..7 {
-          NODE_VALUE 4..5 {
+          NODE_LITERAL 4..5 {
             TOKEN_INTEGER("3") 4..5
           }
           TOKEN_SUB("-") 5..6
-          NODE_VALUE 6..7 {
+          NODE_LITERAL 6..7 {
             TOKEN_INTEGER("2") 6..7
           }
         }

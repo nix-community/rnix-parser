@@ -88,7 +88,7 @@ NODE_ROOT 0..306 {
               }
             }
             TOKEN_WHITESPACE(" ") 296..297
-            NODE_VALUE 297..298 {
+            NODE_LITERAL 297..298 {
               TOKEN_INTEGER("0") 297..298
             }
           }

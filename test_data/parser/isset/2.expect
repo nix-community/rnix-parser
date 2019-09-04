@@ -19,14 +19,14 @@ NODE_ROOT 0..14 {
       TOKEN_WHITESPACE(" ") 5..6
       TOKEN_IDENT("or") 6..8
       TOKEN_WHITESPACE(" ") 8..9
-      NODE_VALUE 9..10 {
+      NODE_LITERAL 9..10 {
         TOKEN_INTEGER("1") 9..10
       }
     }
     TOKEN_WHITESPACE(" ") 10..11
     TOKEN_ADD("+") 11..12
     TOKEN_WHITESPACE(" ") 12..13
-    NODE_VALUE 13..14 {
+    NODE_LITERAL 13..14 {
       TOKEN_INTEGER("1") 13..14
     }
   }

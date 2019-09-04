@@ -26,7 +26,7 @@ NODE_ROOT 0..166 {
       TOKEN_WHITESPACE(" ") 28..29
       TOKEN_ASSIGN("=") 29..30
       TOKEN_WHITESPACE(" ") 30..31
-      NODE_VALUE 31..32 {
+      NODE_LITERAL 31..32 {
         TOKEN_INTEGER("1") 31..32
       }
       TOKEN_SEMICOLON(";") 32..33

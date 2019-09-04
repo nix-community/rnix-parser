@@ -45,7 +45,7 @@ NODE_ROOT 0..137 {
       TOKEN_WHITESPACE(" ") 101..102
       TOKEN_ASSIGN("=") 102..103
       TOKEN_WHITESPACE(" ") 103..104
-      NODE_VALUE 104..134 {
+      NODE_LITERAL 104..134 {
         TOKEN_URI("http://example.org/foo.tar.bz2") 104..134
       }
       TOKEN_SEMICOLON(";") 134..135

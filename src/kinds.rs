@@ -94,7 +94,7 @@ pub enum SyntaxKind {
     NODE_SET,
     NODE_SET_ENTRY,
     NODE_UNARY_OP,
-    NODE_VALUE,
+    NODE_LITERAL,
     NODE_WITH,
 
     #[doc(hidden)]
@@ -103,8 +103,8 @@ pub enum SyntaxKind {
 use SyntaxKind::*;
 
 impl SyntaxKind {
-    /// Returns true if this token is a value, such as an integer or a string
-    pub fn is_value(self) -> bool {
+    /// Returns true if this token is a literal, such as an integer or a string
+    pub fn is_literal(self) -> bool {
         match self {
             TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI => true,
             _ => false,
@@ -124,7 +124,7 @@ impl SyntaxKind {
         match self {
             TOKEN_REC | TOKEN_CURLY_B_OPEN | TOKEN_SQUARE_B_OPEN | TOKEN_PAREN_OPEN
             | TOKEN_STRING_START | TOKEN_IDENT => true,
-            _ => self.is_value(),
+            _ => self.is_literal(),
         }
     }
     /// Returns true if this token is a comment, whitespace, or similar, and
