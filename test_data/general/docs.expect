@@ -73,7 +73,7 @@ NODE_ROOT 0..306 {
         NODE_APPLY 277..303 {
           NODE_APPLY 277..298 {
             NODE_APPLY 277..296 {
-              NODE_INDEX_SET 277..292 {
+              NODE_SELECT 277..292 {
                 NODE_IDENT 277..285 {
                   TOKEN_IDENT("builtins") 277..285
                 }

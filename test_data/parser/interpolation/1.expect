@@ -6,7 +6,7 @@ NODE_ROOT 0..43 {
     NODE_STRING_INTERPOL 9..40 {
       TOKEN_INTERPOL_START("${") 9..11
       TOKEN_WHITESPACE(" ") 11..12
-      NODE_INDEX_SET 12..38 {
+      NODE_SELECT 12..38 {
         NODE_SET 12..32 {
           TOKEN_CURLY_B_OPEN("{") 12..13
           TOKEN_WHITESPACE(" ") 13..14

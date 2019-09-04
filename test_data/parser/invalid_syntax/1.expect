@@ -1,7 +1,7 @@
 error: unexpected eof, wanted any of [TOKEN_IDENT]
 error: error node at 0..1
 NODE_ROOT 0..2 {
-  NODE_INDEX_SET 0..2 {
+  NODE_SELECT 0..2 {
     NODE_ERROR 0..1 {
       TOKEN_SQUARE_B_CLOSE("]") 0..1
     }

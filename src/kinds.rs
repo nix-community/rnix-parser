@@ -75,7 +75,7 @@ pub enum SyntaxKind {
     NODE_ERROR,
     NODE_IDENT,
     NODE_IF_ELSE,
-    NODE_INDEX_SET,
+    NODE_SELECT,
     NODE_INHERIT,
     NODE_INHERIT_FROM,
     NODE_STRING,

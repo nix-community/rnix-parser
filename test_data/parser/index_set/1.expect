@@ -1,6 +1,6 @@
 NODE_ROOT 0..5 {
-  NODE_INDEX_SET 0..5 {
-    NODE_INDEX_SET 0..3 {
+  NODE_SELECT 0..5 {
+    NODE_SELECT 0..3 {
       NODE_IDENT 0..1 {
         TOKEN_IDENT("a") 0..1
       }
