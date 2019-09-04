@@ -1,11 +1,11 @@
 NODE_ROOT 0..54 {
-  NODE_SET 0..54 {
+  NODE_ATTR_SET 0..54 {
     TOKEN_REC("rec") 0..3
     TOKEN_WHITESPACE(" ") 3..4
     TOKEN_CURLY_B_OPEN("{") 4..5
     TOKEN_WHITESPACE("\n  ") 5..8
-    NODE_SET_ENTRY 8..27 {
-      NODE_ATTRIBUTE 8..9 {
+    NODE_KEY_VALUE 8..27 {
+      NODE_KEY 8..9 {
         NODE_IDENT 8..9 {
           TOKEN_IDENT("x") 8..9
         }
@@ -14,11 +14,11 @@ NODE_ROOT 0..54 {
       TOKEN_ASSIGN("=") 10..11
       TOKEN_WHITESPACE(" ") 11..12
       NODE_BIN_OP 12..26 {
-        NODE_SET 12..22 {
+        NODE_ATTR_SET 12..22 {
           TOKEN_CURLY_B_OPEN("{") 12..13
           TOKEN_WHITESPACE(" ") 13..14
-          NODE_SET_ENTRY 14..20 {
-            NODE_ATTRIBUTE 14..15 {
+          NODE_KEY_VALUE 14..20 {
+            NODE_KEY 14..15 {
               NODE_IDENT 14..15 {
                 TOKEN_IDENT("a") 14..15
               }
@@ -44,8 +44,8 @@ NODE_ROOT 0..54 {
       TOKEN_SEMICOLON(";") 26..27
     }
     TOKEN_WHITESPACE("\n  ") 27..30
-    NODE_SET_ENTRY 30..52 {
-      NODE_ATTRIBUTE 30..31 {
+    NODE_KEY_VALUE 30..52 {
+      NODE_KEY 30..31 {
         NODE_IDENT 30..31 {
           TOKEN_IDENT("y") 30..31
         }
@@ -55,11 +55,11 @@ NODE_ROOT 0..54 {
       TOKEN_WHITESPACE(" ") 33..34
       NODE_OR_DEFAULT 34..51 {
         NODE_SELECT 34..46 {
-          NODE_SET 34..44 {
+          NODE_ATTR_SET 34..44 {
             TOKEN_CURLY_B_OPEN("{") 34..35
             TOKEN_WHITESPACE(" ") 35..36
-            NODE_SET_ENTRY 36..42 {
-              NODE_ATTRIBUTE 36..37 {
+            NODE_KEY_VALUE 36..42 {
+              NODE_KEY 36..37 {
                 NODE_IDENT 36..37 {
                   TOKEN_IDENT("b") 36..37
                 }

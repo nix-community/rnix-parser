@@ -1,9 +1,9 @@
 NODE_ROOT 0..288 {
-  NODE_SET 0..288 {
+  NODE_ATTR_SET 0..288 {
     TOKEN_CURLY_B_OPEN("{") 0..1
     TOKEN_WHITESPACE("\n  ") 1..4
-    NODE_SET_ENTRY 4..12 {
-      NODE_ATTRIBUTE 4..7 {
+    NODE_KEY_VALUE 4..12 {
+      NODE_KEY 4..7 {
         NODE_IDENT 4..7 {
           TOKEN_IDENT("int") 4..7
         }
@@ -17,8 +17,8 @@ NODE_ROOT 0..288 {
       TOKEN_SEMICOLON(";") 11..12
     }
     TOKEN_WHITESPACE("\n  ") 12..15
-    NODE_SET_ENTRY 15..27 {
-      NODE_ATTRIBUTE 15..20 {
+    NODE_KEY_VALUE 15..27 {
+      NODE_KEY 15..20 {
         NODE_IDENT 15..20 {
           TOKEN_IDENT("float") 15..20
         }
@@ -32,8 +32,8 @@ NODE_ROOT 0..288 {
       TOKEN_SEMICOLON(";") 26..27
     }
     TOKEN_WHITESPACE("\n  ") 27..30
-    NODE_SET_ENTRY 30..53 {
-      NODE_ATTRIBUTE 30..36 {
+    NODE_KEY_VALUE 30..53 {
+      NODE_KEY 30..36 {
         NODE_IDENT 30..36 {
           TOKEN_IDENT("string") 30..36
         }
@@ -49,8 +49,8 @@ NODE_ROOT 0..288 {
       TOKEN_SEMICOLON(";") 52..53
     }
     TOKEN_WHITESPACE("\n  ") 53..56
-    NODE_SET_ENTRY 56..286 {
-      NODE_ATTRIBUTE 56..65 {
+    NODE_KEY_VALUE 56..286 {
+      NODE_KEY 56..65 {
         NODE_IDENT 56..65 {
           TOKEN_IDENT("multiline") 56..65
         }

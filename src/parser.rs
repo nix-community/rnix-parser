@@ -238,7 +238,7 @@ where
         }
     }
     fn parse_attr(&mut self) {
-        self.start_node(NODE_ATTRIBUTE);
+        self.start_node(NODE_KEY);
         loop {
             self.next_attr();
 
@@ -323,7 +323,7 @@ where
                     self.finish_node();
                 }
                 Some(_) => {
-                    self.start_node(NODE_SET_ENTRY);
+                    self.start_node(NODE_KEY_VALUE);
                     self.parse_attr();
                     self.expect(TOKEN_ASSIGN);
                     self.parse_expr();
@@ -357,7 +357,7 @@ where
                 self.finish_node();
             }
             TOKEN_REC => {
-                self.start_node(NODE_SET);
+                self.start_node(NODE_ATTR_SET);
                 self.bump();
                 self.expect(TOKEN_CURLY_B_OPEN);
                 self.parse_set(TOKEN_CURLY_B_CLOSE);
@@ -402,7 +402,7 @@ where
                     }
                     _ => {
                         // This looks like a set
-                        self.start_node(NODE_SET);
+                        self.start_node(NODE_ATTR_SET);
                         self.bump();
                         self.parse_set(TOKEN_CURLY_B_CLOSE);
                         self.finish_node();
@@ -665,11 +665,11 @@ mod tests {
             actual.trim(),
             r##"
 NODE_ROOT 0..50 {
-  NODE_SET 0..48 {
+  NODE_ATTR_SET 0..48 {
     TOKEN_CURLY_B_OPEN("{") 0..1
     TOKEN_WHITESPACE("\n  ") 1..4
-    NODE_SET_ENTRY 4..48 {
-      NODE_ATTRIBUTE 4..11 {
+    NODE_KEY_VALUE 4..48 {
+      NODE_KEY 4..11 {
         NODE_IDENT 4..11 {
           TOKEN_IDENT("traceIf") 4..11
         }
@@ -703,7 +703,7 @@ NODE_ROOT 0..50 {
             actual.trim(),
             r##"
 NODE_ROOT 0..5 {
-  NODE_SET 0..2 {
+  NODE_ATTR_SET 0..2 {
     TOKEN_CURLY_B_OPEN("{") 0..1
     TOKEN_CURLY_B_CLOSE("}") 1..2
   }

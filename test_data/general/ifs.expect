@@ -26,11 +26,11 @@ NODE_ROOT 0..284 {
     }
     TOKEN_COLON(":") 22..23
     TOKEN_WHITESPACE("\n") 23..24
-    NODE_SET 24..284 {
+    NODE_ATTR_SET 24..284 {
       TOKEN_CURLY_B_OPEN("{") 24..25
       TOKEN_WHITESPACE("\n  ") 25..28
-      NODE_SET_ENTRY 28..197 {
-        NODE_ATTRIBUTE 28..29 {
+      NODE_KEY_VALUE 28..197 {
+        NODE_KEY 28..29 {
           NODE_IDENT 28..29 {
             TOKEN_IDENT("x") 28..29
           }
@@ -136,8 +136,8 @@ NODE_ROOT 0..284 {
         TOKEN_SEMICOLON(";") 196..197
       }
       TOKEN_WHITESPACE("\n\n  ") 197..201
-      NODE_SET_ENTRY 201..217 {
-        NODE_ATTRIBUTE 201..208 {
+      NODE_KEY_VALUE 201..217 {
+        NODE_KEY 201..208 {
           NODE_IDENT 201..208 {
             TOKEN_IDENT("enabled") 201..208
           }
@@ -151,8 +151,8 @@ NODE_ROOT 0..284 {
         TOKEN_SEMICOLON(";") 216..217
       }
       TOKEN_WHITESPACE("\n  ") 217..220
-      NODE_SET_ENTRY 220..233 {
-        NODE_ATTRIBUTE 220..225 {
+      NODE_KEY_VALUE 220..233 {
+        NODE_KEY 220..225 {
           NODE_IDENT 220..225 {
             TOKEN_IDENT("value") 220..225
           }
@@ -166,8 +166,8 @@ NODE_ROOT 0..284 {
         TOKEN_SEMICOLON(";") 232..233
       }
       TOKEN_WHITESPACE("\n  ") 233..236
-      NODE_SET_ENTRY 236..282 {
-        NODE_ATTRIBUTE 236..241 {
+      NODE_KEY_VALUE 236..282 {
+        NODE_KEY 236..241 {
           NODE_IDENT 236..241 {
             TOKEN_IDENT("valid") 236..241
           }

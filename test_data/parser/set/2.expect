@@ -1,9 +1,9 @@
 NODE_ROOT 0..12 {
-  NODE_SET 0..12 {
+  NODE_ATTR_SET 0..12 {
     TOKEN_REC("rec") 0..3
     TOKEN_CURLY_B_OPEN("{") 3..4
-    NODE_SET_ENTRY 4..11 {
-      NODE_ATTRIBUTE 4..8 {
+    NODE_KEY_VALUE 4..11 {
+      NODE_KEY 4..8 {
         NODE_IDENT 4..8 {
           TOKEN_IDENT("test") 4..8
         }

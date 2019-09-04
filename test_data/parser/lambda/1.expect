@@ -8,7 +8,7 @@ NODE_ROOT 0..17 {
         TOKEN_PATH("<nixpkgs>") 6..15
       }
     }
-    NODE_SET 15..17 {
+    NODE_ATTR_SET 15..17 {
       TOKEN_CURLY_B_OPEN("{") 15..16
       TOKEN_CURLY_B_CLOSE("}") 16..17
     }

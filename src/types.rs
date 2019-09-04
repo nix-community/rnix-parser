@@ -191,8 +191,8 @@ pub trait TokenWrapper: TypedNode {
 /// Provides the function `.entries()`
 pub trait EntryHolder: TypedNode {
     /// Return an iterator over all key=value entries
-    fn entries(&self) -> Box<dyn Iterator<Item = SetEntry>> {
-        Box::new(self.node().children().filter_map(SetEntry::cast))
+    fn entries(&self) -> Box<dyn Iterator<Item = KeyValue>> {
+        Box::new(self.node().children().filter_map(KeyValue::cast))
     }
     /// Return an iterator over all inherit entries
     fn inherits(&self) -> Box<dyn Iterator<Item = Inherit>> {
@@ -212,7 +212,7 @@ pub struct ParsedTypeError(pub SyntaxKind);
 pub enum ParsedType {
     Apply(Apply),
     Assert(Assert),
-    Attribute(Attribute),
+    Key(Key),
     Dynamic(Dynamic),
     Error(Error),
     Ident(Ident),
@@ -231,8 +231,8 @@ pub enum ParsedType {
     PatEntry(PatEntry),
     Pattern(Pattern),
     Root(Root),
-    Set(Set),
-    SetEntry(SetEntry),
+    AttrSet(AttrSet),
+    KeyValue(KeyValue),
     Str(Str),
     UnaryOp(UnaryOp),
     Value(Value),
@@ -246,7 +246,7 @@ impl core::convert::TryFrom<SyntaxNode> for ParsedType {
         match node.kind() {
             NODE_APPLY => Ok(ParsedType::Apply(Apply::cast(node).unwrap())),
             NODE_ASSERT => Ok(ParsedType::Assert(Assert::cast(node).unwrap())),
-            NODE_ATTRIBUTE => Ok(ParsedType::Attribute(Attribute::cast(node).unwrap())),
+            NODE_KEY => Ok(ParsedType::Key(Key::cast(node).unwrap())),
             NODE_DYNAMIC => Ok(ParsedType::Dynamic(Dynamic::cast(node).unwrap())),
             NODE_ERROR => Ok(ParsedType::Error(Error::cast(node).unwrap())),
             NODE_IDENT => Ok(ParsedType::Ident(Ident::cast(node).unwrap())),
@@ -266,8 +266,8 @@ impl core::convert::TryFrom<SyntaxNode> for ParsedType {
             NODE_PAT_BIND => Ok(ParsedType::PatBind(PatBind::cast(node).unwrap())),
             NODE_PAT_ENTRY => Ok(ParsedType::PatEntry(PatEntry::cast(node).unwrap())),
             NODE_ROOT => Ok(ParsedType::Root(Root::cast(node).unwrap())),
-            NODE_SET => Ok(ParsedType::Set(Set::cast(node).unwrap())),
-            NODE_SET_ENTRY => Ok(ParsedType::SetEntry(SetEntry::cast(node).unwrap())),
+            NODE_ATTR_SET => Ok(ParsedType::AttrSet(AttrSet::cast(node).unwrap())),
+            NODE_KEY_VALUE => Ok(ParsedType::KeyValue(KeyValue::cast(node).unwrap())),
             NODE_UNARY_OP => Ok(ParsedType::UnaryOp(UnaryOp::cast(node).unwrap())),
             NODE_LITERAL => Ok(ParsedType::Value(Value::cast(node).unwrap())),
             NODE_WITH => Ok(ParsedType::With(With::cast(node).unwrap())),
@@ -306,7 +306,7 @@ typed! [
             nth!(self; 1)
         }
     },
-    NODE_ATTRIBUTE => Attribute: {
+    NODE_KEY => Key: {
         /// Return the path as an iterator of identifiers
         pub fn path<'a>(&'a self) -> impl Iterator<Item = SyntaxNode> + 'a {
             self.node().children()
@@ -439,7 +439,7 @@ typed! [
         }
     },
     NODE_ROOT => Root: Wrapper,
-    NODE_SET => Set: EntryHolder: {
+    NODE_ATTR_SET => AttrSet: EntryHolder: {
         /// Returns true if this set is recursive
         pub fn recursive(&self) -> bool {
             self.node().children_with_tokens().any(|node| node.kind() == TOKEN_REC)
@@ -448,15 +448,15 @@ typed! [
         /// callback function returns false
         /// { a = 2; b = 3; } without 0 is { b = 3; }
         pub fn filter_entries<F>(&self, _callback: F) -> Root
-            where F: FnMut(&SetEntry) -> bool
+            where F: FnMut(&KeyValue) -> bool
         {
             unimplemented!("TODO: filter_entries or better editing API")
         }
     },
-    NODE_SET_ENTRY => SetEntry: {
+    NODE_KEY_VALUE => KeyValue: {
         /// Return this entry's key
-        pub fn key(&self) -> Option<Attribute> {
-            nth!(self; (Attribute) 0)
+        pub fn key(&self) -> Option<Key> {
+            nth!(self; (Key) 0)
         }
         /// Return this entry's value
         pub fn value(&self) -> Option<SyntaxNode> {

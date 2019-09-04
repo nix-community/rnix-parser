@@ -7,7 +7,7 @@ NODE_ROOT 0..8 {
           TOKEN_IDENT("a") 1..2
         }
         TOKEN_QUESTION("?") 2..3
-        NODE_SET 3..5 {
+        NODE_ATTR_SET 3..5 {
           TOKEN_CURLY_B_OPEN("{") 3..4
           TOKEN_CURLY_B_CLOSE("}") 4..5
         }

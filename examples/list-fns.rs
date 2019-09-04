@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let content = fs::read_to_string(&file)?;
     let ast = rnix::parse(&content).as_result()?;
-    let set = ast.root().inner().and_then(Set::cast).ok_or("root isn't a set")?;
+    let set = ast.root().inner().and_then(AttrSet::cast).ok_or("root isn't a set")?;
 
     for entry in set.entries() {
         if let Some(lambda) = entry.value().and_then(Lambda::cast) {
