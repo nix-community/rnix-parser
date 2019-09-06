@@ -6,7 +6,7 @@ fn all_packages(c: &mut Criterion) {
     c.bench(
         "all-packages",
         Benchmark::new("all-packages", move |b| b.iter(|| parse(input)))
-            .throughput(Throughput::Bytes(input.len() as u32))
+            .throughput(Throughput::Bytes(input.len() as u64))
             .sample_size(30),
     );
 }
