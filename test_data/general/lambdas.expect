@@ -2,8 +2,8 @@ NODE_ROOT 0..51 {
   NODE_LET_IN 0..51 {
     TOKEN_LET("let") 0..3
     TOKEN_WHITESPACE("\n  ") 3..6
-    NODE_SET_ENTRY 6..24 {
-      NODE_ATTRIBUTE 6..9 {
+    NODE_KEY_VALUE 6..24 {
+      NODE_KEY 6..9 {
         NODE_IDENT 6..9 {
           TOKEN_IDENT("add") 6..9
         }
@@ -41,11 +41,11 @@ NODE_ROOT 0..51 {
     TOKEN_WHITESPACE("\n") 24..25
     TOKEN_IN("in") 25..27
     TOKEN_WHITESPACE(" ") 27..28
-    NODE_SET 28..51 {
+    NODE_ATTR_SET 28..51 {
       TOKEN_CURLY_B_OPEN("{") 28..29
       TOKEN_WHITESPACE("\n  ") 29..32
-      NODE_SET_ENTRY 32..49 {
-        NODE_ATTRIBUTE 32..38 {
+      NODE_KEY_VALUE 32..49 {
+        NODE_KEY 32..38 {
           NODE_IDENT 32..38 {
             TOKEN_IDENT("result") 32..38
           }

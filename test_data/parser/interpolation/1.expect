@@ -7,11 +7,11 @@ NODE_ROOT 0..43 {
       TOKEN_INTERPOL_START("${") 9..11
       TOKEN_WHITESPACE(" ") 11..12
       NODE_SELECT 12..38 {
-        NODE_SET 12..32 {
+        NODE_ATTR_SET 12..32 {
           TOKEN_CURLY_B_OPEN("{") 12..13
           TOKEN_WHITESPACE(" ") 13..14
-          NODE_SET_ENTRY 14..30 {
-            NODE_ATTRIBUTE 14..19 {
+          NODE_KEY_VALUE 14..30 {
+            NODE_KEY 14..19 {
               NODE_IDENT 14..19 {
                 TOKEN_IDENT("world") 14..19
               }

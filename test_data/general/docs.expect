@@ -1,7 +1,7 @@
 NODE_ROOT 0..306 {
   TOKEN_COMMENT("# Test used by examples/list-fns.rs") 0..35
   TOKEN_WHITESPACE("\n") 35..36
-  NODE_SET 36..306 {
+  NODE_ATTR_SET 36..306 {
     TOKEN_REC("rec") 36..39
     TOKEN_WHITESPACE(" ") 39..40
     TOKEN_CURLY_B_OPEN("{") 40..41
@@ -10,8 +10,8 @@ NODE_ROOT 0..306 {
     TOKEN_WHITESPACE("\n  ") 60..63
     TOKEN_COMMENT("# Adds the integers x and y together and returns the result") 63..122
     TOKEN_WHITESPACE("\n  ") 122..125
-    NODE_SET_ENTRY 125..196 {
-      NODE_ATTRIBUTE 125..128 {
+    NODE_KEY_VALUE 125..196 {
+      NODE_KEY 125..128 {
         NODE_IDENT 125..128 {
           TOKEN_IDENT("add") 125..128
         }
@@ -55,8 +55,8 @@ NODE_ROOT 0..306 {
     TOKEN_WHITESPACE("\n  ") 216..219
     TOKEN_COMMENT("# Returns the sum of the integer array nums") 219..262
     TOKEN_WHITESPACE("\n  ") 262..265
-    NODE_SET_ENTRY 265..304 {
-      NODE_ATTRIBUTE 265..268 {
+    NODE_KEY_VALUE 265..304 {
+      NODE_KEY 265..268 {
         NODE_IDENT 265..268 {
           TOKEN_IDENT("sum") 265..268
         }

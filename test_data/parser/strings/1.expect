@@ -1,9 +1,9 @@
 NODE_ROOT 0..137 {
-  NODE_SET 0..137 {
+  NODE_ATTR_SET 0..137 {
     TOKEN_CURLY_B_OPEN("{") 0..1
     TOKEN_WHITESPACE("\n  ") 1..4
-    NODE_SET_ENTRY 4..21 {
-      NODE_ATTRIBUTE 4..10 {
+    NODE_KEY_VALUE 4..21 {
+      NODE_KEY 4..10 {
         NODE_IDENT 4..10 {
           TOKEN_IDENT("simple") 4..10
         }
@@ -19,8 +19,8 @@ NODE_ROOT 0..137 {
       TOKEN_SEMICOLON(";") 20..21
     }
     TOKEN_WHITESPACE("\n  ") 21..24
-    NODE_SET_ENTRY 24..63 {
-      NODE_ATTRIBUTE 24..32 {
+    NODE_KEY_VALUE 24..63 {
+      NODE_KEY 24..32 {
         NODE_IDENT 24..32 {
           TOKEN_IDENT("indented") 24..32
         }
@@ -36,8 +36,8 @@ NODE_ROOT 0..137 {
       TOKEN_SEMICOLON(";") 62..63
     }
     TOKEN_WHITESPACE("\n  ") 63..66
-    NODE_SET_ENTRY 66..135 {
-      NODE_ATTRIBUTE 66..101 {
+    NODE_KEY_VALUE 66..135 {
+      NODE_KEY 66..101 {
         NODE_IDENT 66..101 {
           TOKEN_IDENT("uri_is_also_a_string_how_convenient") 66..101
         }

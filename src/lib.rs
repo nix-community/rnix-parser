@@ -52,7 +52,7 @@ mod tests {
         let ast = parse(include_str!("../test_data/general/interpolation.nix"));
 
         let let_in = ast.root().inner().and_then(LetIn::cast).unwrap();
-        let set = let_in.body().and_then(Set::cast).unwrap();
+        let set = let_in.body().and_then(AttrSet::cast).unwrap();
         let entry = set.entries().nth(1).unwrap();
         let value = entry.value().and_then(Str::cast).unwrap();
 
@@ -75,7 +75,7 @@ mod tests {
         let ast = parse(include_str!("../test_data/general/inherit.nix"));
 
         let let_in = ast.root().inner().and_then(LetIn::cast).unwrap();
-        let set = let_in.body().and_then(Set::cast).unwrap();
+        let set = let_in.body().and_then(AttrSet::cast).unwrap();
         let inherit = set.inherits().nth(1).unwrap();
 
         let from = inherit.from().unwrap().inner().and_then(Ident::cast).unwrap();

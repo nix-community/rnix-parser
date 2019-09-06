@@ -1,8 +1,8 @@
 NODE_ROOT 0..36 {
-  NODE_SET 0..36 {
+  NODE_ATTR_SET 0..36 {
     TOKEN_CURLY_B_OPEN("{") 0..1
-    NODE_SET_ENTRY 1..5 {
-      NODE_ATTRIBUTE 1..2 {
+    NODE_KEY_VALUE 1..5 {
+      NODE_KEY 1..2 {
         NODE_IDENT 1..2 {
           TOKEN_IDENT("a") 1..2
         }
