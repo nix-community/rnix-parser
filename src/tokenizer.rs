@@ -408,6 +408,15 @@ impl<'a> Iterator for Tokenizer<'a> {
                     if self.consume(|c| c >= '0' && c <= '9') == 0 {
                         return Some((TOKEN_ERROR, self.string_since(start)));
                     }
+                    if self.peek() == Some('e') || self.peek() == Some('E') {
+                        self.next().unwrap();
+                        if self.peek() == Some('-') {
+                            self.next().unwrap();
+                        }
+                        if self.consume(|c| c >= '0' && c <= '9') == 0 {
+                            return Some((TOKEN_ERROR, self.string_since(start)));
+                        }
+                    }
                     Some((TOKEN_FLOAT, self.string_since(start)))
                 } else {
                     Some((TOKEN_INTEGER, self.string_since(start)))
@@ -463,6 +472,28 @@ mod tests {
                 (TOKEN_ASSIGN, "="),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_FLOAT, "1.234"),
+                (TOKEN_SEMICOLON, ";"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_CURLY_B_CLOSE, "}")
+            ]
+        );
+        assert_eq!(
+            tokenize("{ scientific = 1.1e4; uppercase = 123.4E-2; }"),
+            tokens![
+                (TOKEN_CURLY_B_OPEN, "{"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "scientific"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_FLOAT, "1.1e4"),
+                (TOKEN_SEMICOLON, ";"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_IDENT, "uppercase"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ASSIGN, "="),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_FLOAT, "123.4E-2"),
                 (TOKEN_SEMICOLON, ";"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_CURLY_B_CLOSE, "}")
