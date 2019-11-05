@@ -21,7 +21,7 @@ fn is_valid_path_char(c: char) -> bool {
 
 fn is_valid_uri_char(c: char) -> bool {
     match c {
-        '?' | ':' | '@' | '&' | '=' | '$' | ',' | '!' | '~' | '*' | '\'' => true,
+        '%' | '?' | ':' | '@' | '&' | '=' | '$' | ',' | '!' | '~' | '*' | '\'' => true,
         _ => is_valid_path_char(c),
     }
 }
