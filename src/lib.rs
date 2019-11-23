@@ -40,7 +40,7 @@ pub type SyntaxElement = rowan::NodeOrToken<SyntaxNode, SyntaxToken>;
 
 /// A convenience function for first tokenizing and then parsing given input
 pub fn parse(input: &str) -> AST {
-    parser::parse(Tokenizer::new(input))
+    parser::parse(rowan_tools::lexer::string_slices(input, Tokenizer::new(input)))
 }
 
 #[cfg(test)]

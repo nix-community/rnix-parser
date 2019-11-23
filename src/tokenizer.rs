@@ -1,6 +1,7 @@
 //! The tokenizer: turns a string into tokens, such as numbers, strings, and keywords
 
-use rowan::SmolStr;
+use rowan_tools::lexer::{self, State};
+use rowan::TextUnit;
 
 use crate::SyntaxKind::{self, *};
 
@@ -44,18 +45,6 @@ struct Context {
     todo: Option<Todo>,
 }
 
-#[derive(Clone, Copy)]
-struct State<'a> {
-    input: &'a str,
-    offset: usize,
-}
-impl PartialEq for State<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self.input, other.input) && self.offset == other.offset
-    }
-}
-impl Eq for State<'_> {}
-
 /// The tokenizer. You may want to use the `tokenize` convenience function from this module instead.
 pub struct Tokenizer<'a> {
     ctx: Vec<Context>,
@@ -64,78 +53,43 @@ pub struct Tokenizer<'a> {
 impl<'a> Tokenizer<'a> {
     /// Create a new instance
     pub fn new(input: &'a str) -> Self {
-        Self { ctx: vec![Context::default()], state: State { input, offset: 0 } }
+        Self { ctx: vec![Context::default()], state: State::new(input) }
     }
 
-    fn remaining(&self) -> &str {
-        &self.state.input[self.state.offset..]
-    }
-    fn peek(&self) -> Option<char> {
-        self.remaining().chars().next()
-    }
-    fn next(&mut self) -> Option<char> {
-        let c = self.peek();
-        if let Some(c) = c {
-            self.state.offset += c.len_utf8();
-        }
-        c
-    }
-    fn starts_with_bump(&mut self, s: &str) -> bool {
-        let starts_with = self.remaining().starts_with(s);
-        if starts_with {
-            self.state.offset += s.len();
-        }
-        starts_with
-    }
-    fn string_since(&self, past: State) -> SmolStr {
-        SmolStr::new(&past.input[past.offset..self.state.offset])
-    }
-
-    fn consume<F>(&mut self, mut f: F) -> usize
-    where
-        F: FnMut(char) -> bool,
-    {
-        let mut len = 0;
-        while self.peek().map(|c| f(c)).unwrap_or(false) {
-            self.next().unwrap();
-            len += 1;
-        }
-        len
-    }
-    fn next_string(&mut self, multiline: bool) -> SyntaxKind {
+    fn next_string(&mut self, state: &mut State<'_>, multiline: bool) -> SyntaxKind {
         loop {
-            let start = self.state;
-            match self.next() {
+            let start = *state;
+            match state.next() {
                 None => return TOKEN_ERROR,
                 Some('"') if !multiline => {
-                    self.state = start;
+                    *state = start;
                     return TOKEN_STRING_CONTENT;
                 }
-                Some('\\') if !multiline => match self.next() {
+                Some('\\') if !multiline => match state.next() {
                     None => return TOKEN_ERROR,
                     Some(_) => (),
                 },
 
-                Some('\'') if multiline => match self.next() {
+                Some('\'') if multiline => match state.next() {
                     None => return TOKEN_ERROR,
-                    Some('\'') => match self.peek() {
+                    Some('\'') => match state.peek() {
                         Some('\'') | Some('\\') | Some('$') => {
-                            self.next().unwrap();
+                            state.bump();
                         }
                         _ => {
-                            self.state = start;
+                            *state = start;
                             return TOKEN_STRING_CONTENT;
                         }
                     },
                     Some(_) => (),
                 },
 
-                Some('$') => match self.peek() {
+                Some('$') => match state.peek() {
                     Some('$') => {
-                        self.next().unwrap();
+                        state.bump();
                     }
                     Some('{') => {
-                        self.state = start;
+                        *state = start;
                         self.ctx.push(Context {
                             interpol: Some(Interpol { brackets: 0, string: true, multiline }),
                             todo: Some(Todo::InterpolStart),
@@ -151,279 +105,284 @@ impl<'a> Tokenizer<'a> {
     }
 }
 impl<'a> Iterator for Tokenizer<'a> {
-    type Item = (SyntaxKind, SmolStr);
+    type Item = (SyntaxKind, TextUnit);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let start = self.state;
+        let (token, len) = lexer::wrap(self.state, |state| {
+            let start = *state;
 
-        // Handle already started multi-token
-        loop {
-            let todo = &mut self.ctx.last_mut().unwrap().todo;
-            match todo.take() {
-                Some(Todo::InterpolStart) => {
-                    if self.starts_with_bump("${") {
-                        return Some((TOKEN_INTERPOL_START, self.string_since(start)));
-                    }
-                }
-                Some(Todo::StringBody { multiline }) => {
-                    *todo = Some(Todo::StringEnd);
-                    let token = self.next_string(multiline);
-                    if self.state == start {
-                        continue;
-                    }
-                    return Some((token, self.string_since(start)));
-                }
-                Some(Todo::StringEnd) => {
-                    let status = match self.peek() {
-                        Some('"') => {
-                            self.next().unwrap();
-                            true
+            // Handle already started multi-token
+            loop {
+                let todo = &mut self.ctx.last_mut().unwrap().todo;
+                match todo.take() {
+                    Some(Todo::InterpolStart) => {
+                        if state.take("${").is_some() {
+                            return Ok(TOKEN_INTERPOL_START);
                         }
-                        Some('\'') => match {
-                            self.next().unwrap();
-                            self.peek()
-                        } {
-                            Some('\'') => {
-                                self.next().unwrap();
+                    }
+                    Some(Todo::StringBody { multiline }) => {
+                        *todo = Some(Todo::StringEnd);
+                        let token = self.next_string(state, multiline);
+                        if *state == start {
+                            continue;
+                        }
+                        return Ok(token);
+                    }
+                    Some(Todo::StringEnd) => {
+                        let status = match state.peek() {
+                            Some('"') => {
+                                state.bump();
                                 true
                             }
+                            Some('\'') => match {
+                                state.bump();
+                                state.peek()
+                            } {
+                                Some('\'') => {
+                                    state.bump();
+                                    true
+                                }
+                                _ => false,
+                            },
                             _ => false,
-                        },
-                        _ => false,
-                    };
-                    if !status {
-                        return Some((TOKEN_ERROR, self.string_since(start)));
-                    }
+                        };
+                        if !status {
+                            return Ok(TOKEN_ERROR);
+                        }
 
-                    return Some((TOKEN_STRING_END, self.string_since(start)));
-                }
-                _ => (),
-            }
-            break;
-        }
-
-        if self.consume(char::is_whitespace) > 0 {
-            return Some((TOKEN_WHITESPACE, self.string_since(start)));
-        }
-
-        if self.peek() == Some('#') {
-            self.consume(|c| c != '\n');
-            return Some((TOKEN_COMMENT, self.string_since(start)));
-        }
-        if self.starts_with_bump("/*") {
-            loop {
-                self.consume(|c| c != '*');
-                self.next(); // consume the '*', if any
-                match self.peek() {
-                    None => return Some((TOKEN_ERROR, self.string_since(start))),
-                    Some('/') => {
-                        self.next().unwrap();
-                        return Some((TOKEN_COMMENT, self.string_since(start)));
+                        return Ok(TOKEN_STRING_END);
                     }
                     _ => (),
                 }
+                break;
             }
-        }
 
-        if self.starts_with_bump("...") {
-            return Some((TOKEN_ELLIPSIS, self.string_since(start)));
-        }
+            if state.take_while(char::is_whitespace).is_some() {
+                return Ok(TOKEN_WHITESPACE);
+            }
 
-        // Check if it's a path
-        let store_path = self.peek() == Some('<');
-        let kind = {
-            let mut lookahead = self.remaining().chars().skip_while(|c| match c {
-                'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' | '+' | '-' => true,
-                '<' | '/' => store_path,
-                _ => false,
-            });
-            match (lookahead.next(), lookahead.next()) {
-                // a//b parses as Update(a, b)
-                (Some('/'), Some('/')) => None,
-                (Some('/'), Some('*')) => None,
-                (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
-                (Some('>'), _) => Some(IdentType::Store),
-                (Some(':'), Some(c)) if is_valid_uri_char(c) => Some(IdentType::Uri),
-                _ => None,
+            if state.peek() == Some('#') {
+                state.take_while(|c| c != '\n');
+                return Ok(TOKEN_COMMENT);
             }
-        };
-
-        let c = self.next()?;
-
-        if c == '~' || kind == Some(IdentType::Path) {
-            if c == '~' && self.next() != Some('/') {
-                return Some((TOKEN_ERROR, self.string_since(start)));
-            }
-            self.consume(is_valid_path_char);
-            let ident = self.string_since(start);
-            if ident.ends_with('/') {
-                return Some((TOKEN_ERROR, ident));
-            }
-            return Some((TOKEN_PATH, ident));
-        }
-
-        match c {
-            '=' if self.peek() == Some('=') => {
-                self.next().unwrap();
-                Some((TOKEN_EQUAL, self.string_since(start)))
-            }
-            '!' if self.peek() == Some('=') => {
-                self.next().unwrap();
-                Some((TOKEN_NOT_EQUAL, self.string_since(start)))
-            }
-            '!' => Some((TOKEN_INVERT, self.string_since(start))),
-            '{' => {
-                if let Some(Interpol { ref mut brackets, .. }) =
-                    self.ctx.last_mut().unwrap().interpol
-                {
-                    *brackets += 1;
+            if state.take("/*").is_some() {
+                loop {
+                    state.take_while(|c| c != '*');
+                    state.next(); // consume the '*', if any
+                    match state.peek() {
+                        None => return Ok(TOKEN_ERROR),
+                        Some('/') => {
+                            state.bump();
+                            return Ok(TOKEN_COMMENT);
+                        }
+                        _ => (),
+                    }
                 }
-                Some((TOKEN_CURLY_B_OPEN, self.string_since(start)))
             }
-            '}' => {
-                if let Some(Interpol { ref mut brackets, string, multiline }) =
-                    self.ctx.last_mut().unwrap().interpol
-                {
-                    match brackets.checked_sub(1) {
-                        Some(new) => *brackets = new,
-                        None => {
-                            self.ctx.pop().unwrap();
 
-                            if string {
-                                self.ctx.last_mut().unwrap().todo =
-                                    Some(Todo::StringBody { multiline });
-                                return Some((TOKEN_INTERPOL_END, self.string_since(start)));
-                            } else {
-                                return Some((TOKEN_DYNAMIC_END, self.string_since(start)));
+            if state.take("...").is_some() {
+                return Ok(TOKEN_ELLIPSIS);
+            }
+
+            // Check if it's a path
+            let store_path = state.peek() == Some('<');
+            let kind = {
+                let mut lookahead = state.remaining().chars().skip_while(|c| match c {
+                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' | '+' | '-' => true,
+                    '<' | '/' => store_path,
+                    _ => false,
+                });
+                match (lookahead.next(), lookahead.next()) {
+                    // a//b parses as Update(a, b)
+                    (Some('/'), Some('/')) => None,
+                    (Some('/'), Some('*')) => None,
+                    (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
+                    (Some('>'), _) => Some(IdentType::Store),
+                    (Some(':'), Some(c)) if is_valid_uri_char(c) => Some(IdentType::Uri),
+                    _ => None,
+                }
+            };
+
+            let c = state.peek_or_fail()?;
+            state.bump();
+
+            if c == '~' || kind == Some(IdentType::Path) {
+                if c == '~' && state.next() != Some('/') {
+                    return Ok(TOKEN_ERROR);
+                }
+                state.take_while(is_valid_path_char);
+                let ident = state.string_since(&start);
+                if ident.ends_with('/') {
+                    return Ok(TOKEN_ERROR);
+                }
+                return Ok(TOKEN_PATH);
+            }
+
+            match c {
+                '=' if state.peek() == Some('=') => {
+                    state.bump();
+                    Ok(TOKEN_EQUAL)
+                }
+                '!' if state.peek() == Some('=') => {
+                    state.bump();
+                    Ok(TOKEN_NOT_EQUAL)
+                }
+                '!' => Ok(TOKEN_INVERT),
+                '{' => {
+                    if let Some(Interpol { ref mut brackets, .. }) =
+                        self.ctx.last_mut().unwrap().interpol
+                    {
+                        *brackets += 1;
+                    }
+                    Ok(TOKEN_CURLY_B_OPEN)
+                }
+                '}' => {
+                    if let Some(Interpol { ref mut brackets, string, multiline }) =
+                        self.ctx.last_mut().unwrap().interpol
+                    {
+                        match brackets.checked_sub(1) {
+                            Some(new) => *brackets = new,
+                            None => {
+                                self.ctx.pop().unwrap();
+
+                                if string {
+                                    self.ctx.last_mut().unwrap().todo =
+                                        Some(Todo::StringBody { multiline });
+                                    return Ok(TOKEN_INTERPOL_END);
+                                } else {
+                                    return Ok(TOKEN_DYNAMIC_END);
+                                }
                             }
                         }
                     }
+                    Ok(TOKEN_CURLY_B_CLOSE)
                 }
-                Some((TOKEN_CURLY_B_CLOSE, self.string_since(start)))
-            }
-            '[' => Some((TOKEN_SQUARE_B_OPEN, self.string_since(start))),
-            ']' => Some((TOKEN_SQUARE_B_CLOSE, self.string_since(start))),
-            '@' => Some((TOKEN_AT, self.string_since(start))),
-            ':' => Some((TOKEN_COLON, self.string_since(start))),
-            ',' => Some((TOKEN_COMMA, self.string_since(start))),
-            '.' => Some((TOKEN_DOT, self.string_since(start))),
-            '=' => Some((TOKEN_ASSIGN, self.string_since(start))),
-            '?' => Some((TOKEN_QUESTION, self.string_since(start))),
-            ';' => Some((TOKEN_SEMICOLON, self.string_since(start))),
-            '(' => Some((TOKEN_PAREN_OPEN, self.string_since(start))),
-            ')' => Some((TOKEN_PAREN_CLOSE, self.string_since(start))),
-            '+' if self.peek() == Some('+') => {
-                self.next().unwrap();
-                Some((TOKEN_CONCAT, self.string_since(start)))
-            }
-            '-' if self.peek() == Some('>') => {
-                self.next().unwrap();
-                Some((TOKEN_IMPLICATION, self.string_since(start)))
-            }
-            '/' if self.peek() == Some('/') => {
-                self.next().unwrap();
-                Some((TOKEN_UPDATE, self.string_since(start)))
-            }
-            '+' => Some((TOKEN_ADD, self.string_since(start))),
-            '-' => Some((TOKEN_SUB, self.string_since(start))),
-            '*' => Some((TOKEN_MUL, self.string_since(start))),
-            '/' => Some((TOKEN_DIV, self.string_since(start))),
-            '<' if kind == Some(IdentType::Store) => {
-                self.consume(is_valid_path_char);
-                if self.next() != Some('>') {
-                    return Some((TOKEN_ERROR, self.string_since(start)));
+                '[' => Ok(TOKEN_SQUARE_B_OPEN),
+                ']' => Ok(TOKEN_SQUARE_B_CLOSE),
+                '@' => Ok(TOKEN_AT),
+                ':' => Ok(TOKEN_COLON),
+                ',' => Ok(TOKEN_COMMA),
+                '.' => Ok(TOKEN_DOT),
+                '=' => Ok(TOKEN_ASSIGN),
+                '?' => Ok(TOKEN_QUESTION),
+                ';' => Ok(TOKEN_SEMICOLON),
+                '(' => Ok(TOKEN_PAREN_OPEN),
+                ')' => Ok(TOKEN_PAREN_CLOSE),
+                '+' if state.peek() == Some('+') => {
+                    state.bump();
+                    Ok(TOKEN_CONCAT)
                 }
-                Some((TOKEN_PATH, self.string_since(start)))
-            }
-            '&' if self.peek() == Some('&') => {
-                self.next().unwrap();
-                Some((TOKEN_AND, self.string_since(start)))
-            }
-            '|' if self.peek() == Some('|') => {
-                self.next().unwrap();
-                Some((TOKEN_OR, self.string_since(start)))
-            }
-            '<' if self.peek() == Some('=') => {
-                self.next().unwrap();
-                Some((TOKEN_LESS_OR_EQ, self.string_since(start)))
-            }
-            '<' => Some((TOKEN_LESS, self.string_since(start))),
-            '>' if self.peek() == Some('=') => {
-                self.next().unwrap();
-                Some((TOKEN_MORE_OR_EQ, self.string_since(start)))
-            }
-            '>' => Some((TOKEN_MORE, self.string_since(start))),
-            '$' if self.peek() == Some('{') => {
-                self.next().unwrap();
-                self.ctx.push(Context {
-                    interpol: Some(Interpol { brackets: 0, string: false, multiline: false }),
-                    ..Default::default()
-                });
-                Some((TOKEN_DYNAMIC_START, self.string_since(start)))
-            }
-            'a'..='z' | 'A'..='Z' | '_' => {
-                let kind = match kind {
-                    // It's detected as store if it ends with >, but if it
-                    // didn't start with <, that's wrong
-                    Some(IdentType::Store) | None => IdentType::Ident,
-                    Some(kind) => kind,
-                };
-                assert_ne!(kind, IdentType::Path, "paths are checked earlier");
-                self.consume(|c| match c {
-                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '\'' => true,
-                    c => kind == IdentType::Uri && is_valid_uri_char(c),
-                });
-                let ident = self.string_since(start);
-                let syntax_kind = match kind {
-                    IdentType::Ident => match &*ident {
-                        "assert" => TOKEN_ASSERT,
-                        "else" => TOKEN_ELSE,
-                        "if" => TOKEN_IF,
-                        "in" => TOKEN_IN,
-                        "inherit" => TOKEN_INHERIT,
-                        "let" => TOKEN_LET,
-                        "rec" => TOKEN_REC,
-                        "then" => TOKEN_THEN,
-                        "with" => TOKEN_WITH,
-                        _ => TOKEN_IDENT,
-                    },
-                    IdentType::Path | IdentType::Store => TOKEN_PATH,
-                    IdentType::Uri => TOKEN_URI,
-                };
-                Some((syntax_kind, ident))
-            }
-            '"' => {
-                self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: false });
-                Some((TOKEN_STRING_START, self.string_since(start)))
-            }
-            '\'' if self.peek() == Some('\'') => {
-                self.next().unwrap();
-                self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: true });
-                Some((TOKEN_STRING_START, self.string_since(start)))
-            }
-            '0'..='9' => {
-                self.consume(|c| c >= '0' && c <= '9');
-                if self.peek() == Some('.') {
-                    self.next().unwrap();
-                    if self.consume(|c| c >= '0' && c <= '9') == 0 {
-                        return Some((TOKEN_ERROR, self.string_since(start)));
+                '-' if state.peek() == Some('>') => {
+                    state.bump();
+                    Ok(TOKEN_IMPLICATION)
+                }
+                '/' if state.peek() == Some('/') => {
+                    state.bump();
+                    Ok(TOKEN_UPDATE)
+                }
+                '+' => Ok(TOKEN_ADD),
+                '-' => Ok(TOKEN_SUB),
+                '*' => Ok(TOKEN_MUL),
+                '/' => Ok(TOKEN_DIV),
+                '<' if kind == Some(IdentType::Store) => {
+                    state.take_while(is_valid_path_char);
+                    if state.next() != Some('>') {
+                        return Ok(TOKEN_ERROR);
                     }
-                    if self.peek() == Some('e') || self.peek() == Some('E') {
-                        self.next().unwrap();
-                        if self.peek() == Some('-') {
-                            self.next().unwrap();
-                        }
-                        if self.consume(|c| c >= '0' && c <= '9') == 0 {
-                            return Some((TOKEN_ERROR, self.string_since(start)));
-                        }
-                    }
-                    Some((TOKEN_FLOAT, self.string_since(start)))
-                } else {
-                    Some((TOKEN_INTEGER, self.string_since(start)))
+                    Ok(TOKEN_PATH)
                 }
+                '&' if state.peek() == Some('&') => {
+                    state.bump();
+                    Ok(TOKEN_AND)
+                }
+                '|' if state.peek() == Some('|') => {
+                    state.bump();
+                    Ok(TOKEN_OR)
+                }
+                '<' if state.peek() == Some('=') => {
+                    state.bump();
+                    Ok(TOKEN_LESS_OR_EQ)
+                }
+                '<' => Ok(TOKEN_LESS),
+                '>' if state.peek() == Some('=') => {
+                    state.bump();
+                    Ok(TOKEN_MORE_OR_EQ)
+                }
+                '>' => Ok(TOKEN_MORE),
+                '$' if state.peek() == Some('{') => {
+                    state.bump();
+                    self.ctx.push(Context {
+                        interpol: Some(Interpol { brackets: 0, string: false, multiline: false }),
+                        ..Default::default()
+                    });
+                    Ok(TOKEN_DYNAMIC_START)
+                }
+                'a'..='z' | 'A'..='Z' | '_' => {
+                    let kind = match kind {
+                        // It's detected as store if it ends with >, but if it
+                        // didn't start with <, that's wrong
+                        Some(IdentType::Store) | None => IdentType::Ident,
+                        Some(kind) => kind,
+                    };
+                    assert_ne!(kind, IdentType::Path, "paths are checked earlier");
+                    state.take_while(|c| match c {
+                        'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '\'' => true,
+                        c => kind == IdentType::Uri && is_valid_uri_char(c),
+                    });
+                    let ident = state.string_since(&start);
+                    let syntax_kind = match kind {
+                        IdentType::Ident => match &*ident {
+                            "assert" => TOKEN_ASSERT,
+                            "else" => TOKEN_ELSE,
+                            "if" => TOKEN_IF,
+                            "in" => TOKEN_IN,
+                            "inherit" => TOKEN_INHERIT,
+                            "let" => TOKEN_LET,
+                            "rec" => TOKEN_REC,
+                            "then" => TOKEN_THEN,
+                            "with" => TOKEN_WITH,
+                            _ => TOKEN_IDENT,
+                        },
+                        IdentType::Path | IdentType::Store => TOKEN_PATH,
+                        IdentType::Uri => TOKEN_URI,
+                    };
+                    Ok(syntax_kind)
+                }
+                '"' => {
+                    self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: false });
+                    Ok(TOKEN_STRING_START)
+                }
+                '\'' if state.peek() == Some('\'') => {
+                    state.bump();
+                    self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: true });
+                    Ok(TOKEN_STRING_START)
+                }
+                '0'..='9' => {
+                    state.take_while(|c| c >= '0' && c <= '9');
+                    if state.peek() == Some('.') {
+                        state.bump();
+                        if state.take_while(|c| c >= '0' && c <= '9').is_none() {
+                            return Ok(TOKEN_ERROR);
+                        }
+                        if state.peek() == Some('e') || state.peek() == Some('E') {
+                            state.bump();
+                            if state.peek() == Some('-') {
+                                state.bump();
+                            }
+                            if state.take_while(|c| c >= '0' && c <= '9').is_none() {
+                                return Ok(TOKEN_ERROR);
+                            }
+                        }
+                        Ok(TOKEN_FLOAT)
+                    } else {
+                        Ok(TOKEN_INTEGER)
+                    }
+                }
+                _ => Ok(TOKEN_ERROR),
             }
-            _ => Some((TOKEN_ERROR, self.string_since(start))),
-        }
+        })?;
+        self.state.consume(len);
+        Some((token, len))
     }
 }
 
@@ -433,7 +392,9 @@ mod tests {
     use rowan::SmolStr;
 
     fn tokenize(input: &str) -> Vec<(SyntaxKind, SmolStr)> {
-        Tokenizer::new(input).collect()
+        rowan_tools::lexer::string_slices(input, Tokenizer::new(input))
+            .map(|(token, s)| (token, SmolStr::new(s)))
+            .collect()
     }
 
     macro_rules! tokens {

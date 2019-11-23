@@ -77,9 +77,9 @@ impl AST {
     }
 }
 
-struct Parser<I>
+struct Parser<'a, I>
 where
-    I: Iterator<Item = (SyntaxKind, SmolStr)>,
+    I: Iterator<Item = (SyntaxKind, &'a str)>,
 {
     builder: GreenNodeBuilder,
     errors: Vec<ParseError>,
@@ -88,9 +88,9 @@ where
     buffer: VecDeque<I::Item>,
     iter: I,
 }
-impl<I> Parser<I>
+impl<'a, I> Parser<'a, I>
 where
-    I: Iterator<Item = (SyntaxKind, SmolStr)>,
+    I: Iterator<Item = (SyntaxKind, &'a str)>,
 {
     fn new(iter: I) -> Self {
         Self {
@@ -103,7 +103,7 @@ where
         }
     }
 
-    fn peek_raw(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
+    fn peek_raw(&mut self) -> Option<&(SyntaxKind, &str)> {
         if self.buffer.is_empty() {
             if let Some(token) = self.iter.next() {
                 self.buffer.push_back(token);
@@ -115,7 +115,7 @@ where
         self.peek();
         self.trivia_buffer.drain(..).for_each({
             let builder = &mut self.builder;
-            move |(t, s)| builder.token(NixLanguage::kind_to_raw(t), s)
+            move |(t, s)| builder.token(NixLanguage::kind_to_raw(t), SmolStr::new(s))
         });
     }
     fn start_node(&mut self, kind: SyntaxKind) {
@@ -141,15 +141,15 @@ where
                 } else {
                     self.trivia_buffer.drain(..).for_each({
                         let builder = &mut self.builder;
-                        move |(t, s)| builder.token(NixLanguage::kind_to_raw(t), s)
+                        move |(t, s)| builder.token(NixLanguage::kind_to_raw(t), SmolStr::new(s))
                     });
-                    self.builder.token(NixLanguage::kind_to_raw(token), s)
+                    self.builder.token(NixLanguage::kind_to_raw(token), SmolStr::new(s))
                 }
             }
             None => self.errors.push(ParseError::UnexpectedEOF),
         }
     }
-    fn peek_data(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
+    fn peek_data(&mut self) -> Option<&(SyntaxKind, &str)> {
         while self.peek_raw().map(|&(t, _)| t.is_trivia()).unwrap_or(false) {
             self.bump();
         }
@@ -466,7 +466,7 @@ where
             self.next_attr();
             self.finish_node();
         }
-        if self.peek_data().map(|&(t, ref s)| t == TOKEN_IDENT && s == OR).unwrap_or(false) {
+        if self.peek_data().map(|&(t, s)| t == TOKEN_IDENT && s == OR).unwrap_or(false) {
             self.start_node_at(checkpoint, NODE_OR_DEFAULT);
             self.bump();
             self.parse_val();
@@ -623,9 +623,9 @@ where
 }
 
 /// Parse tokens into an AST
-pub fn parse<I>(iter: I) -> AST
+pub fn parse<'a, I>(iter: I) -> AST
 where
-    I: IntoIterator<Item = (SyntaxKind, SmolStr)>,
+    I: IntoIterator<Item = (SyntaxKind, &'a str)>,
 {
     let mut parser = Parser::new(iter.into_iter());
     parser.builder.start_node(NixLanguage::kind_to_raw(NODE_ROOT));

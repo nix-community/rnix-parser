@@ -137,3 +137,9 @@ impl SyntaxKind {
         }
     }
 }
+
+impl From<rowan_tools::lexer::Error> for SyntaxKind {
+    fn from(_error: rowan_tools::lexer::Error) -> Self {
+        Self::TOKEN_ERROR
+    }
+}
