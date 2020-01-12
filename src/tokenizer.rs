@@ -429,7 +429,10 @@ impl<'a> Iterator for Tokenizer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{SyntaxKind::{self, *}, Tokenizer};
+    use super::{
+        SyntaxKind::{self, *},
+        Tokenizer,
+    };
     use rowan::SmolStr;
 
     fn tokenize(input: &str) -> Vec<(SyntaxKind, SmolStr)> {

@@ -25,7 +25,9 @@ pub enum ParseError {
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParseError::Unexpected(range) => write!(f, "error node at {}..{}", range.start(), range.end()),
+            ParseError::Unexpected(range) => {
+                write!(f, "error node at {}..{}", range.start(), range.end())
+            }
             ParseError::UnexpectedEOF => write!(f, "unexpected eof"),
             ParseError::UnexpectedEOFWanted(kinds) => {
                 write!(f, "unexpected eof, wanted any of {:?}", kinds)

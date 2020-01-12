@@ -2,10 +2,8 @@ use std::{env, error::Error, fs, path::Path};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let path = env::var("NIX_PATH")?;
-    let nixpkgs = path
-        .split(':')
-        .find(|s| s.starts_with("nixpkgs="))
-        .ok_or("no store path found")?;
+    let nixpkgs =
+        path.split(':').find(|s| s.starts_with("nixpkgs=")).ok_or("no store path found")?;
 
     println!("Nix store path: {}", nixpkgs);
 
