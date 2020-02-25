@@ -79,11 +79,6 @@ impl AST {
     pub fn root(&self) -> Root {
         Root::cast(self.node()).unwrap()
     }
-    /// Return all the errors that occured while parsing - NOT
-    /// including invalid stuff in the AST
-    pub fn root_errors(&self) -> &[ParseError] {
-        &self.errors
-    }
     /// Return all errors in the tree, if any
     pub fn errors(&self) -> Vec<ParseError> {
         let ranges: HashSet<_> = self
@@ -357,7 +352,7 @@ where
             self.bump();
             self.expect_ident();
             let end = self.finish_error_node();
-            if kind == NODE_ERROR {
+            if bound {
                 self.errors.push(ParseError::UnexpectedDoubleBind(TextRange::from_to(start, end)));
             }
         }
