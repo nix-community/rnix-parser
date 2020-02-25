@@ -24,13 +24,13 @@ pub enum NixLanguage {}
 
 impl rowan::Language for NixLanguage {
     type Kind = SyntaxKind;
-    fn kind_from_raw(raw: rowan::cursor::SyntaxKind) -> Self::Kind {
+    fn kind_from_raw(raw: rowan::SyntaxKind) -> Self::Kind {
         let discriminant: u16 = raw.0;
         assert!(discriminant <= (SyntaxKind::__LAST as u16));
         unsafe { std::mem::transmute::<u16, SyntaxKind>(discriminant) }
     }
-    fn kind_to_raw(kind: Self::Kind) -> rowan::cursor::SyntaxKind {
-        rowan::cursor::SyntaxKind(kind as u16)
+    fn kind_to_raw(kind: Self::Kind) -> rowan::SyntaxKind {
+        rowan::SyntaxKind(kind as u16)
     }
 }
 
