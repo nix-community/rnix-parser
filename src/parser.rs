@@ -1,9 +1,12 @@
 //! The parser: turns a series of tokens into an AST
 
-use std::{collections::VecDeque, fmt};
+use std::{
+    collections::{HashSet, VecDeque},
+    fmt,
+};
 
 use cbitset::BitSet256;
-use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, SmolStr, TextRange};
+use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, SmolStr, TextRange, TextUnit};
 
 use crate::{
     types::{Root, TypedNode},
@@ -17,8 +20,17 @@ const OR: &'static str = "or";
 /// An error that occurred during parsing
 #[derive(Clone, Debug, PartialEq)]
 pub enum ParseError {
+    /// Unexpected is used when the cause cannot be specified further
     Unexpected(TextRange),
+    /// UnexpectedExtra is used when there are additional tokens to the root in the tree
+    UnexpectedExtra(TextRange),
+    /// UnexpectedWanted is used when specific tokens are expected, but different one is found
+    UnexpectedWanted(SyntaxKind, TextRange, Box<[SyntaxKind]>),
+    /// UnexpectedWanted is used when a pattern is bound twice
+    UnexpectedDoubleBind(TextRange),
+    /// UnexpectedEOF is used when the end of file is reached, while tokens are still expected
     UnexpectedEOF,
+    /// UnexpectedWanted is used when specific tokens are expected, but the end of file is reached
     UnexpectedEOFWanted(Box<[SyntaxKind]>),
 }
 
@@ -28,9 +40,23 @@ impl fmt::Display for ParseError {
             ParseError::Unexpected(range) => {
                 write!(f, "error node at {}..{}", range.start(), range.end())
             }
-            ParseError::UnexpectedEOF => write!(f, "unexpected eof"),
+            ParseError::UnexpectedExtra(range) => {
+                write!(f, "unexpected token at {}..{}", range.start(), range.end())
+            }
+            ParseError::UnexpectedWanted(got, range, kinds) => write!(
+                f,
+                "unexpected {:?} at {}..{}, wanted any of {:?}",
+                got,
+                range.start(),
+                range.end(),
+                kinds
+            ),
+            ParseError::UnexpectedDoubleBind(range) => {
+                write!(f, "unexpected double bind at {}..{}", range.start(), range.end())
+            }
+            ParseError::UnexpectedEOF => write!(f, "unexpected end of file"),
             ParseError::UnexpectedEOFWanted(kinds) => {
-                write!(f, "unexpected eof, wanted any of {:?}", kinds)
+                write!(f, "unexpected end of file, wanted any of {:?}", kinds)
             }
         }
     }
@@ -60,20 +86,31 @@ impl AST {
     }
     /// Return all errors in the tree, if any
     pub fn errors(&self) -> Vec<ParseError> {
+        let ranges: HashSet<_> = self
+            .errors
+            .iter()
+            .filter_map(|e| match e {
+                ParseError::UnexpectedWanted(_, t, _) => Some(t),
+                ParseError::UnexpectedDoubleBind(t) => Some(t),
+                ParseError::UnexpectedExtra(t) => Some(t),
+                _ => None,
+            })
+            .collect();
         let mut errors = self.errors.clone();
         errors.extend(
-            self.root().errors().into_iter().map(|node| ParseError::Unexpected(node.text_range())),
+            self.root()
+                .errors()
+                .into_iter()
+                .filter(|node| !ranges.contains(&node.text_range()))
+                .map(|node| ParseError::Unexpected(node.text_range())),
         );
 
         errors
     }
     /// Either return the first error in the tree, or if there are none return self
     pub fn as_result(self) -> Result<Self, ParseError> {
-        if let Some(err) = self.errors.first() {
+        if let Some(err) = self.errors().first() {
             return Err(err.clone());
-        }
-        if let Some(node) = self.root().errors().first() {
-            return Err(ParseError::Unexpected(node.text_range()));
         }
         Ok(self)
     }
@@ -89,6 +126,7 @@ where
     trivia_buffer: Vec<I::Item>,
     buffer: VecDeque<I::Item>,
     iter: I,
+    index: usize,
 }
 impl<I> Parser<I>
 where
@@ -102,7 +140,12 @@ where
             trivia_buffer: Vec::with_capacity(1),
             buffer: VecDeque::with_capacity(1),
             iter,
+            index: 0,
         }
+    }
+
+    fn get_text_position(&self) -> TextUnit {
+        TextUnit::from_usize(self.index)
     }
 
     fn peek_raw(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
@@ -113,12 +156,15 @@ where
         }
         self.buffer.front()
     }
+    fn drain_trivia_buffer(&mut self) {
+        for (t, s) in self.trivia_buffer.drain(..) {
+            self.index += s.as_bytes().len();
+            self.builder.token(NixLanguage::kind_to_raw(t), s)
+        }
+    }
     fn eat_trivia(&mut self) {
         self.peek();
-        self.trivia_buffer.drain(..).for_each({
-            let builder = &mut self.builder;
-            move |(t, s)| builder.token(NixLanguage::kind_to_raw(t), s)
-        });
+        self.drain_trivia_buffer();
     }
     fn start_node(&mut self, kind: SyntaxKind) {
         self.eat_trivia();
@@ -134,6 +180,14 @@ where
     fn finish_node(&mut self) {
         self.builder.finish_node();
     }
+    fn start_error_node(&mut self) -> TextUnit {
+        self.start_node(NODE_ERROR);
+        self.get_text_position()
+    }
+    fn finish_error_node(&mut self) -> TextUnit {
+        self.finish_node();
+        self.get_text_position()
+    }
     fn bump(&mut self) {
         let next = self.buffer.pop_front().or_else(|| self.iter.next());
         match next {
@@ -141,10 +195,8 @@ where
                 if token.is_trivia() {
                     self.trivia_buffer.push((token, s))
                 } else {
-                    self.trivia_buffer.drain(..).for_each({
-                        let builder = &mut self.builder;
-                        move |(t, s)| builder.token(NixLanguage::kind_to_raw(t), s)
-                    });
+                    self.drain_trivia_buffer();
+                    self.index += s.as_bytes().len();
                     self.builder.token(NixLanguage::kind_to_raw(token), s)
                 }
             }
@@ -166,15 +218,21 @@ where
         let next = match self.peek() {
             None => None,
             Some(kind) if allowed.contains(kind as usize) => Some(kind),
-            Some(_) => {
-                self.start_node(NODE_ERROR);
+            Some(kind) => {
+                let start = self.start_error_node();
                 loop {
                     self.bump();
                     if self.peek().map(|kind| allowed.contains(kind as usize)).unwrap_or(true) {
                         break;
                     }
                 }
-                self.finish_node();
+                let end = self.finish_error_node();
+                self.errors.push(ParseError::UnexpectedWanted(
+                    kind,
+                    TextRange::from_to(start, end),
+                    allowed_slice.to_vec().into_boxed_slice(),
+                ));
+
                 self.peek()
             }
         };
@@ -295,9 +353,13 @@ where
         if self.peek() == Some(TOKEN_AT) {
             let kind = if bound { NODE_ERROR } else { NODE_PAT_BIND };
             self.start_node(kind);
+            let start = self.get_text_position();
             self.bump();
             self.expect_ident();
-            self.finish_node();
+            let end = self.finish_error_node();
+            if kind == NODE_ERROR {
+                self.errors.push(ParseError::UnexpectedDoubleBind(TextRange::from_to(start, end)));
+            }
         }
     }
     fn parse_set(&mut self, until: SyntaxKind) {
@@ -455,10 +517,25 @@ where
                     _ => (),
                 }
             }
-            _ => {
-                self.start_node(NODE_ERROR);
+            kind => {
+                let start = self.start_error_node();
                 self.bump();
-                self.finish_node();
+                let end = self.finish_error_node();
+                self.errors.push(ParseError::UnexpectedWanted(
+                    kind,
+                    TextRange::from_to(start, end),
+                    [
+                        TOKEN_PAREN_OPEN,
+                        TOKEN_REC,
+                        TOKEN_CURLY_B_OPEN,
+                        TOKEN_SQUARE_B_OPEN,
+                        TOKEN_DYNAMIC_START,
+                        TOKEN_STRING_START,
+                        TOKEN_IDENT,
+                    ]
+                    .to_vec()
+                    .into_boxed_slice(),
+                ));
             }
         };
 
@@ -634,11 +711,12 @@ where
     parser.parse_expr();
     parser.eat_trivia();
     if parser.peek().is_some() {
-        parser.builder.start_node(NixLanguage::kind_to_raw(NODE_ERROR));
+        let start = parser.start_error_node();
         while parser.peek().is_some() {
             parser.bump();
         }
-        parser.builder.finish_node();
+        let end = parser.finish_error_node();
+        parser.errors.push(ParseError::UnexpectedExtra(TextRange::from_to(start, end)));
         parser.eat_trivia();
     }
     parser.builder.finish_node();
