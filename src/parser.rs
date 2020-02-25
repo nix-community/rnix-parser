@@ -83,7 +83,7 @@ struct Parser<I>
 where
     I: Iterator<Item = (SyntaxKind, SmolStr)>,
 {
-    builder: GreenNodeBuilder,
+    builder: GreenNodeBuilder<'static>,
     errors: Vec<ParseError>,
 
     trivia_buffer: Vec<I::Item>,
