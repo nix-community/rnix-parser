@@ -184,7 +184,10 @@ pub trait TypedNode: Clone {
 
 pub trait TokenWrapper: TypedNode {
     fn as_str(&self) -> &str {
-        self.node().green().children()[0].as_token().unwrap().text().as_str()
+        match &self.node().green().children().next() {
+            Some(rowan::NodeOrToken::Token(token)) => token.text().as_str(),
+            _ => unreachable!(),
+        }
     }
 }
 
