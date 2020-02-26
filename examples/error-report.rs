@@ -20,12 +20,16 @@ fn main() {
     for error in ast.errors() {
         let range = match error {
             ParseError::Unexpected(range) => range,
+            ParseError::UnexpectedExtra(range) => range,
+            ParseError::UnexpectedWanted(_, range, _) => range,
+            ParseError::UnexpectedDoubleBind(range) => range,
             err => {
                 eprintln!("error: {}", err);
                 continue;
             }
         };
         eprintln!("----- ERROR -----");
+        eprintln!("{}", error);
         let start = range.start().to_usize();
         let start_row = content[..start].lines().count() - 1;
         let start_line = content[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
