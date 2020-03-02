@@ -428,6 +428,11 @@ typed! [
         pub fn entries(&self) -> impl Iterator<Item = PatEntry> {
             self.node().children().filter_map(PatEntry::cast)
         }
+        /// Returns the identifier bound with {}@identifier if it exists
+        pub fn at(&self) -> Option<Ident> {
+            let binding = self.node().children().find(|node| node.kind() == NODE_PAT_BIND)?;
+            binding.children().filter_map(Ident::cast).next()
+        }
         /// Returns true if this pattern is inexact (has an ellipsis, ...)
         pub fn ellipsis(&self) -> bool {
             self.node().children_with_tokens().any(|node| node.kind() == TOKEN_ELLIPSIS)
