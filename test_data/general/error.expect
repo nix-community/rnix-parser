@@ -1,12 +1,12 @@
-error: unexpected eof, wanted any of [TOKEN_ASSIGN]
-error: unexpected eof
-error: unexpected eof, wanted any of [TOKEN_SEMICOLON]
-error: unexpected eof
-error: unexpected eof, wanted any of [TOKEN_SEMICOLON]
-error: unexpected eof
-error: error node at 10..28
-error: error node at 78..98
-error: error node at 162..166
+error: unexpected TOKEN_STRING_START at 10..28, wanted any of [TOKEN_ASSIGN]
+error: unexpected TOKEN_STRING_START at 78..98, wanted any of [TOKEN_ASSIGN]
+error: unexpected TOKEN_CURLY_B_CLOSE at 162..166, wanted any of [TOKEN_ASSIGN]
+error: unexpected end of file, wanted any of [TOKEN_ASSIGN]
+error: unexpected end of file
+error: unexpected end of file, wanted any of [TOKEN_SEMICOLON]
+error: unexpected end of file
+error: unexpected end of file, wanted any of [TOKEN_SEMICOLON]
+error: unexpected end of file
 NODE_ROOT 0..166 {
   NODE_ATTR_SET 0..166 {
     TOKEN_CURLY_B_OPEN("{") 0..1
