@@ -118,14 +118,17 @@ impl<'a> Tokenizer<'a> {
 
                 Some('\'') if multiline => match self.peek() {
                     None => return TOKEN_ERROR,
-                    Some('\'') => match { self.next(); self.peek() } {
+                    Some('\'') => match {
+                        self.next();
+                        self.peek()
+                    } {
                         Some('\'') | Some('\\') | Some('$') => {
                             self.next().unwrap();
-                        },
+                        }
                         _ => {
                             self.state = start;
                             return TOKEN_STRING_CONTENT;
-                        },
+                        }
                     },
                     Some(_) => (),
                 },
