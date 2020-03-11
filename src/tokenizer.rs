@@ -116,16 +116,16 @@ impl<'a> Tokenizer<'a> {
                     Some(_) => (),
                 },
 
-                Some('\'') if multiline => match self.next() {
+                Some('\'') if multiline => match self.peek() {
                     None => return TOKEN_ERROR,
-                    Some('\'') => match self.peek() {
+                    Some('\'') => match { self.next(); self.peek() } {
                         Some('\'') | Some('\\') | Some('$') => {
                             self.next().unwrap();
-                        }
+                        },
                         _ => {
                             self.state = start;
                             return TOKEN_STRING_CONTENT;
-                        }
+                        },
                     },
                     Some(_) => (),
                 },
@@ -440,9 +440,12 @@ mod tests {
     }
 
     macro_rules! tokens {
+        ($(($token:expr, $str:expr),)*) => {
+            vec![$(($token, $str.into()),)*]
+        };
         ($(($token:expr, $str:expr)),*) => {
             vec![$(($token, $str.into())),*]
-        }
+        };
     }
 
     #[test]
@@ -459,8 +462,8 @@ mod tests {
                 (TOKEN_INTEGER, "42"),
                 (TOKEN_SEMICOLON, ";"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_CURLY_B_CLOSE, "}")
-            ]
+                (TOKEN_CURLY_B_CLOSE, "}"),
+            ],
         );
     }
     #[test]
@@ -477,8 +480,8 @@ mod tests {
                 (TOKEN_FLOAT, "1.234"),
                 (TOKEN_SEMICOLON, ";"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_CURLY_B_CLOSE, "}")
-            ]
+                (TOKEN_CURLY_B_CLOSE, "}"),
+            ],
         );
         assert_eq!(
             tokenize("{ scientific = 1.1e4; uppercase = 123.4E-2; }"),
@@ -499,8 +502,8 @@ mod tests {
                 (TOKEN_FLOAT, "123.4E-2"),
                 (TOKEN_SEMICOLON, ";"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_CURLY_B_CLOSE, "}")
-            ]
+                (TOKEN_CURLY_B_CLOSE, "}"),
+            ],
         );
     }
     #[test]
@@ -519,8 +522,8 @@ mod tests {
                 (TOKEN_STRING_END, "\""),
                 (TOKEN_SEMICOLON, ";"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_CURLY_B_CLOSE, "}")
-            ]
+                (TOKEN_CURLY_B_CLOSE, "}"),
+            ],
         );
     }
     #[test]
@@ -560,8 +563,8 @@ mod tests {
                 (TOKEN_STRING_END, "''"),
                 (TOKEN_SEMICOLON, ";"),
                 (TOKEN_WHITESPACE, "\n"),
-                (TOKEN_CURLY_B_CLOSE, "}")
-            ]
+                (TOKEN_CURLY_B_CLOSE, "}"),
+            ],
         );
     }
     #[test]
@@ -573,7 +576,7 @@ mod tests {
                 (TOKEN_STRING_START, "\""),
                 (TOKEN_STRING_CONTENT, r#"$${test}"#),
                 (TOKEN_STRING_END, "\""),
-                (TOKEN_WHITESPACE, " ")
+                (TOKEN_WHITESPACE, " "),
             ]
         );
         assert_eq!(
@@ -583,7 +586,7 @@ mod tests {
                 (TOKEN_STRING_START, "''"),
                 (TOKEN_STRING_CONTENT, r#"$${test}"#),
                 (TOKEN_STRING_END, "''"),
-                (TOKEN_WHITESPACE, " ")
+                (TOKEN_WHITESPACE, " "),
             ]
         );
     }
@@ -615,7 +618,7 @@ mod tests {
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_CONTENT, "!"),
                 (TOKEN_STRING_END, "\""),
-                (TOKEN_WHITESPACE, " ")
+                (TOKEN_WHITESPACE, " "),
             ]
         );
         assert_eq!(
@@ -628,7 +631,7 @@ mod tests {
                 (TOKEN_IDENT, "test"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "\""),
-                (TOKEN_WHITESPACE, " ")
+                (TOKEN_WHITESPACE, " "),
             ]
         );
         assert_eq!(
@@ -641,7 +644,7 @@ mod tests {
                 (TOKEN_IDENT, "test"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "''"),
-                (TOKEN_WHITESPACE, " ")
+                (TOKEN_WHITESPACE, " "),
             ]
         );
         assert_eq!(
@@ -654,7 +657,7 @@ mod tests {
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_CONTENT, "#123"),
                 (TOKEN_STRING_END, "\""),
-                (TOKEN_WHITESPACE, " ")
+                (TOKEN_WHITESPACE, " "),
             ]
         );
         assert_eq!(
@@ -667,7 +670,7 @@ mod tests {
                 (TOKEN_IDENT, "test"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "''"),
-                (TOKEN_WHITESPACE, " ")
+                (TOKEN_WHITESPACE, " "),
             ]
         );
         assert_eq!(
@@ -683,7 +686,7 @@ mod tests {
                 (TOKEN_IDENT, "world"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "\""),
-                (TOKEN_WHITESPACE, " ")
+                (TOKEN_WHITESPACE, " "),
             ]
         );
         assert_eq!(
@@ -699,8 +702,22 @@ mod tests {
                 (TOKEN_STRING_END, "\""),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "''"),
-                (TOKEN_WHITESPACE, " ")
+                (TOKEN_WHITESPACE, " "),
             ]
+        );
+        assert_eq!(
+            tokenize(r#" ''dont '${escape} me'' "#),
+            tokens![
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_STRING_START, "''"),
+                (TOKEN_STRING_CONTENT, "dont '"),
+                (TOKEN_INTERPOL_START, "${"),
+                (TOKEN_IDENT, "escape"),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_STRING_CONTENT, " me"),
+                (TOKEN_STRING_END, "''"),
+                (TOKEN_WHITESPACE, " "),
+            ],
         );
     }
     #[test]
@@ -726,7 +743,7 @@ mod tests {
                 (TOKEN_WHITESPACE, "\n"),
                 (TOKEN_CURLY_B_CLOSE, "}"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_COMMENT, "# single line at the end")
+                (TOKEN_COMMENT, "# single line at the end"),
             ]
         );
     }
@@ -743,7 +760,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_MUL, "*"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTEGER, "3")
+                (TOKEN_INTEGER, "3"),
             ]
         );
         assert_eq!(
@@ -760,7 +777,7 @@ mod tests {
                 (TOKEN_SUB, "-"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
-                (TOKEN_PAREN_CLOSE, ")")
+                (TOKEN_PAREN_CLOSE, ")"),
             ]
         );
         assert_eq!(
@@ -769,7 +786,7 @@ mod tests {
                 (TOKEN_IDENT, "a"),
                 (TOKEN_DIV, "/"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTEGER, "3")
+                (TOKEN_INTEGER, "3"),
             ]
         );
     }
@@ -789,7 +806,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IN, "in"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_IDENT, "a")
+                (TOKEN_IDENT, "a"),
             ]
         );
     }
@@ -803,7 +820,7 @@ mod tests {
                 (TOKEN_IDENT, "namespace"),
                 (TOKEN_SEMICOLON, ";"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_IDENT, "expr")
+                (TOKEN_IDENT, "expr"),
             ]
         );
     }
@@ -842,7 +859,7 @@ mod tests {
                 (TOKEN_STRING_START, "\""),
                 (TOKEN_STRING_CONTENT, r#"lol"#),
                 (TOKEN_STRING_END, "\""),
-                (TOKEN_SQUARE_B_CLOSE, "]")
+                (TOKEN_SQUARE_B_CLOSE, "]"),
             ]
         );
         assert_eq!(
@@ -862,7 +879,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_SQUARE_B_OPEN, "["),
                 (TOKEN_INTEGER, "3"),
-                (TOKEN_SQUARE_B_CLOSE, "]")
+                (TOKEN_SQUARE_B_CLOSE, "]"),
             ]
         );
     }
@@ -881,7 +898,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_ADD, "+"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_IDENT, "b")
+                (TOKEN_IDENT, "b"),
             ]
         );
     }
@@ -910,7 +927,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_AT, "@"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_IDENT, "outer")
+                (TOKEN_IDENT, "outer"),
             ]
         );
     }
@@ -943,7 +960,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_OR, "||"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_IDENT, "true")
+                (TOKEN_IDENT, "true"),
             ]
         );
         assert_eq!(
@@ -977,7 +994,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_MORE_OR_EQ, ">="),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTEGER, "2")
+                (TOKEN_INTEGER, "2"),
             ]
         );
         assert_eq!(
@@ -995,7 +1012,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_NOT_EQUAL, "!="),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTEGER, "3")
+                (TOKEN_INTEGER, "3"),
             ]
         );
         assert_eq!(
@@ -1007,7 +1024,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "b"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_SQUARE_B_CLOSE, "]")
+                (TOKEN_SQUARE_B_CLOSE, "]"),
             ]
         );
         assert_eq!(
@@ -1019,7 +1036,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "b"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_PAREN_CLOSE, ")")
+                (TOKEN_PAREN_CLOSE, ")"),
             ]
         );
         assert_eq!(
@@ -1045,7 +1062,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_ELSE, "else"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTEGER, "3")
+                (TOKEN_INTEGER, "3"),
             ]
         );
         assert_eq!(
@@ -1064,7 +1081,7 @@ mod tests {
                 (TOKEN_IDENT, "b"),
                 (TOKEN_DYNAMIC_END, "}"),
                 (TOKEN_DOT, "."),
-                (TOKEN_IDENT, "c")
+                (TOKEN_IDENT, "c"),
             ]
         );
         assert_eq!(
@@ -1093,7 +1110,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_DYNAMIC_END, "}"),
                 (TOKEN_DOT, "."),
-                (TOKEN_IDENT, "c")
+                (TOKEN_IDENT, "c"),
             ]
         );
     }
