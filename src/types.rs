@@ -1,4 +1,5 @@
 //! Provides a type system for the AST, in some sense
+use std::convert::TryFrom;
 use std::fmt;
 
 use crate::{
@@ -212,6 +213,7 @@ pub trait Wrapper: TypedNode {
 
 pub struct ParsedTypeError(pub SyntaxKind);
 
+#[derive(Clone)]
 pub enum ParsedType {
     Apply(Apply),
     Assert(Assert),
@@ -242,7 +244,7 @@ pub enum ParsedType {
     With(With),
 }
 
-impl core::convert::TryFrom<SyntaxNode> for ParsedType {
+impl TryFrom<SyntaxNode> for ParsedType {
     type Error = ParsedTypeError;
 
     fn try_from(node: SyntaxNode) -> Result<Self, ParsedTypeError> {
@@ -276,6 +278,44 @@ impl core::convert::TryFrom<SyntaxNode> for ParsedType {
             NODE_WITH => Ok(ParsedType::With(With::cast(node).unwrap())),
             other => Err(ParsedTypeError(other)),
         }
+    }
+}
+
+impl TypedNode for ParsedType {
+    fn node(&self) -> &SyntaxNode {
+        match self {
+            ParsedType::Apply(n) => n.node(),
+            ParsedType::Assert(n) => n.node(),
+            ParsedType::Key(n) => n.node(),
+            ParsedType::Dynamic(n) => n.node(),
+            ParsedType::Error(n) => n.node(),
+            ParsedType::Ident(n) => n.node(),
+            ParsedType::IfElse(n) => n.node(),
+            ParsedType::Select(n) => n.node(),
+            ParsedType::Inherit(n) => n.node(),
+            ParsedType::InheritFrom(n) => n.node(),
+            ParsedType::Lambda(n) => n.node(),
+            ParsedType::LegacyLet(n) => n.node(),
+            ParsedType::LetIn(n) => n.node(),
+            ParsedType::List(n) => n.node(),
+            ParsedType::BinOp(n) => n.node(),
+            ParsedType::OrDefault(n) => n.node(),
+            ParsedType::Paren(n) => n.node(),
+            ParsedType::PatBind(n) => n.node(),
+            ParsedType::PatEntry(n) => n.node(),
+            ParsedType::Pattern(n) => n.node(),
+            ParsedType::Root(n) => n.node(),
+            ParsedType::AttrSet(n) => n.node(),
+            ParsedType::KeyValue(n) => n.node(),
+            ParsedType::Str(n) => n.node(),
+            ParsedType::UnaryOp(n) => n.node(),
+            ParsedType::Value(n) => n.node(),
+            ParsedType::With(n) => n.node(),
+        }
+    }
+
+    fn cast(from: SyntaxNode) -> Option<Self> {
+        Self::try_from(from).ok()
     }
 }
 
