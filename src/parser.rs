@@ -374,8 +374,8 @@ where
                         self.finish_node();
                     }
 
-                    while let Some(TOKEN_IDENT) = self.peek() {
-                        self.expect_ident();
+                    while self.peek() != Some(TOKEN_SEMICOLON) {
+                        self.parse_val();
                     }
 
                     self.expect(TOKEN_SEMICOLON);
