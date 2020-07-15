@@ -12,7 +12,7 @@ use crate::{
 macro_rules! typed {
     ($($kind:expr => $name:ident$(: $trait:ident)*$(: { $($block:tt)* })*),*) => {
         $(
-            #[derive(Clone)]
+            #[derive(Clone, Debug)]
             pub struct $name(SyntaxNode);
 
             impl TypedNode for $name {
@@ -213,7 +213,7 @@ pub trait Wrapper: TypedNode {
 
 pub struct ParsedTypeError(pub SyntaxKind);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ParsedType {
     Apply(Apply),
     Assert(Assert),
