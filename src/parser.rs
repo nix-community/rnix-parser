@@ -19,6 +19,7 @@ const OR: &'static str = "or";
 
 /// An error that occurred during parsing
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum ParseError {
     /// Unexpected is used when the cause cannot be specified further
     Unexpected(TextRange),
