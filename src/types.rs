@@ -127,7 +127,7 @@ impl fmt::Display for TextDump {
                     if let NodeOrToken::Token(token) = enter {
                         write!(f, "(\"{}\")", token.text().escape_default())?
                     }
-                    write!(f, " {}..{}", enter.text_range().start(), enter.text_range().end())?;
+                    write!(f, " {}..{}", usize::from(enter.text_range().start()), usize::from(enter.text_range().end()))?;
                     if let NodeOrToken::Node(_) = enter {
                         write!(f, " {{")?;
                     }
@@ -186,7 +186,7 @@ pub trait TypedNode: Clone {
 pub trait TokenWrapper: TypedNode {
     fn as_str(&self) -> &str {
         match &self.node().green().children().next() {
-            Some(rowan::NodeOrToken::Token(token)) => token.text().as_str(),
+            Some(rowan::NodeOrToken::Token(token)) => token.text(),
             _ => unreachable!(),
         }
     }

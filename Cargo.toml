@@ -13,8 +13,9 @@ harness = false
 name = "all-packages"
 
 [dependencies]
-rowan = "0.9.0"
 cbitset = "0.2.0"
+rowan = "0.12.5"
+smol_str = "0.1.17"
 
 [dev-dependencies]
 criterion = "0.3.0"

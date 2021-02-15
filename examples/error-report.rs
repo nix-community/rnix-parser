@@ -30,11 +30,11 @@ fn main() {
         };
         eprintln!("----- ERROR -----");
         eprintln!("{}", error);
-        let start = range.start().to_usize();
+        let start = usize::from(range.start());
         let start_row = content[..start].lines().count() - 1;
         let start_line = content[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
         let start_col = content[start_line..start].chars().count();
-        let end = range.end().to_usize();
+        let end = usize::from(range.end());
         let end_row = content[..end].lines().count() - 1;
         let end_line = content[..end].rfind('\n').map(|i| i + 1).unwrap_or(0);
         let end_col = content[end_line..end].chars().count();

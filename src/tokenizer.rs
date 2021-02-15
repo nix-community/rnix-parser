@@ -1,6 +1,6 @@
 //! The tokenizer: turns a string into tokens, such as numbers, strings, and keywords
 
-use rowan::SmolStr;
+use smol_str::SmolStr;
 
 use crate::SyntaxKind::{self, *};
 
@@ -436,7 +436,7 @@ mod tests {
         SyntaxKind::{self, *},
         Tokenizer,
     };
-    use rowan::SmolStr;
+    use smol_str::SmolStr;
 
     fn tokenize(input: &str) -> Vec<(SyntaxKind, SmolStr)> {
         Tokenizer::new(input).collect()

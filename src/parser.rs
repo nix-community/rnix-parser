@@ -6,7 +6,8 @@ use std::{
 };
 
 use cbitset::BitSet256;
-use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, SmolStr, TextRange, TextUnit};
+use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, TextRange, TextSize};
+use smol_str::SmolStr;
 
 use crate::{
     types::{Root, TypedNode},
@@ -39,21 +40,21 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ParseError::Unexpected(range) => {
-                write!(f, "error node at {}..{}", range.start(), range.end())
+                write!(f, "error node at {}..{}", usize::from(range.start()), usize::from(range.end()))
             }
             ParseError::UnexpectedExtra(range) => {
-                write!(f, "unexpected token at {}..{}", range.start(), range.end())
+                write!(f, "unexpected token at {}..{}", usize::from(range.start()), usize::from(range.end()))
             }
             ParseError::UnexpectedWanted(got, range, kinds) => write!(
                 f,
                 "unexpected {:?} at {}..{}, wanted any of {:?}",
                 got,
-                range.start(),
-                range.end(),
+                usize::from(range.start()),
+                usize::from(range.end()),
                 kinds
             ),
             ParseError::UnexpectedDoubleBind(range) => {
-                write!(f, "unexpected double bind at {}..{}", range.start(), range.end())
+                write!(f, "unexpected double bind at {}..{}", usize::from(range.start()), usize::from(range.end()))
             }
             ParseError::UnexpectedEOF => write!(f, "unexpected end of file"),
             ParseError::UnexpectedEOFWanted(kinds) => {
@@ -122,7 +123,7 @@ where
     trivia_buffer: Vec<I::Item>,
     buffer: VecDeque<I::Item>,
     iter: I,
-    index: usize,
+    consumed: TextSize,
 }
 impl<I> Parser<I>
 where
@@ -136,12 +137,12 @@ where
             trivia_buffer: Vec::with_capacity(1),
             buffer: VecDeque::with_capacity(1),
             iter,
-            index: 0,
+            consumed: TextSize::from(0),
         }
     }
 
-    fn get_text_position(&self) -> TextUnit {
-        TextUnit::from_usize(self.index)
+    fn get_text_position(&self) -> TextSize {
+        self.consumed
     }
 
     fn peek_raw(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
@@ -154,8 +155,8 @@ where
     }
     fn drain_trivia_buffer(&mut self) {
         for (t, s) in self.trivia_buffer.drain(..) {
-            self.index += s.as_bytes().len();
-            self.builder.token(NixLanguage::kind_to_raw(t), s)
+            self.consumed += TextSize::of(s.as_str());
+            self.builder.token(NixLanguage::kind_to_raw(t), s.as_str())
         }
     }
     fn eat_trivia(&mut self) {
@@ -176,11 +177,11 @@ where
     fn finish_node(&mut self) {
         self.builder.finish_node();
     }
-    fn start_error_node(&mut self) -> TextUnit {
+    fn start_error_node(&mut self) -> TextSize {
         self.start_node(NODE_ERROR);
         self.get_text_position()
     }
-    fn finish_error_node(&mut self) -> TextUnit {
+    fn finish_error_node(&mut self) -> TextSize {
         self.finish_node();
         self.get_text_position()
     }
@@ -192,8 +193,8 @@ where
                     self.trivia_buffer.push((token, s))
                 } else {
                     self.drain_trivia_buffer();
-                    self.index += s.as_bytes().len();
-                    self.builder.token(NixLanguage::kind_to_raw(token), s)
+                    self.consumed += TextSize::of(s.as_str());
+                    self.builder.token(NixLanguage::kind_to_raw(token), s.as_str())
                 }
             }
             None => self.errors.push(ParseError::UnexpectedEOF),
@@ -225,7 +226,7 @@ where
                 let end = self.finish_error_node();
                 self.errors.push(ParseError::UnexpectedWanted(
                     kind,
-                    TextRange::from_to(start, end),
+                    TextRange::new(start, end),
                     allowed_slice.to_vec().into_boxed_slice(),
                 ));
 
@@ -354,7 +355,7 @@ where
             self.expect_ident();
             let end = self.finish_error_node();
             if bound {
-                self.errors.push(ParseError::UnexpectedDoubleBind(TextRange::from_to(start, end)));
+                self.errors.push(ParseError::UnexpectedDoubleBind(TextRange::new(start, end)));
             }
         }
     }
@@ -519,7 +520,7 @@ where
                 let end = self.finish_error_node();
                 self.errors.push(ParseError::UnexpectedWanted(
                     kind,
-                    TextRange::from_to(start, end),
+                    TextRange::new(start, end),
                     [
                         TOKEN_PAREN_OPEN,
                         TOKEN_REC,
@@ -700,7 +701,7 @@ where
 /// Parse tokens into an AST
 pub fn parse<I>(iter: I) -> AST
 where
-    I: IntoIterator<Item = (SyntaxKind, SmolStr)>,
+    I: Iterator<Item = (SyntaxKind, SmolStr)>,
 {
     let mut parser = Parser::new(iter.into_iter());
     parser.builder.start_node(NixLanguage::kind_to_raw(NODE_ROOT));
@@ -712,7 +713,7 @@ where
             parser.bump();
         }
         let end = parser.finish_error_node();
-        parser.errors.push(ParseError::UnexpectedExtra(TextRange::from_to(start, end)));
+        parser.errors.push(ParseError::UnexpectedExtra(TextRange::new(start, end)));
         parser.eat_trivia();
     }
     parser.builder.finish_node();

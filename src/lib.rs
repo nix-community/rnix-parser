@@ -13,7 +13,7 @@ pub use self::{
 };
 
 pub use rowan::{
-    NodeOrToken, SmolStr, SyntaxElementChildren, SyntaxNodeChildren, TextRange, TextUnit,
+    NodeOrToken, SyntaxElementChildren, SyntaxNodeChildren, TextRange, TextSize,
     TokenAtOffset, WalkEvent,
 };
 

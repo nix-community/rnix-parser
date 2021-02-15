@@ -226,7 +226,7 @@ pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
     let mut parts = Vec::new();
     let mut literals = 0;
     let mut common = std::usize::MAX;
-    let multiline = string.first_token().map_or(false, |t| t.text().as_str() == "''");
+    let multiline = string.first_token().map_or(false, |t| t.text() == "''");
     let mut last_was_ast = false;
 
     for child in string.node().children_with_tokens() {
@@ -296,15 +296,15 @@ mod tests {
     }
     #[test]
     fn parts() {
-        use crate::{types::Str, NixLanguage, SmolStr, SyntaxNode};
+        use crate::{types::Str, NixLanguage, SyntaxNode};
         use rowan::{GreenNodeBuilder, Language};
 
         fn string_node(content: &str) -> Str {
             let mut builder = GreenNodeBuilder::new();
             builder.start_node(NixLanguage::kind_to_raw(NODE_STRING));
-            builder.token(NixLanguage::kind_to_raw(TOKEN_STRING_START), SmolStr::new("''"));
-            builder.token(NixLanguage::kind_to_raw(TOKEN_STRING_CONTENT), SmolStr::new(content));
-            builder.token(NixLanguage::kind_to_raw(TOKEN_STRING_END), SmolStr::new("''"));
+            builder.token(NixLanguage::kind_to_raw(TOKEN_STRING_START), "''");
+            builder.token(NixLanguage::kind_to_raw(TOKEN_STRING_CONTENT), content);
+            builder.token(NixLanguage::kind_to_raw(TOKEN_STRING_END), "''");
             builder.finish_node();
 
             Str::cast(SyntaxNode::new_root(builder.finish())).unwrap()
