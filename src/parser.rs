@@ -833,25 +833,19 @@ NODE_ROOT 0..5 {
     #[rustfmt::skip]
     mod dir_tests {
         use super::test_dir;
-        #[test] fn general() { test_dir("general"); }
-        #[test] fn set() { test_dir("parser/set"); }
-        #[test] fn math() { test_dir("parser/math"); }
-        #[test] fn let_in() { test_dir("parser/let_in"); }
-        #[test] fn let_legacy_syntax() { test_dir("parser/let_legacy_syntax"); }
-        #[test] fn interpolation() { test_dir("parser/interpolation"); }
-        #[test] fn index_set() { test_dir("parser/index_set"); }
-        #[test] fn isset() { test_dir("parser/isset"); }
-        #[test] fn merge() { test_dir("parser/merge"); }
-        #[test] fn with() { test_dir("parser/with"); }
-        #[test] fn assert() { test_dir("parser/assert"); }
-        #[test] fn inherit() { test_dir("parser/inherit"); }
-        #[test] fn ifs() { test_dir("parser/ifs"); }
-        #[test] fn list() { test_dir("parser/list"); }
-        #[test] fn lambda() { test_dir("parser/lambda"); }
-        #[test] fn patterns() { test_dir("parser/patterns"); }
-        #[test] fn dynamic() { test_dir("parser/dynamic"); }
-        #[test] fn paths() { test_dir("parser/paths"); }
-        #[test] fn strings() { test_dir("parser/strings"); }
-        #[test] fn invalid_syntax() { test_dir("parser/invalid_syntax"); }
+        #[test] 
+        fn general() { 
+            test_dir("general"); 
+        }
+
+        #[test]
+        fn parser() {
+            for dir in std::fs::read_dir("test_data/parser").unwrap() {
+                let dir = dir.unwrap();
+                let file_name = dir.file_name().into_string().unwrap();
+                println!("testing: {}", file_name);
+                test_dir(&format!("parser/{}", file_name));
+            }
+        }
     }
 }
