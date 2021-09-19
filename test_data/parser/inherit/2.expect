@@ -1,0 +1,13 @@
+error: unexpected end of file
+error: unexpected end of file, wanted any of [TOKEN_SEMICOLON]
+error: unexpected end of file
+error: unexpected end of file
+NODE_ROOT 0..13 {
+  NODE_LET_IN 0..13 {
+    TOKEN_LET("let") 0..3
+    TOKEN_WHITESPACE("\n  ") 3..6
+    NODE_INHERIT 6..13 {
+      TOKEN_INHERIT("inherit") 6..13
+    }
+  }
+}
