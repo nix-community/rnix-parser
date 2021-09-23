@@ -378,6 +378,9 @@ where
 
                     while self.peek() != Some(TOKEN_SEMICOLON) {
                         self.parse_val();
+                        if self.errors.last().map_or(false, |x| *x == ParseError::UnexpectedEOF) {
+                            break;
+                        }
                     }
 
                     self.expect(TOKEN_SEMICOLON);
