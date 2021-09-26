@@ -34,11 +34,21 @@ pub enum ParseError {
     UnexpectedEOF,
     /// UnexpectedWanted is used when specific tokens are expected, but the end of file is reached
     UnexpectedEOFWanted(Box<[SyntaxKind]>),
+    Expected(TextRange, String),
 }
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ParseError::Expected(range, description) => {
+                write!(
+                    f,
+                    "expected {} at {}..{}",
+                    description,
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
+            }
             ParseError::Unexpected(range) => {
                 write!(f, "error node at {}..{}", usize::from(range.start()), usize::from(range.end()))
             }
@@ -291,7 +301,15 @@ where
         match self.peek() {
             Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
             Some(TOKEN_STRING_START) => self.parse_string(),
-            _ => self.expect_ident(),
+            Some(TOKEN_IDENT) => self.expect_ident(),
+            _ => {
+                let start = self.start_error_node();
+                let end = self.finish_error_node();
+                self.errors.push(ParseError::Expected(
+                    TextRange::new(start, end),
+                    "attribute".to_string(),
+                ));
+            }
         }
     }
     fn parse_attr(&mut self) {
@@ -391,7 +409,9 @@ where
                     self.parse_attr();
                     self.expect(TOKEN_ASSIGN);
                     self.parse_expr();
-                    self.expect(TOKEN_SEMICOLON);
+                    if let Some(TOKEN_SEMICOLON) = self.peek() {
+                        self.bump();
+                    }
                     self.finish_node();
                 }
             }
@@ -694,6 +714,16 @@ where
                 self.expect(TOKEN_SEMICOLON);
                 self.parse_expr();
                 self.finish_node();
+                checkpoint
+            }
+            Some(TOKEN_SEMICOLON) => {
+                let checkpoint = self.checkpoint();
+                let start = self.start_error_node();
+                let end = self.finish_error_node();
+                self.errors.push(ParseError::Expected(
+                    TextRange::new(start, end),
+                    "expression".to_string(),
+                ));
                 checkpoint
             }
             _ => self.parse_math(),

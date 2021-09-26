@@ -1,0 +1,47 @@
+error: expected expression at 12..12
+NODE_ROOT 0..40 {
+  NODE_BIN_OP 0..40 {
+    NODE_ATTR_SET 0..28 {
+      TOKEN_CURLY_B_OPEN("{") 0..1
+      TOKEN_WHITESPACE("\n    ") 1..6
+      NODE_KEY_VALUE 6..13 {
+        NODE_KEY 6..9 {
+          NODE_IDENT 6..9 {
+            TOKEN_IDENT("foo") 6..9
+          }
+        }
+        TOKEN_WHITESPACE(" ") 9..10
+        TOKEN_ASSIGN("=") 10..11
+        TOKEN_WHITESPACE(" ") 11..12
+        NODE_ERROR 12..12 {
+        }
+        TOKEN_SEMICOLON(";") 12..13
+      }
+      TOKEN_WHITESPACE("\n    ") 13..18
+      NODE_KEY_VALUE 18..26 {
+        NODE_KEY 18..21 {
+          NODE_IDENT 18..21 {
+            TOKEN_IDENT("bar") 18..21
+          }
+        }
+        TOKEN_WHITESPACE(" ") 21..22
+        TOKEN_ASSIGN("=") 22..23
+        TOKEN_WHITESPACE(" ") 23..24
+        NODE_LITERAL 24..25 {
+          TOKEN_INTEGER("1") 24..25
+        }
+        TOKEN_SEMICOLON(";") 25..26
+      }
+      TOKEN_WHITESPACE("\n") 26..27
+      TOKEN_CURLY_B_CLOSE("}") 27..28
+    }
+    TOKEN_WHITESPACE(" ") 28..29
+    TOKEN_UPDATE("//") 29..31
+    TOKEN_WHITESPACE(" ") 31..32
+    NODE_ATTR_SET 32..40 {
+      TOKEN_CURLY_B_OPEN("{") 32..33
+      TOKEN_WHITESPACE("\n    \n") 33..39
+      TOKEN_CURLY_B_CLOSE("}") 39..40
+    }
+  }
+}
