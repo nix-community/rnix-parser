@@ -484,7 +484,7 @@ where
         self.bump(); // the final close, like '}'
     }
     fn parse_val(&mut self) -> Checkpoint {
-        println!("parsing value");
+        // println!("parsing value");
         let peek = match self.peek() {
             Some(it) => it,
             None => {
@@ -497,7 +497,7 @@ where
                 return self.builder.checkpoint();
             }
         };
-        println!("peek is: {:?}", peek);
+        // println!("peek is: {:?}", peek);
         let checkpoint = self.checkpoint();
         match peek {
             TOKEN_PAREN_OPEN => {
@@ -608,15 +608,15 @@ where
                     _ => (),
                 }
             }
-            // T!["}"] => {
-            //     let start = self.start_error_node();
-            //     self.bump();
-            //     self.finish_error_node();
-            //     self.errors.push(ParseError::Message(
-            //         "unmatched right brace".to_string(),
-            //         TextRange::new(start, self.get_text_position()),
-            //     ));
-            // }
+            T!["}"] => {
+                let start = self.start_error_node();
+                self.bump();
+                self.finish_error_node();
+                self.errors.push(ParseError::Message(
+                    "unmatched right brace".to_string(),
+                    TextRange::new(start, self.get_text_position()),
+                ));
+            }
             _ => {
                 // propagate errors up
                 self.err_and_bump("expression");
