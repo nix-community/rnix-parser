@@ -256,36 +256,6 @@ where
         }
         peeks
     }
-    fn expect_peek_any(&mut self, allowed: TokenSet) -> Option<SyntaxKind> {
-        let next = match self.peek() {
-            None => None,
-            Some(kind) if allowed.contains(kind) => Some(kind),
-            Some(kind) => {
-                let start = self.start_error_node();
-                loop {
-                    self.bump();
-                    if self.peek().map(|kind| allowed.contains(kind)).unwrap_or(true) {
-                        break;
-                    }
-                }
-                let end = self.finish_error_node();
-                self.errors
-                    .push(ParseError::Message("pattern".to_string(), TextRange::new(start, end)));
-                // self.errors.push(ParseError::UnexpectedWanted(
-                //     kind,
-                //     TextRange::new(start, end),
-                //     allowed_slice.to_vec().into_boxed_slice(),
-                // ));
-
-                self.peek()
-            }
-        };
-        // if next.is_none() {
-        //     self.errors
-        //         .push(ParseError::UnexpectedEOFWanted(allowed_slice.to_vec().into_boxed_slice()));
-        // }
-        next
-    }
     fn expect(&mut self, expected: SyntaxKind) -> bool {
         let peek = self.peek();
         match peek {
@@ -434,7 +404,9 @@ where
                 }
                 Some(TOKEN_ELLIPSIS) => {
                     self.bump();
-                    self.expect(TOKEN_CURLY_B_CLOSE);
+                    if self.expect(TOKEN_CURLY_B_CLOSE) {
+                        break;
+                    }
                 }
                 Some(TOKEN_IDENT) => {
                     self.start_node(NODE_PAT_ENTRY);
@@ -840,6 +812,12 @@ mod tests {
         // check_parser(&[91, 45])
         // check_parser(&[89, 64, 60, 44, 45, 45, 58])
         // check_parser(&[116, 64, 91, 123, 49, 91, 91, 91, 49, 91, 91, 26])
+    }
+    
+    #[test]
+    fn smoke2() {
+        let ast = crate::parse("true -> true -> true -> true");
+        panic!("{:?}", ast.node());
     }
 
     // #[test]
