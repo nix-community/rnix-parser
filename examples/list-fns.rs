@@ -1,7 +1,7 @@
 use std::{env, error::Error, fs};
 
-use smol_str::SmolStr;
 use rnix::{types::*, NodeOrToken, SyntaxKind::*, SyntaxNode};
+use smol_str::SmolStr;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let file = match env::args().skip(1).next() {

@@ -11,7 +11,6 @@ use crate::{
     SyntaxKind::{self, *},
     SyntaxNode, TokenSet,
 };
-use cbitset::BitSet256;
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, TextRange, TextSize};
 use smol_str::SmolStr;
 
@@ -167,6 +166,11 @@ where
         self.peek().map(|kind| ts.contains(kind)).unwrap_or(false)
     }
 
+    fn error(&mut self, msg: &str) {
+        self.errors
+            .push(ParseError::Message(msg.to_string(), TextRange::empty(self.get_text_position())))
+    }
+
     fn get_text_position(&self) -> TextSize {
         self.consumed
     }
@@ -235,34 +239,51 @@ where
     fn peek(&mut self) -> Option<SyntaxKind> {
         self.peek_data().map(|&(t, _)| t)
     }
-    fn expect_peek_any(&mut self, allowed_slice: &[SyntaxKind]) -> Option<SyntaxKind> {
-        let allowed: BitSet256 = allowed_slice.iter().map(|&k| k as u16).collect();
-
+    fn peek_n<const N: usize>(&mut self) -> [Option<SyntaxKind>; N] {
+        let mut peeks = [None; N];
+        for i in 0..N {
+            let mut token;
+            peeks[i] = loop {
+                token = self.iter.next();
+                let kind = token.as_ref().map(|&(t, _)| t);
+                if let Some(token) = token {
+                    self.buffer.push_back(token);
+                }
+                if kind.map(|t| !t.is_trivia()).unwrap_or(true) {
+                    break kind;
+                }
+            };
+        }
+        peeks
+    }
+    fn expect_peek_any(&mut self, allowed: TokenSet) -> Option<SyntaxKind> {
         let next = match self.peek() {
             None => None,
-            Some(kind) if allowed.contains(kind as usize) => Some(kind),
+            Some(kind) if allowed.contains(kind) => Some(kind),
             Some(kind) => {
                 let start = self.start_error_node();
                 loop {
                     self.bump();
-                    if self.peek().map(|kind| allowed.contains(kind as usize)).unwrap_or(true) {
+                    if self.peek().map(|kind| allowed.contains(kind)).unwrap_or(true) {
                         break;
                     }
                 }
                 let end = self.finish_error_node();
-                self.errors.push(ParseError::UnexpectedWanted(
-                    kind,
-                    TextRange::new(start, end),
-                    allowed_slice.to_vec().into_boxed_slice(),
-                ));
+                self.errors
+                    .push(ParseError::Message("pattern".to_string(), TextRange::new(start, end)));
+                // self.errors.push(ParseError::UnexpectedWanted(
+                //     kind,
+                //     TextRange::new(start, end),
+                //     allowed_slice.to_vec().into_boxed_slice(),
+                // ));
 
                 self.peek()
             }
         };
-        if next.is_none() {
-            self.errors
-                .push(ParseError::UnexpectedEOFWanted(allowed_slice.to_vec().into_boxed_slice()));
-        }
+        // if next.is_none() {
+        //     self.errors
+        //         .push(ParseError::UnexpectedEOFWanted(allowed_slice.to_vec().into_boxed_slice()));
+        // }
         next
     }
     fn expect(&mut self, expected: SyntaxKind) -> bool {
@@ -283,6 +304,16 @@ where
             }
         }
         false
+    }
+
+    pub(crate) fn err_node(&mut self, message: &str) {
+        let start = self.start_error_node();
+        self.bump();
+        self.finish_error_node();
+        self.errors.push(ParseError::Message(
+            message.to_string(),
+            TextRange::new(start, self.get_text_position()),
+        ));
     }
 
     /// Create an error node and consume the next token.
@@ -393,41 +424,40 @@ where
         self.finish_node();
     }
     fn parse_pattern(&mut self, bound: bool) {
-        if self.peek().map(|t| t == TOKEN_CURLY_B_CLOSE).unwrap_or(true) {
-            self.bump();
-        } else {
-            loop {
-                match self.expect_peek_any(&[TOKEN_CURLY_B_CLOSE, TOKEN_ELLIPSIS, TOKEN_IDENT]) {
-                    Some(TOKEN_CURLY_B_CLOSE) => {
+        // println!("in pattern");
+        // println!("peek is: {:?}", self.peek());
+        loop {
+            match self.peek() {
+                Some(TOKEN_CURLY_B_CLOSE) => {
+                    self.bump();
+                    break;
+                }
+                Some(TOKEN_ELLIPSIS) => {
+                    self.bump();
+                    self.expect(TOKEN_CURLY_B_CLOSE);
+                }
+                Some(TOKEN_IDENT) => {
+                    self.start_node(NODE_PAT_ENTRY);
+
+                    self.expect_ident();
+
+                    if let Some(TOKEN_QUESTION) = self.peek() {
                         self.bump();
-                        break;
+                        self.parse_expr();
                     }
-                    Some(TOKEN_ELLIPSIS) => {
-                        self.bump();
-                        self.expect(TOKEN_CURLY_B_CLOSE);
-                        break;
+                    self.finish_node();
+
+                    match self.peek() {
+                        Some(TOKEN_COMMA) => self.bump(),
+                        _ if self.expect(TOKEN_CURLY_B_CLOSE) => break,
+                        _ => (),
                     }
-                    Some(TOKEN_IDENT) => {
-                        self.start_node(NODE_PAT_ENTRY);
-
-                        self.expect_ident();
-
-                        if let Some(TOKEN_QUESTION) = self.peek() {
-                            self.bump();
-                            self.parse_expr();
-                        }
-                        self.finish_node();
-
-                        match self.peek() {
-                            Some(TOKEN_COMMA) => self.bump(),
-                            _ => {
-                                self.expect(TOKEN_CURLY_B_CLOSE);
-                                break;
-                            }
-                        }
-                    }
-                    // handled by expect_peek_any
-                    _ => break,
+                }
+                Some(TOKEN_COMMA) => self.err_node("misplaced comma"),
+                Some(_) => self.err_node("expected a pattern"),
+                None => {
+                    self.error("Unexpected eof, expected a pattern");
+                    break;
                 }
             }
         }
@@ -449,6 +479,7 @@ where
             match self.peek() {
                 None => break,
                 token if token == Some(until) => break,
+                Some(TOKEN_SEMICOLON) => self.err_and_bump("misplaced semicolon"),
                 Some(TOKEN_INHERIT) => {
                     self.start_node(NODE_INHERIT);
                     self.bump();
@@ -515,23 +546,7 @@ where
                 self.finish_node();
             }
             TOKEN_CURLY_B_OPEN => {
-                // Do a lookahead:
-                let mut peek = [None, None];
-                for i in 0..2 {
-                    let mut token;
-                    peek[i] = loop {
-                        token = self.iter.next();
-                        let kind = token.as_ref().map(|&(t, _)| t);
-                        if let Some(token) = token {
-                            self.buffer.push_back(token);
-                        }
-                        if kind.map(|t| !t.is_trivia()).unwrap_or(true) {
-                            break kind;
-                        }
-                    };
-                }
-
-                match peek {
+                match self.peek_n::<2>() {
                     [Some(TOKEN_IDENT), Some(TOKEN_COMMA)]
                     | [Some(TOKEN_IDENT), Some(TOKEN_QUESTION)]
                     | [Some(TOKEN_IDENT), Some(TOKEN_CURLY_B_CLOSE)]
@@ -563,11 +578,7 @@ where
             TOKEN_SQUARE_B_OPEN => {
                 self.start_node(NODE_LIST);
                 self.bump();
-                while self
-                    .peek()
-                    .map(|t| t != TOKEN_SQUARE_B_CLOSE && t != TOKEN_CURLY_B_CLOSE)
-                    .unwrap_or(false)
-                {
+                while self.peek().map(|t| t != TOKEN_SQUARE_B_CLOSE).unwrap_or(false) {
                     self.parse_val();
                 }
                 self.bump();
@@ -608,41 +619,8 @@ where
                     _ => (),
                 }
             }
-            T!["}"] => {
-                let start = self.start_error_node();
-                self.bump();
-                self.finish_error_node();
-                self.errors.push(ParseError::Message(
-                    "unmatched right brace".to_string(),
-                    TextRange::new(start, self.get_text_position()),
-                ));
-            }
-            _ => {
-                // propagate errors up
-                self.err_and_bump("expression");
-            } // kind => {
-              //     // println!("unexpected: {:?}", kind);
-              //     self.err_recover("expected expression", TokenSet::new(&[TOKEN_LET]))
-              // } // kind => {
-              //     let start = self.start_error_node();
-              //     self.bump();
-              //     let end = self.finish_error_node();
-              //     self.errors.push(ParseError::UnexpectedWanted(
-              //         kind,
-              //         TextRange::new(start, end),
-              //         [
-              //             TOKEN_PAREN_OPEN,
-              //             TOKEN_REC,
-              //             TOKEN_CURLY_B_OPEN,
-              //             TOKEN_SQUARE_B_OPEN,
-              //             TOKEN_DYNAMIC_START,
-              //             TOKEN_STRING_START,
-              //             TOKEN_IDENT,
-              //         ]
-              //         .to_vec()
-              //         .into_boxed_slice(),
-              //     ));
-              // }
+            T!["}"] => self.err_node("unmatched right brace"),
+            _ => self.err_and_bump("expected a value"),
         };
 
         while self.peek() == Some(TOKEN_DOT) {
@@ -848,14 +826,20 @@ mod tests {
     fn check_parser(bytes: &[u8]) {
         let s = std::str::from_utf8(bytes).unwrap();
         println!("'{}'", s);
-        // crate::parse(s);
+        crate::parse(s);
     }
 
     #[test]
     fn smoke() {
         // check_parser(&[91, 27, 27, 127, 27, 125]);
         // check_parser(&[91, 125, 0]);
-        check_parser(&[116, 123, 105, 110, 104, 101, 114, 105, 116, 1, 0, 0, 0, 0, 0, 24, 101, 114, 105, 116, 41, 116, 123, 62, 89, 108, 89, 108, 101, 125, 125, 123]);
+        // check_parser(&[
+        //     116, 123, 105, 110, 104, 101, 114, 105, 116, 1, 0, 0, 0, 0, 0, 24, 101, 114, 105, 116,
+        //     41, 116, 123, 62, 89, 108, 89, 108, 101, 125, 125, 123,
+        // ]);
+        // check_parser(&[91, 45])
+        // check_parser(&[89, 64, 60, 44, 45, 45, 58])
+        // check_parser(&[116, 64, 91, 123, 49, 91, 91, 91, 49, 91, 91, 26])
     }
 
     // #[test]
@@ -972,6 +956,7 @@ NODE_ROOT 0..5 {
     #[rustfmt::skip]
     mod dir_tests {
         use super::test_dir;
+
         #[test] 
         fn general() { 
             test_dir("general"); 

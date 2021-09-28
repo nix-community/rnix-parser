@@ -127,7 +127,12 @@ impl fmt::Display for TextDump {
                     if let NodeOrToken::Token(token) = enter {
                         write!(f, "(\"{}\")", token.text().escape_default())?
                     }
-                    write!(f, " {}..{}", usize::from(enter.text_range().start()), usize::from(enter.text_range().end()))?;
+                    write!(
+                        f,
+                        " {}..{}",
+                        usize::from(enter.text_range().start()),
+                        usize::from(enter.text_range().end())
+                    )?;
                     if let NodeOrToken::Node(_) = enter {
                         write!(f, " {{")?;
                     }
