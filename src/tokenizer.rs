@@ -430,17 +430,17 @@ impl<'a> Iterator for Tokenizer<'a> {
     }
 }
 
+pub fn tokenize(input: &str) -> Vec<(SyntaxKind, SmolStr)> {
+    Tokenizer::new(input).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
+        tokenize,
         SyntaxKind::{self, *},
-        Tokenizer,
     };
     use smol_str::SmolStr;
-
-    fn tokenize(input: &str) -> Vec<(SyntaxKind, SmolStr)> {
-        Tokenizer::new(input).collect()
-    }
 
     macro_rules! tokens {
         ($(($token:expr, $str:expr),)*) => {

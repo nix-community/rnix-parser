@@ -9,7 +9,11 @@ pub struct TokenSet(u128);
 impl TokenSet {
     pub(crate) const EMPTY: TokenSet = TokenSet(0);
 
-    pub(crate) const fn new(kinds: &[SyntaxKind]) -> TokenSet {
+    pub(crate) const fn new(kind: SyntaxKind) -> TokenSet {
+        TokenSet(mask(kind))
+    }
+
+    pub(crate) const fn from_slice(kinds: &[SyntaxKind]) -> TokenSet {
         let mut res = 0u128;
         let mut i = 0;
         while i < kinds.len() {
@@ -61,5 +65,21 @@ impl ops::BitOr<TokenSet> for TokenSet {
 
     fn bitor(self, rhs: TokenSet) -> Self::Output {
         self.union(rhs)
+    }
+}
+
+impl ops::BitOr<SyntaxKind> for () {
+    type Output = TokenSet;
+
+    fn bitor(self, rhs: SyntaxKind) -> Self::Output {
+        TokenSet::new(rhs)
+    }
+}
+
+impl ops::BitOr<()> for SyntaxKind {
+    type Output = TokenSet;
+
+    fn bitor(self, (): ()) -> Self::Output {
+        TokenSet::new(self)
     }
 }
