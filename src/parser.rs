@@ -13,7 +13,7 @@ use crate::{
     types::{Root, TypedNode},
     NixLanguage,
     SyntaxKind::{self, *},
-    SyntaxNode,
+    SyntaxNode, TokenSet,
 };
 
 const OR: &'static str = "or";
@@ -22,6 +22,7 @@ const OR: &'static str = "or";
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum ParseError {
+    Message(String, TextRange),
     /// Unexpected is used when the cause cannot be specified further
     Unexpected(TextRange),
     /// UnexpectedExtra is used when there are additional tokens to the root in the tree
@@ -39,11 +40,24 @@ pub enum ParseError {
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ParseError::Message(msg, range) => {
+                write!(f, "{} at {}..{}", msg, usize::from(range.start()), usize::from(range.end()))
+            }
             ParseError::Unexpected(range) => {
-                write!(f, "error node at {}..{}", usize::from(range.start()), usize::from(range.end()))
+                write!(
+                    f,
+                    "error node at {}..{}",
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
             ParseError::UnexpectedExtra(range) => {
-                write!(f, "unexpected token at {}..{}", usize::from(range.start()), usize::from(range.end()))
+                write!(
+                    f,
+                    "unexpected token at {}..{}",
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
             ParseError::UnexpectedWanted(got, range, kinds) => write!(
                 f,
@@ -54,7 +68,12 @@ impl fmt::Display for ParseError {
                 kinds
             ),
             ParseError::UnexpectedDoubleBind(range) => {
-                write!(f, "unexpected double bind at {}..{}", usize::from(range.start()), usize::from(range.end()))
+                write!(
+                    f,
+                    "unexpected double bind at {}..{}",
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
             ParseError::UnexpectedEOF => write!(f, "unexpected end of file"),
             ParseError::UnexpectedEOFWanted(kinds) => {
@@ -139,6 +158,14 @@ where
             iter,
             consumed: TextSize::from(0),
         }
+    }
+
+    fn at(&mut self, kind: SyntaxKind) -> bool {
+        self.peek().map(|kind_| kind_ == kind).unwrap_or(false)
+    }
+
+    fn at_ts(&mut self, ts: TokenSet) -> bool {
+        self.peek().map(|kind| ts.contains(kind)).unwrap_or(false)
     }
 
     fn get_text_position(&self) -> TextSize {
@@ -239,17 +266,80 @@ where
         }
         next
     }
-    fn expect(&mut self, expected: SyntaxKind) {
-        if self.expect_peek_any(&[expected]).is_some() {
-            self.bump();
+    fn expect(&mut self, expected: SyntaxKind) -> bool {
+        let peek = self.peek();
+        match peek {
+            Some(kind) if expected == kind => {
+                self.bump();
+                return true;
+            }
+            Some(kind) => self.errors.push(ParseError::UnexpectedWanted(
+                kind,
+                TextRange::empty(self.get_text_position()),
+                [kind].to_vec().into_boxed_slice(),
+            )),
+            None => {
+                self.errors
+                    .push(ParseError::UnexpectedEOFWanted([expected].to_vec().into_boxed_slice()));
+            }
         }
+        false
     }
-    fn expect_ident(&mut self) {
-        if self.expect_peek_any(&[TOKEN_IDENT]).is_some() {
+
+    /// Create an error node and consume the next token.
+    pub(crate) fn err_recover(&mut self, message: &str, recovery: TokenSet) {
+        match self.peek() {
+            None => {
+                self.errors.push(ParseError::Message(
+                    format!("unexpected eof: {}", message),
+                    TextRange::empty(self.get_text_position()),
+                ));
+            }
+            Some(T!["{"] | T!["}"]) => {
+                self.errors.push(ParseError::Message(
+                    message.to_string(),
+                    TextRange::empty(self.get_text_position()),
+                ));
+                return;
+            }
+            _ => (),
+        }
+
+        if self.at_ts(recovery) {
+            self.errors.push(ParseError::Message(
+                message.to_string(),
+                TextRange::empty(self.get_text_position()),
+            ));
+            return;
+        }
+
+        let start = self.start_error_node();
+        self.bump();
+        self.errors.push(ParseError::Message(
+            message.to_string(),
+            TextRange::new(start, self.get_text_position()),
+        ));
+        self.finish_error_node();
+    }
+
+    pub(crate) fn err_and_bump(&mut self, message: &str) {
+        self.err_recover(message, TokenSet::EMPTY);
+    }
+
+    pub(crate) fn expect_bump(&mut self, kind: SyntaxKind, msg: &str) -> bool {
+        if self.at(kind) {
             self.start_node(NODE_IDENT);
             self.bump();
-            self.finish_node()
+            self.finish_node();
+            true
+        } else {
+            self.err_and_bump(msg);
+            false
         }
+    }
+
+    fn expect_ident(&mut self) {
+        self.expect_bump(TOKEN_IDENT, "expected identifier");
     }
 
     fn parse_dynamic(&mut self) {
@@ -728,6 +818,13 @@ mod tests {
     use super::*;
 
     use std::{ffi::OsStr, fmt::Write, fs, path::PathBuf};
+
+    // #[test]
+    // fn smoke() {
+    //     let code = "+ 1";
+    //     let ast = crate::parse(code);
+    //     panic!("{:?}", ast.errors());
+    // }
 
     #[test]
     fn whitespace_attachment_for_incomplete_code1() {

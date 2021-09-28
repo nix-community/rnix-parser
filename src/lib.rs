@@ -2,6 +2,7 @@
 mod macros;
 mod kinds;
 pub mod parser;
+mod token_set;
 pub mod tokenizer;
 pub mod types;
 pub mod value;
@@ -9,12 +10,13 @@ pub mod value;
 pub use self::{
     kinds::SyntaxKind,
     parser::AST,
+    token_set::TokenSet,
     value::{StrPart, Value as NixValue},
 };
 
 pub use rowan::{
-    NodeOrToken, SyntaxElementChildren, SyntaxNodeChildren, TextRange, TextSize,
-    TokenAtOffset, WalkEvent,
+    NodeOrToken, SyntaxElementChildren, SyntaxNodeChildren, TextRange, TextSize, TokenAtOffset,
+    WalkEvent,
 };
 
 use self::tokenizer::Tokenizer;
