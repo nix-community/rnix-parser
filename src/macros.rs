@@ -10,6 +10,7 @@ macro_rules! T {
     (rec)     => ($crate::SyntaxKind::TOKEN_REC);
     (then)    => ($crate::SyntaxKind::TOKEN_THEN);
     (with)    => ($crate::SyntaxKind::TOKEN_WITH);
+    (ident)   => ($crate::SyntaxKind::TOKEN_IDENT);
 
     ("{")     => ($crate::SyntaxKind::TOKEN_CURLY_B_OPEN);
     ("}")     => ($crate::SyntaxKind::TOKEN_CURLY_B_CLOSE);
