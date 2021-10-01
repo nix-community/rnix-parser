@@ -87,8 +87,8 @@ impl<'a> Tokenizer<'a> {
         }
         starts_with
     }
-    fn string_since(&self, past: State) -> SmolStr {
-        SmolStr::new(&past.input[past.offset..self.state.offset])
+    fn string_since(&self, past: State<'a>) -> &'a str {
+        &past.input[past.offset..self.state.offset]
     }
 
     fn consume<F>(&mut self, mut f: F) -> usize
@@ -154,7 +154,7 @@ impl<'a> Tokenizer<'a> {
     }
 }
 impl<'a> Iterator for Tokenizer<'a> {
-    type Item = (SyntaxKind, SmolStr);
+    type Item = (SyntaxKind, &'a str);
 
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.state;
@@ -438,7 +438,7 @@ mod tests {
     };
     use smol_str::SmolStr;
 
-    fn tokenize(input: &str) -> Vec<(SyntaxKind, SmolStr)> {
+    fn tokenize<'a>(input: &'a str) -> Vec<(SyntaxKind, &'a str)> {
         Tokenizer::new(input).collect()
     }
 
@@ -829,7 +829,7 @@ mod tests {
     }
     #[test]
     fn paths() {
-        fn path(path: &str) -> Vec<(SyntaxKind, SmolStr)> {
+        fn path(path: &str) -> Vec<(SyntaxKind, &str)> {
             tokens![(TOKEN_PATH, path)]
         }
         assert_eq!(tokenize("/hello/world"), path("/hello/world"));

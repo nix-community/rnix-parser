@@ -7,7 +7,6 @@ use std::{
 
 use cbitset::BitSet256;
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, TextRange, TextSize};
-use smol_str::SmolStr;
 
 use crate::{
     types::{Root, TypedNode},
@@ -113,21 +112,19 @@ impl AST {
     }
 }
 
-struct Parser<I>
-where
-    I: Iterator<Item = (SyntaxKind, SmolStr)>,
+struct Parser<I, T>
 {
     builder: GreenNodeBuilder<'static>,
     errors: Vec<ParseError>,
 
-    trivia_buffer: Vec<I::Item>,
-    buffer: VecDeque<I::Item>,
+    trivia_buffer: Vec<T>,
+    buffer: VecDeque<T>,
     iter: I,
     consumed: TextSize,
 }
-impl<I> Parser<I>
+impl<'a, I> Parser<I, (SyntaxKind, &'a str)>
 where
-    I: Iterator<Item = (SyntaxKind, SmolStr)>,
+    I: Iterator<Item = (SyntaxKind, &'a str)>,
 {
     fn new(iter: I) -> Self {
         Self {
@@ -145,7 +142,7 @@ where
         self.consumed
     }
 
-    fn peek_raw(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
+    fn peek_raw(&mut self) -> Option<&(SyntaxKind, &'a str)> {
         if self.buffer.is_empty() {
             if let Some(token) = self.iter.next() {
                 self.buffer.push_back(token);
@@ -155,8 +152,8 @@ where
     }
     fn drain_trivia_buffer(&mut self) {
         for (t, s) in self.trivia_buffer.drain(..) {
-            self.consumed += TextSize::of(s.as_str());
-            self.builder.token(NixLanguage::kind_to_raw(t), s.as_str())
+            self.consumed += TextSize::of(s);
+            self.builder.token(NixLanguage::kind_to_raw(t), s)
         }
     }
     fn eat_trivia(&mut self) {
@@ -193,14 +190,14 @@ where
                     self.trivia_buffer.push((token, s))
                 } else {
                     self.drain_trivia_buffer();
-                    self.consumed += TextSize::of(s.as_str());
-                    self.builder.token(NixLanguage::kind_to_raw(token), s.as_str())
+                    self.consumed += TextSize::of(s);
+                    self.builder.token(NixLanguage::kind_to_raw(token), s)
                 }
             }
             None => self.errors.push(ParseError::UnexpectedEOF),
         }
     }
-    fn peek_data(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
+    fn peek_data(&mut self) -> Option<&(SyntaxKind, &'a str)> {
         while self.peek_raw().map(|&(t, _)| t.is_trivia()).unwrap_or(false) {
             self.bump();
         }
@@ -545,7 +542,7 @@ where
             self.next_attr();
             self.finish_node();
         }
-        if self.peek_data().map(|&(t, ref s)| t == TOKEN_IDENT && s == OR).unwrap_or(false) {
+        if self.peek_data().map(|&(t, s)| t == TOKEN_IDENT && s == OR).unwrap_or(false) {
             self.start_node_at(checkpoint, NODE_OR_DEFAULT);
             self.bump();
             self.parse_val();
@@ -702,9 +699,9 @@ where
 }
 
 /// Parse tokens into an AST
-pub fn parse<I>(iter: I) -> AST
+pub fn parse<'a, I>(iter: I) -> AST
 where
-    I: Iterator<Item = (SyntaxKind, SmolStr)>,
+    I: Iterator<Item = (SyntaxKind, &'a str)>,
 {
     let mut parser = Parser::new(iter.into_iter());
     parser.builder.start_node(NixLanguage::kind_to_raw(NODE_ROOT));
