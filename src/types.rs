@@ -63,6 +63,7 @@ pub enum BinOpKind {
     NotEqual,
     Or,
 }
+
 impl BinOpKind {
     /// Get the operation kind from a token in the AST
     pub fn from_token(token: SyntaxKind) -> Option<Self> {

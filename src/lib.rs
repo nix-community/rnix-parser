@@ -4,6 +4,7 @@ mod kinds;
 pub mod parser;
 pub mod tokenizer;
 pub mod types;
+pub mod ast;
 pub mod value;
 
 pub use self::{
@@ -12,10 +13,7 @@ pub use self::{
     value::{StrPart, Value as NixValue},
 };
 
-pub use rowan::{
-    NodeOrToken, SyntaxElementChildren, SyntaxNodeChildren, TextRange, TextSize,
-    TokenAtOffset, WalkEvent,
-};
+pub use rowan::{NodeOrToken, TextRange, TextSize, TokenAtOffset, WalkEvent};
 
 use self::tokenizer::Tokenizer;
 
@@ -37,6 +35,8 @@ impl rowan::Language for NixLanguage {
 pub type SyntaxNode = rowan::SyntaxNode<NixLanguage>;
 pub type SyntaxToken = rowan::SyntaxToken<NixLanguage>;
 pub type SyntaxElement = rowan::NodeOrToken<SyntaxNode, SyntaxToken>;
+pub type SyntaxElementChildren = rowan::SyntaxElementChildren<NixLanguage>;
+pub type SyntaxNodeChildren = rowan::SyntaxNodeChildren<NixLanguage>;
 
 /// A convenience function for first tokenizing and then parsing given input
 pub fn parse(input: &str) -> AST {

@@ -1,27 +1,30 @@
 //! Provides a type system for the AST, in some sense
-use std::fmt;
-use std::{convert::TryFrom, marker::PhantomData};
+
+mod operators;
+mod node_ext;
+mod token_ext;
+
+use std::marker::PhantomData;
 
 use crate::{
-    value::{self, StrPart},
-    NodeOrToken, SyntaxElement,
+    SyntaxElement,
     SyntaxKind::{self, *},
-    SyntaxNode, SyntaxNodeChildren, SyntaxToken, WalkEvent,
+    SyntaxNode, SyntaxNodeChildren, SyntaxToken,
 };
 
 #[derive(Debug, Clone)]
-pub struct TypedNodeChildren<N> {
+pub struct AstNodeChildren<N> {
     inner: SyntaxNodeChildren,
-    ph: PhantomData<N>,
+    _p: PhantomData<N>,
 }
 
-impl<N> TypedNodeChildren<N> {
+impl<N> AstNodeChildren<N> {
     fn new(parent: &SyntaxNode) -> Self {
-        TypedNodeChildren { inner: parent.children(), ph: PhantomData }
+        AstNodeChildren { inner: parent.children(), _p: PhantomData }
     }
 }
 
-impl<N: TypedNode> Iterator for TypedNodeChildren<N> {
+impl<N: AstNode> Iterator for AstNodeChildren<N> {
     type Item = N;
 
     fn next(&mut self) -> Option<N> {
@@ -29,29 +32,29 @@ impl<N: TypedNode> Iterator for TypedNodeChildren<N> {
     }
 }
 
-fn first<N: TypedNode, NN: TypedNode>(parent: &N) -> Option<NN> {
+fn first<N: AstNode, NN: AstNode>(parent: &N) -> Option<NN> {
     parent.node().children().find_map(NN::cast)
 }
 
-// fn last<N: TypedNode, NN: TypedNode>(parent: &N) -> Option<NN> {
-//     parent.node().children().rev().find_map(NN::cast)
-// }
-
-fn nth<N: TypedNode, NN: TypedNode>(parent: &N, n: usize) -> Option<NN> {
+fn nth<N: AstNode, NN: AstNode>(parent: &N, n: usize) -> Option<NN> {
     parent.node().children().flat_map(NN::cast).nth(n)
 }
 
-fn children<N: TypedNode, NN: TypedNode>(parent: &N) -> TypedNodeChildren<NN> {
-    TypedNodeChildren::new(parent.node())
+fn children<N: AstNode, NN: AstNode>(parent: &N) -> AstNodeChildren<NN> {
+    AstNodeChildren::new(parent.node())
 }
 
-fn token(parent: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
-    parent.children_with_tokens().filter_map(|it| it.into_token()).find(|it| it.kind() == kind)
+fn token<N: AstNode>(parent: &N, kind: SyntaxKind) -> Option<SyntaxToken> {
+    parent
+        .node()
+        .children_with_tokens()
+        .filter_map(|it| it.into_token())
+        .find(|it| it.kind() == kind)
 }
 
 /// A TypedNode is simply a wrapper around an untyped node to provide a type
 /// system in some sense.
-pub trait TypedNode {
+pub trait AstNode {
     fn can_cast(from: &SyntaxNode) -> bool
     where
         Self: Sized;
@@ -61,8 +64,10 @@ pub trait TypedNode {
     fn cast(from: SyntaxNode) -> Option<Self>
     where
         Self: Sized;
+
     /// Return a reference to the inner untyped node
     fn node(&self) -> &SyntaxNode;
+
     /// Return all errors of all children, recursively
     fn errors(&self) -> Vec<SyntaxElement> {
         self.node()
@@ -73,12 +78,7 @@ pub trait TypedNode {
             .filter(|node| node.kind() == NODE_ERROR || node.kind() == TOKEN_ERROR)
             .collect()
     }
-    // /// Return the first non-trivia token
-    // fn first_token(&self) -> Option<SyntaxToken> {
-    //     tokens(self.node()).next()
-    // }
-    // /// Return a dump of the AST. One of the goals is to be a stable
-    // /// format that can be used in tests.
+
     // fn dump(&self) -> TextDump {
     //     TextDump(self.node().clone())
     // }
@@ -113,7 +113,7 @@ macro_rules! typed {
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub struct $name(SyntaxNode);
 
-        impl TypedNode for $name {
+        impl AstNode for $name {
             fn can_cast(from: &SyntaxNode) -> bool {
                 from.kind() == $kind
             }
@@ -145,7 +145,7 @@ macro_rules! typed {
             )*
         }
 
-        impl TypedNode for $name {
+        impl AstNode for $name {
             fn can_cast(from: &SyntaxNode) -> bool {
                 matches!(from.kind(), $($kind)|*)
             }
@@ -219,7 +219,6 @@ typed! {
         NODE_DYNAMIC => Dynamic,
         NODE_ERROR => Error,
         NODE_IF_ELSE => IfElse,
-
         NODE_SELECT => Select,
         NODE_INHERIT => Inherit,
         NODE_INHERIT_FROM => InheritFrom,
@@ -238,23 +237,35 @@ typed! {
         NODE_ATTR_SET => AttrSet,
         NODE_KEY_VALUE => KeyValue,
         NODE_UNARY_OP => UnaryOp,
-        // NODE_LITERAL => Ok(ParsedType::Value(Value::cast(node).unwrap())),
+        // NODE_IDENT => Ident,
+        // poaidfuaposidf => Literal,
         NODE_WITH => With,
     } => Expr: { },
+
+    // @node NODE_IDENT => Ident: {
+    //     pub fn ident_token(&self) -> Option<SyntaxToken> {
+    //         token(self, T![ident])
+    //     }
+    // }
+
     @node NODE_APPLY => Apply: {
         /// Return the lambda being applied
         pub fn lambda(&self) -> Option<Expr> {
-            nth(self, 0)
+            first(self)
         }
         /// Return the value which the lambda is being applied with
-        pub fn value(&self) -> Option<Expr> {
+        pub fn argument(&self) -> Option<Expr> {
             nth(self, 1)
         }
     },
     @node NODE_ASSERT => Assert: {
+        pub fn assert(&self) -> Option<SyntaxToken> {
+            token(self, T![assert])
+        }
+
         /// Return the assert condition
         pub fn condition(&self) -> Option<Expr> {
-            nth(self, 0)
+            first(self)
         }
 
         /// Return the success body
@@ -271,14 +282,28 @@ typed! {
     @node NODE_DYNAMIC => Dynamic: { },
     @node NODE_ERROR => Error: { },
     @node NODE_IF_ELSE => IfElse: {
+        pub fn if_token(&self) -> Option<SyntaxToken> {
+            token(self, T![if])
+        }
+
         /// Return the condition
         pub fn condition(&self) -> Option<Expr> {
             nth(self, 0)
         }
+
+        pub fn then_token(&self) -> Option<SyntaxToken> {
+            token(self, T![then])
+        }
+
         /// Return the success body
         pub fn body(&self) -> Option<Expr> {
             nth(self, 1)
         }
+
+        pub fn else_token(&self) -> Option<SyntaxToken> {
+            token(self, T![else])
+        }
+
         /// Return the else body
         pub fn else_body(&self) -> Option<Expr> {
             nth(self, 2)
@@ -287,8 +312,13 @@ typed! {
     @node NODE_SELECT => Select: {
         /// Return the set being indexed
         pub fn set(&self) -> Option<Expr> {
-            nth(self, 0)
+            first(self)
         }
+
+        pub fn dot_token(&self) -> Option<SyntaxToken> {
+            token(self, T![.])
+        }
+
         /// Return the index
         pub fn index(&self) -> Option<SyntaxNode> {
             nth!(self; 1)
@@ -296,6 +326,10 @@ typed! {
     },
     @node NODE_INHERIT => Inherit: {
         // /// Return the set where keys are being inherited from, if any
+        pub fn inherit_token(&self) -> Option<SyntaxToken> {
+            token(self, T![inherit])
+        }
+
         // pub fn from(&self) -> Option<InheritFrom> {
         //     self.node().children()
         //         .find_map(InheritFrom::cast)
@@ -430,24 +464,26 @@ typed! {
         }
     },
     @node NODE_UNARY_OP => UnaryOp: {
-        // /// Return the operator
-        // pub fn operator(&self) -> UnaryOpKind {
-        //     self.first_token().and_then(|t| UnaryOpKind::from_token(t.kind())).expect("invalid ast")
+        /// Return the operator
+        // pub fn operator(&self) -> Option<UnaryOpKind> {
+        //     self.first_token().and_then(|t| UnaryOpKind::from_token(t.kind()))
         // }
-        // /// Return the value in the operation
-        // pub fn value(&self) -> Option<SyntaxNode> {
-        //     nth!(self; 0)
-        // }
+
+        /// Return the value in the operation
+        pub fn expr(&self) -> Option<Expr> {
+            first(self)
+        }
     },
     @node NODE_WITH => With: {
-        // /// Return the namespace
-        // pub fn namespace(&self) -> Option<SyntaxNode> {
-        //     nth!(self; 0)
-        // }
-        // /// Return the body
-        // pub fn body(&self) -> Option<SyntaxNode> {
-        //     nth!(self; 1)
-        // }
+        /// Return the namespace
+        pub fn namespace(&self) -> Option<Expr> {
+            nth(self, 0)
+        }
+
+        /// Return the body
+        pub fn body(&self) -> Option<Expr> {
+            nth(self, 1)
+        }
     },
     @token TOKEN_WHITESPACE => Whitespace: { },
     @token TOKEN_COMMENT => Comment: { },
