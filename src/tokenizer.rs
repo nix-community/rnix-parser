@@ -1,7 +1,5 @@
 //! The tokenizer: turns a string into tokens, such as numbers, strings, and keywords
 
-use smol_str::SmolStr;
-
 use crate::SyntaxKind::{self, *};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

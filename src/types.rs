@@ -184,12 +184,12 @@ pub trait TypedNode: Clone {
 }
 
 pub trait TokenWrapper: TypedNode {
-    fn as_str(&self) -> &str {
-        match &self.node().green().children().next() {
-            Some(rowan::NodeOrToken::Token(token)) => token.text(),
-            _ => unreachable!(),
-        }
-    }
+    // fn as_str(&self) -> &str {
+    //     match &self.node().green().children().next() {
+    //         Some(rowan::NodeOrToken::Token(token)) => token.text(),
+    //         _ => unreachable!(),
+    //     }
+    // }
 }
 
 /// Provides the function `.entries()`
@@ -323,10 +323,10 @@ typed! [
     NODE_IDENT => Ident: TokenWrapper: {
     },
     NODE_LITERAL => Value: TokenWrapper: {
-        /// Parse the value
-        pub fn to_value(&self) -> Result<ParsedValue, ValueError> {
-            ParsedValue::from_token(self.first_token().expect("invalid ast").kind(), self.as_str())
-        }
+        // /// Parse the value
+        // pub fn to_value(&self) -> Result<ParsedValue, ValueError> {
+        //     ParsedValue::from_token(self.first_token().expect("invalid ast").kind(), self.0.text())
+        // }
     },
 
     NODE_APPLY => Apply: {
