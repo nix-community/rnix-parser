@@ -27,7 +27,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let mut value = Some(lambda);
                 while let Some(lambda) = value {
                     let ident = lambda.arg().and_then(Ident::cast);
-                    let s = ident.as_ref().map_or_else(|| "error".to_string(), Ident::to_inner_string);
+                    let s =
+                        ident.as_ref().map_or_else(|| "error".to_string(), Ident::to_inner_string);
                     println!("-> Arg: {}", s);
                     if let Some(comment) = lambda.arg().and_then(find_comment) {
                         println!("--> Doc: {}", comment);

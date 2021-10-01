@@ -1,5 +1,6 @@
 #[macro_use]
 mod macros;
+pub mod ast;
 mod kinds;
 pub mod parser;
 pub mod tokenizer;
@@ -13,10 +14,7 @@ pub use self::{
     value::{StrPart, Value as NixValue},
 };
 
-pub use rowan::{
-    NodeOrToken, SyntaxElementChildren, SyntaxNodeChildren, TextRange, TextSize, TokenAtOffset,
-    WalkEvent,
-};
+pub use rowan::{NodeOrToken, TextRange, TextSize, TokenAtOffset, WalkEvent};
 
 use self::tokenizer::Tokenizer;
 
@@ -38,10 +36,39 @@ impl rowan::Language for NixLanguage {
 pub type SyntaxNode = rowan::SyntaxNode<NixLanguage>;
 pub type SyntaxToken = rowan::SyntaxToken<NixLanguage>;
 pub type SyntaxElement = rowan::NodeOrToken<SyntaxNode, SyntaxToken>;
+pub type SyntaxElementChildren = rowan::SyntaxElementChildren<NixLanguage>;
+pub type SyntaxNodeChildren = rowan::SyntaxNodeChildren<NixLanguage>;
 
 /// A convenience function for first tokenizing and then parsing given input
 pub fn parse(input: &str) -> AST {
     parser::parse(Tokenizer::new(input))
+}
+
+/// Matches a `SyntaxNode` against an `ast` type.
+///
+/// # Example:
+///
+/// ```ignore
+/// match_ast! {
+///     match node {
+///         ast::CallExpr(it) => { ... },
+///         ast::MethodCallExpr(it) => { ... },
+///         ast::MacroCall(it) => { ... },
+///         _ => None,
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! match_ast {
+    (match $node:ident { $($tt:tt)* }) => { match_ast!(match ($node) { $($tt)* }) };
+
+    (match ($node:expr) {
+        $( ast::$ast:ident($it:ident) => $res:expr, )*
+        _ => $catch_all:expr $(,)?
+    }) => {{
+        $( if let Some($it) = ast::$ast::cast($node.clone()) { $res } else )*
+        { $catch_all }
+    }};
 }
 
 #[cfg(test)]
