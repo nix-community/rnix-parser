@@ -16,6 +16,7 @@ use crate::{
 };
 
 pub use nodes::*;
+pub use operators::{BinOpKind, UnaryOpKind};
 pub use tokens::*;
 
 #[derive(Debug, Clone)]
@@ -39,8 +40,8 @@ impl<N: AstNode> Iterator for AstNodeChildren<N> {
 }
 
 mod support {
-    use crate::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
     use super::{AstNode, AstNodeChildren, AstToken};
+    use crate::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
 
     pub(super) fn first<N: AstNode, NN: AstNode>(parent: &N) -> Option<NN> {
         parent.node().children().find_map(NN::cast)
@@ -58,12 +59,17 @@ mod support {
         parent.node().children_with_tokens().filter_map(SyntaxElement::into_token).find_map(T::cast)
     }
 
+    /// Token untyped
     pub(super) fn token_u<N: AstNode>(parent: &N, kind: SyntaxKind) -> Option<SyntaxToken> {
         parent
             .node()
             .children_with_tokens()
             .filter_map(SyntaxElement::into_token)
             .find(|it| it.kind() == kind)
+    }
+
+    pub(super) fn children_tokens_u<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
+        parent.node().children_with_tokens().filter_map(SyntaxElement::into_token)
     }
 }
 

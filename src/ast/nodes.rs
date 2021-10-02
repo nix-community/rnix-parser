@@ -1,16 +1,33 @@
-use crate::{
-    SyntaxKind::{self, *},
-    SyntaxNode, SyntaxToken,
-};
+use crate::{SyntaxElement, SyntaxKind::*, SyntaxNode, SyntaxToken};
 
 use super::{
-    tokens::*,
-    AstNodeChildren,
-    {
-        support::*,
-        AstNode, AstToken,
-    },
+    operators::BinOpKind,
+    AstNodeChildren, UnaryOpKind,
+    {support::*, AstNode},
 };
+
+pub trait EntryHolder: AstNode {
+    fn entries(&self) -> AstNodeChildren<Entry>
+    where
+        Self: Sized,
+    {
+        children(self)
+    }
+
+    fn key_values(&self) -> AstNodeChildren<KeyValue>
+    where
+        Self: Sized,
+    {
+        children(self)
+    }
+
+    fn inherits(&self) -> AstNodeChildren<Inherit>
+    where
+        Self: Sized,
+    {
+        children(self)
+    }
+}
 
 macro_rules! nth {
     ($self:expr; $index:expr) => {
@@ -93,7 +110,7 @@ macro_rules! ast_nodes {
         ast_nodes! { @impl $name $($tt)* }
     };
 
-    (@impl $name:ident $(: $trait:ident)* $(:{ $($item:item)* })?, $($tt:tt)*) => {
+    (@impl $name:ident $(: $trait:ident)* $(: { $($item:item)* })?, $($tt:tt)*) => {
         $(impl $name {
             $($item)*
         })?
@@ -130,9 +147,9 @@ ast_nodes! {
         NODE_IDENT => Ident,
         NODE_WITH => With,
     } => Expr,
-    
+
     NODE_LITERAL => Literal,
-    
+
     {
         NODE_DYNAMIC => Dynamic,
         NODE_STRING => Str,
@@ -216,7 +233,7 @@ ast_nodes! {
         }
 
         /// Return the index
-        pub fn attr(&self) -> Option<Key> {
+        pub fn key(&self) -> Option<Key> {
             first(self)
         }
     },
@@ -254,18 +271,25 @@ ast_nodes! {
             first(self)
         }
     },
-     NODE_LEGACY_LET => LegacyLet: {},
-     NODE_LET_IN => LetIn: {
-        // /// Return the body
-        // pub fn body(&self) -> Option<SyntaxNode> {
-        //     self.node().last_child()
-        // }
-    },
+     NODE_LEGACY_LET => LegacyLet: EntryHolder,
+     NODE_LET_IN => LetIn: EntryHolder: {
+         pub fn body(&self) -> Option<Expr> {
+             first(self)
+         }
+     },
      NODE_LIST => List: {
-        // /// Return an iterator over items in the list
-        // pub fn items(&self) -> impl Iterator<Item = SyntaxNode> {
-        //     self.node().children()
-        // }
+        pub fn l_brack_token(&self) -> Option<SyntaxToken> {
+            token_u(self, T!["["])
+        }
+
+        /// Return an iterator over items in the list
+        pub fn items(&self) -> AstNodeChildren<Expr> {
+            children(self)
+        }
+
+        pub fn r_brack_token(&self) -> Option<SyntaxToken> {
+            token_u(self, T!["]"])
+        }
     },
      NODE_BIN_OP => BinOp: {
         /// Return the left hand side of the binary operation
@@ -274,9 +298,10 @@ ast_nodes! {
         }
 
         // /// Return the operator
-        // pub fn operator(&self) -> BinOpKind {
-        //     self.first_token().and_then(|t| BinOpKind::from_token(t.kind())).expect("invalid ast")
-        // }
+        pub fn operator(&self) -> Option<BinOpKind> {
+            children_tokens_u(self)
+                .find_map(|t| BinOpKind::from_kind(t.kind()))
+        }
 
         /// Return the right hand side of the binary operation
         pub fn rhs(&self) -> Option<Expr> {
@@ -295,31 +320,32 @@ ast_nodes! {
     },
 
      NODE_PAREN => Paren: {
-         fn l_paren_token(&self) -> Option<SyntaxToken> {
+         pub fn l_paren_token(&self) -> Option<SyntaxToken> {
              token_u(self, T!["("])
          }
 
-         fn expr(&self) -> Option<Expr> {
+         pub fn expr(&self) -> Option<Expr> {
              first(self)
          }
 
-         fn r_paren_token(&self) -> Option<SyntaxToken> {
+         pub fn r_paren_token(&self) -> Option<SyntaxToken> {
              token_u(self, T![")"])
          }
      },
 
      NODE_PAT_BIND => PatBind: {
-        // /// Return the identifier the set is being bound as
-        // pub fn name(&self) -> Option<Ident> {
-        //     nth!(self; (Ident) 0)
-        // }
+        /// Return the identifier the set is being bound as
+        pub fn ident(&self) -> Option<Ident> {
+            first(self)
+        }
     },
 
      NODE_PAT_ENTRY => PatEntry: {
         /// Return the identifier the argument is being bound as
-        // pub fn name(&self) -> Option<Ident> {
-        //     nth!(self; (Ident) 0)
-        // }
+        pub fn ident(&self) -> Option<Ident> {
+            first(self)
+        }
+
         /// Return the default value, if any
         pub fn default(&self) -> Option<SyntaxNode> {
             self.node().children().nth(1)
@@ -348,24 +374,15 @@ ast_nodes! {
         pub fn has_ellipsis(&self) -> bool {
             self.ellipsis_token().is_some()
         }
+
         /// Returns the identifier bound with {}@identifier if it exists
-        // pub fn at(&self) -> Option<Ident> {
-        //     let binding = self.node().children().find(|node| node.kind() == NODE_PAT_BIND)?;
-        //     binding.children().filter_map(Ident::cast).next()
-        // }
-        /// Returns true if this pattern is inexact (has an ellipsis, ...)
-        /// Returns a clone of the tree root but without entries where the
-        /// callback function returns false
-        /// { a, b, c } without b is { a, c }
-        pub fn filter_entries<F>(&self, _callback: F) -> Root
-            where F: FnMut(&PatEntry) -> bool
-        {
-            unimplemented!("TODO: filter_entries or better editing API")
+        pub fn pat_bind(&self) -> Option<PatBind> {
+            first(self)
         }
     },
      NODE_ROOT => Root,
 
-     NODE_ATTR_SET => AttrSet: {
+     NODE_ATTR_SET => AttrSet: EntryHolder: {
          pub fn rec_token(&self) -> Option<SyntaxToken> {
              token_u(self, T![rec])
          }
@@ -375,24 +392,19 @@ ast_nodes! {
             self.rec_token().is_some()
         }
 
-        pub fn items(&self) -> AstNodeChildren<AttrItem> {
-            children(self)
+        pub fn l_curly_token(&self) -> Option<SyntaxToken> {
+            token_u(self, T!["{"])
         }
 
-        /// Returns a clone of the tree root but without entries where the
-        /// callback function returns false
-        /// { a = 2; b = 3; } without 0 is { b = 3; }
-        pub fn filter_entries<F>(&self, _callback: F) -> Root
-            where F: FnMut(&KeyValue) -> bool
-        {
-            unimplemented!("TODO: filter_entries or better editing API")
+        pub fn r_curly_token(&self) -> Option<SyntaxToken> {
+            token_u(self, T!["}"])
         }
     },
 
     {
         NODE_INHERIT => Inherit,
         NODE_KEY_VALUE => KeyValue,
-    } => AttrItem,
+    } => Entry,
 
      NODE_KEY_VALUE => KeyValue: {
         /// Return this entry's key
@@ -407,9 +419,9 @@ ast_nodes! {
     },
      NODE_UNARY_OP => UnaryOp: {
         /// Return the operator
-        // pub fn operator(&self) -> Option<UnaryOpKind> {
-        //     self.first_token().and_then(|t| UnaryOpKind::from_token(t.kind()))
-        // }
+        pub fn operator(&self) -> Option<UnaryOpKind> {
+            children_tokens_u(self).find_map(|t| UnaryOpKind::from_kind(t.kind()))
+        }
 
         /// Return the value in the operation
         pub fn expr(&self) -> Option<Expr> {
