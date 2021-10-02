@@ -7,6 +7,8 @@ use crate::{
     SyntaxNode, SyntaxToken,
 };
 
+use super::AstNodeChildren;
+
 macro_rules! nth {
     ($self:expr; $index:expr) => {
         $self.node().children()
@@ -21,6 +23,12 @@ macro_rules! ast_nodes {
     ($kind:ident => $name:ident $($tt:tt)*) => {
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub struct $name(SyntaxNode);
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                std::fmt::Display::fmt(self.node(), f)
+            }
+        }
 
         impl AstNode for $name {
             fn can_cast(from: &SyntaxNode) -> bool {
@@ -48,6 +56,12 @@ macro_rules! ast_nodes {
                 $typed($typed),
             )*
         }
+        
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                std::fmt::Display::fmt(self.node(), f)
+            }
+        }
 
         impl AstNode for $name {
             fn can_cast(from: &SyntaxNode) -> bool {
@@ -57,7 +71,7 @@ macro_rules! ast_nodes {
             fn cast(syntax: SyntaxNode) -> Option<Self> {
                 let res = match syntax.kind() {
                     $(
-                        $kind => Expr::$typed($typed(syntax))
+                        $kind => $name::$typed($typed(syntax))
                     ),*,
                     _ => return None,
                 };
@@ -67,7 +81,7 @@ macro_rules! ast_nodes {
             fn node(&self) -> &SyntaxNode {
                 match self {
                     $(
-                        Expr::$typed(it) => &it.0,
+                        $name::$typed(it) => &it.0,
                     )*
                 }
             }
@@ -94,6 +108,12 @@ macro_rules! ast_tokens {
         $(
             #[derive(Clone, Debug)]
             pub struct $name(SyntaxToken);
+
+            impl std::fmt::Display for $name {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    std::fmt::Display::fmt(self.token(), f)
+                }
+            }
 
             impl AstToken for $name {
                 fn can_cast(kind: SyntaxKind) -> bool {
@@ -124,7 +144,6 @@ ast_nodes! {
      {
         NODE_APPLY => Apply,
         NODE_ASSERT => Assert,
-        NODE_KEY => Key,
         NODE_DYNAMIC => Dynamic,
         NODE_ERROR => Error,
         NODE_IF_ELSE => IfElse,
@@ -139,17 +158,18 @@ ast_nodes! {
         NODE_BIN_OP => BinOp,
         NODE_OR_DEFAULT => OrDefault,
         NODE_PAREN => Paren,
-        NODE_PATTERN => Pattern,
-        NODE_PAT_BIND => PatBind,
-        NODE_PAT_ENTRY => PatEntry,
         NODE_ROOT => Root,
         NODE_ATTR_SET => AttrSet,
-        NODE_KEY_VALUE => KeyValue,
         NODE_UNARY_OP => UnaryOp,
         NODE_IDENT => Ident,
         // poaidfuaposidf => Literal,
         NODE_WITH => With,
-    } => Expr: { },
+    } => Expr,
+
+    {
+        NODE_DYNAMIC => Dynamic,
+        NODE_STRING => Str,
+    } => Key,
 
      NODE_IDENT => Ident: {
         pub fn ident_token(&self) -> Option<SyntaxToken> {
@@ -182,14 +202,14 @@ ast_nodes! {
             nth(self, 1)
         }
     },
-     NODE_KEY => Key: {
+    //  NODE_KEY => Key: {
         // /// Return the path as an iterator of identifiers
         // pub fn path<'a>(&'a self) -> impl Iterator<Item = SyntaxNode> + 'a {
         //     self.node().children()
         // }
-    },
-     NODE_DYNAMIC => Dynamic: { },
-     NODE_ERROR => Error: { },
+    // },
+     NODE_DYNAMIC => Dynamic,
+     NODE_ERROR => Error,
      NODE_IF_ELSE => IfElse: {
         pub fn if_token(&self) -> Option<SyntaxToken> {
             token(self, T![if])
@@ -220,7 +240,7 @@ ast_nodes! {
     },
      NODE_SELECT => Select: {
         /// Return the set being indexed
-        pub fn set(&self) -> Option<Expr> {
+        pub fn expr(&self) -> Option<Expr> {
             first(self)
         }
 
@@ -229,8 +249,8 @@ ast_nodes! {
         }
 
         /// Return the index
-        pub fn index(&self) -> Option<SyntaxNode> {
-            nth!(self; 1)
+        pub fn attr(&self) -> Option<Key> {
+            first(self)
         }
     },
      NODE_INHERIT => Inherit: {
@@ -257,10 +277,11 @@ ast_nodes! {
         // }
     },
      NODE_LAMBDA => Lambda: {
-        // /// Return the argument of the lambda
-        pub fn arg(&self) -> Option<SyntaxNode> {
-            nth!(self; 0)
+        /// Return the argument of the lambda
+        pub fn param(&self) -> Option<Param> {
+            first(self)
         }
+
         /// Return the body of the lambda
         pub fn body(&self) -> Option<Expr> {
             first(self)
@@ -305,7 +326,20 @@ ast_nodes! {
             nth!(self; 1)
         }
     },
-     NODE_PAREN => Paren: {},
+
+     NODE_PAREN => Paren: {
+         fn l_paren_token(&self) -> Option<SyntaxToken> {
+             token(self, T!["("])
+         }
+
+         fn expr(&self) -> Option<Expr> {
+             first(self)
+         }
+
+         fn r_paren_token(&self) -> Option<SyntaxToken> {
+             token(self, T![")"])
+         }
+     },
 
      NODE_PAT_BIND => PatBind: {
         // /// Return the identifier the set is being bound as
@@ -324,10 +358,28 @@ ast_nodes! {
             self.node().children().nth(1)
         }
     },
+     
+    {
+        NODE_PATTERN => Pattern,
+        NODE_IDENT => Ident,
+    } => Param,
+
      NODE_PATTERN => Pattern: {
+        pub fn at_token(&self) -> Option<SyntaxToken> {
+            token(self, T![@])
+        }
+
         /// Return an iterator over all pattern entries
         pub fn entries(&self) -> impl Iterator<Item = PatEntry> {
             children(self)
+        }
+
+        pub fn ellipsis_token(&self) -> Option<SyntaxToken> {
+            token(self, T![...])
+        }
+
+        pub fn has_ellipsis(&self) -> bool {
+            self.ellipsis_token().is_some()
         }
         /// Returns the identifier bound with {}@identifier if it exists
         // pub fn at(&self) -> Option<Ident> {
@@ -335,9 +387,6 @@ ast_nodes! {
         //     binding.children().filter_map(Ident::cast).next()
         // }
         /// Returns true if this pattern is inexact (has an ellipsis, ...)
-        pub fn ellipsis(&self) -> bool {
-            self.node().children_with_tokens().any(|node| node.kind() == TOKEN_ELLIPSIS)
-        }
         /// Returns a clone of the tree root but without entries where the
         /// callback function returns false
         /// { a, b, c } without b is { a, c }
@@ -348,11 +397,21 @@ ast_nodes! {
         }
     },
      NODE_ROOT => Root,
+
      NODE_ATTR_SET => AttrSet: {
+         pub fn rec_token(&self) -> Option<SyntaxToken> {
+             token(self, T![rec])
+         }
+
         /// Returns true if this set is recursive
-        pub fn recursive(&self) -> bool {
-            self.node().children_with_tokens().any(|node| node.kind() == TOKEN_REC)
+        pub fn is_recursive(&self) -> bool {
+            self.rec_token().is_some()
         }
+
+        pub fn items(&self) -> AstNodeChildren<AttrItem> {
+            children(self)
+        }
+
         /// Returns a clone of the tree root but without entries where the
         /// callback function returns false
         /// { a = 2; b = 3; } without 0 is { b = 3; }
@@ -362,14 +421,21 @@ ast_nodes! {
             unimplemented!("TODO: filter_entries or better editing API")
         }
     },
+
+    {
+        NODE_INHERIT => Inherit,
+        NODE_KEY_VALUE => KeyValue,
+    } => AttrItem,
+
      NODE_KEY_VALUE => KeyValue: {
         /// Return this entry's key
         pub fn key(&self) -> Option<Key> {
-            nth!(self; (Key) 0)
+            first(self)
         }
+
         /// Return this entry's value
-        pub fn value(&self) -> Option<SyntaxNode> {
-            nth!(self; 1)
+        pub fn value(&self) -> Option<Expr> {
+            first(self)
         }
     },
      NODE_UNARY_OP => UnaryOp: {
