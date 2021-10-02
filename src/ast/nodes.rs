@@ -1,13 +1,16 @@
 use crate::{
-    ast::{
-        support::{children, first, nth, token},
-        AstNode, AstToken,
-    },
     SyntaxKind::{self, *},
     SyntaxNode, SyntaxToken,
 };
 
-use super::AstNodeChildren;
+use super::{
+    tokens::*,
+    AstNodeChildren,
+    {
+        support::*,
+        AstNode, AstToken,
+    },
+};
 
 macro_rules! nth {
     ($self:expr; $index:expr) => {
@@ -22,7 +25,7 @@ macro_rules! nth {
 macro_rules! ast_nodes {
     ($kind:ident => $name:ident $($tt:tt)*) => {
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-        pub struct $name(SyntaxNode);
+        pub struct $name(pub(super) SyntaxNode);
 
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -56,7 +59,7 @@ macro_rules! ast_nodes {
                 $typed($typed),
             )*
         }
-        
+
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 std::fmt::Display::fmt(self.node(), f)
@@ -103,43 +106,6 @@ macro_rules! ast_nodes {
     () => { };
 }
 
-macro_rules! ast_tokens {
-    ($($kind:ident => $name:ident $(: $trait:ident)* $(: { $($block:tt)* })?),* $(,)?) => {
-        $(
-            #[derive(Clone, Debug)]
-            pub struct $name(SyntaxToken);
-
-            impl std::fmt::Display for $name {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    std::fmt::Display::fmt(self.token(), f)
-                }
-            }
-
-            impl AstToken for $name {
-                fn can_cast(kind: SyntaxKind) -> bool {
-                    $kind == kind
-                }
-
-                fn cast(from: SyntaxToken) -> Option<Self> {
-                    if from.kind() == $kind {
-                        Some(Self(from))
-                    } else {
-                        None
-                    }
-                }
-
-                fn token(&self) -> &SyntaxToken {
-                    &self.0
-                }
-            }
-
-            $(impl $trait for $name {})*
-
-            $(impl $name { $($block)* })?
-        )*
-    }
-}
-
 ast_nodes! {
      {
         NODE_APPLY => Apply,
@@ -150,7 +116,7 @@ ast_nodes! {
         NODE_SELECT => Select,
         NODE_INHERIT => Inherit,
         NODE_INHERIT_FROM => InheritFrom,
-        NODE_STRING => Str,
+        NODE_LITERAL => Literal,
         NODE_LAMBDA => Lambda,
         NODE_LEGACY_LET => LegacyLet,
         NODE_LET_IN => LetIn,
@@ -162,10 +128,11 @@ ast_nodes! {
         NODE_ATTR_SET => AttrSet,
         NODE_UNARY_OP => UnaryOp,
         NODE_IDENT => Ident,
-        // poaidfuaposidf => Literal,
         NODE_WITH => With,
     } => Expr,
-
+    
+    NODE_LITERAL => Literal,
+    
     {
         NODE_DYNAMIC => Dynamic,
         NODE_STRING => Str,
@@ -173,7 +140,7 @@ ast_nodes! {
 
      NODE_IDENT => Ident: {
         pub fn ident_token(&self) -> Option<SyntaxToken> {
-            token(self, T![ident])
+            token_u(self, T![ident])
         }
     },
 
@@ -189,7 +156,7 @@ ast_nodes! {
     },
      NODE_ASSERT => Assert: {
         pub fn assert(&self) -> Option<SyntaxToken> {
-            token(self, T![assert])
+            token_u(self, T![assert])
         }
 
         /// Return the assert condition
@@ -212,7 +179,7 @@ ast_nodes! {
      NODE_ERROR => Error,
      NODE_IF_ELSE => IfElse: {
         pub fn if_token(&self) -> Option<SyntaxToken> {
-            token(self, T![if])
+            token_u(self, T![if])
         }
 
         /// Return the condition
@@ -221,7 +188,7 @@ ast_nodes! {
         }
 
         pub fn then_token(&self) -> Option<SyntaxToken> {
-            token(self, T![then])
+            token_u(self, T![then])
         }
 
         /// Return the success body
@@ -230,7 +197,7 @@ ast_nodes! {
         }
 
         pub fn else_token(&self) -> Option<SyntaxToken> {
-            token(self, T![else])
+            token_u(self, T![else])
         }
 
         /// Return the else body
@@ -245,7 +212,7 @@ ast_nodes! {
         }
 
         pub fn dot_token(&self) -> Option<SyntaxToken> {
-            token(self, T![.])
+            token_u(self, T![.])
         }
 
         /// Return the index
@@ -256,7 +223,7 @@ ast_nodes! {
      NODE_INHERIT => Inherit: {
         // /// Return the set where keys are being inherited from, if any
         pub fn inherit_token(&self) -> Option<SyntaxToken> {
-            token(self, T![inherit])
+            token_u(self, T![inherit])
         }
 
         // pub fn from(&self) -> Option<InheritFrom> {
@@ -329,7 +296,7 @@ ast_nodes! {
 
      NODE_PAREN => Paren: {
          fn l_paren_token(&self) -> Option<SyntaxToken> {
-             token(self, T!["("])
+             token_u(self, T!["("])
          }
 
          fn expr(&self) -> Option<Expr> {
@@ -337,7 +304,7 @@ ast_nodes! {
          }
 
          fn r_paren_token(&self) -> Option<SyntaxToken> {
-             token(self, T![")"])
+             token_u(self, T![")"])
          }
      },
 
@@ -358,7 +325,7 @@ ast_nodes! {
             self.node().children().nth(1)
         }
     },
-     
+
     {
         NODE_PATTERN => Pattern,
         NODE_IDENT => Ident,
@@ -366,7 +333,7 @@ ast_nodes! {
 
      NODE_PATTERN => Pattern: {
         pub fn at_token(&self) -> Option<SyntaxToken> {
-            token(self, T![@])
+            token_u(self, T![@])
         }
 
         /// Return an iterator over all pattern entries
@@ -375,7 +342,7 @@ ast_nodes! {
         }
 
         pub fn ellipsis_token(&self) -> Option<SyntaxToken> {
-            token(self, T![...])
+            token_u(self, T![...])
         }
 
         pub fn has_ellipsis(&self) -> bool {
@@ -400,7 +367,7 @@ ast_nodes! {
 
      NODE_ATTR_SET => AttrSet: {
          pub fn rec_token(&self) -> Option<SyntaxToken> {
-             token(self, T![rec])
+             token_u(self, T![rec])
          }
 
         /// Returns true if this set is recursive
@@ -460,9 +427,4 @@ ast_nodes! {
             nth(self, 1)
         }
     },
-}
-
-ast_tokens! {
-    TOKEN_WHITESPACE => Whitespace,
-    TOKEN_COMMENT => Comment,
 }

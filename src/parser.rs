@@ -39,10 +39,20 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ParseError::Unexpected(range) => {
-                write!(f, "error node at {}..{}", usize::from(range.start()), usize::from(range.end()))
+                write!(
+                    f,
+                    "error node at {}..{}",
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
             ParseError::UnexpectedExtra(range) => {
-                write!(f, "unexpected token at {}..{}", usize::from(range.start()), usize::from(range.end()))
+                write!(
+                    f,
+                    "unexpected token at {}..{}",
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
             ParseError::UnexpectedWanted(got, range, kinds) => write!(
                 f,
@@ -53,7 +63,12 @@ impl fmt::Display for ParseError {
                 kinds
             ),
             ParseError::UnexpectedDoubleBind(range) => {
-                write!(f, "unexpected double bind at {}..{}", usize::from(range.start()), usize::from(range.end()))
+                write!(
+                    f,
+                    "unexpected double bind at {}..{}",
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
             ParseError::UnexpectedEOF => write!(f, "unexpected end of file"),
             ParseError::UnexpectedEOFWanted(kinds) => {
@@ -112,8 +127,7 @@ impl AST {
     }
 }
 
-struct Parser<I, T>
-{
+struct Parser<I, T> {
     builder: GreenNodeBuilder<'static>,
     errors: Vec<ParseError>,
 
@@ -480,7 +494,11 @@ where
                 self.finish_node();
             }
             TOKEN_DYNAMIC_START => self.parse_dynamic(),
-            TOKEN_STRING_START => self.parse_string(),
+            TOKEN_STRING_START => {
+                self.start_node(NODE_LITERAL);
+                self.parse_string();
+                self.finish_node();
+            }
             t if t.is_literal() => {
                 self.start_node(NODE_LITERAL);
                 self.bump();

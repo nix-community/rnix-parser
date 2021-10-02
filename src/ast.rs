@@ -1,9 +1,11 @@
 //! Provides a type system for the AST, in some sense
 
+mod expr_ext;
 mod node_ext;
+mod nodes;
 mod operators;
 mod token_ext;
-mod types;
+mod tokens;
 
 use std::marker::PhantomData;
 
@@ -13,7 +15,8 @@ use crate::{
     SyntaxNode, SyntaxNodeChildren, SyntaxToken,
 };
 
-pub use types::*;
+pub use nodes::*;
+pub use tokens::*;
 
 #[derive(Debug, Clone)]
 pub struct AstNodeChildren<N> {
@@ -36,9 +39,8 @@ impl<N: AstNode> Iterator for AstNodeChildren<N> {
 }
 
 mod support {
-    use crate::{SyntaxKind, SyntaxToken};
-
-    use super::{AstNode, AstNodeChildren};
+    use crate::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
+    use super::{AstNode, AstNodeChildren, AstToken};
 
     pub(super) fn first<N: AstNode, NN: AstNode>(parent: &N) -> Option<NN> {
         parent.node().children().find_map(NN::cast)
@@ -52,11 +54,15 @@ mod support {
         AstNodeChildren::new(parent.node())
     }
 
-    pub(super) fn token<N: AstNode>(parent: &N, kind: SyntaxKind) -> Option<SyntaxToken> {
+    pub(super) fn token<N: AstNode, T: AstToken>(parent: &N) -> Option<T> {
+        parent.node().children_with_tokens().filter_map(SyntaxElement::into_token).find_map(T::cast)
+    }
+
+    pub(super) fn token_u<N: AstNode>(parent: &N, kind: SyntaxKind) -> Option<SyntaxToken> {
         parent
             .node()
             .children_with_tokens()
-            .filter_map(|it| it.into_token())
+            .filter_map(SyntaxElement::into_token)
             .find(|it| it.kind() == kind)
     }
 }
