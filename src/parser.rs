@@ -40,10 +40,20 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ParseError::Unexpected(range) => {
-                write!(f, "error node at {}..{}", usize::from(range.start()), usize::from(range.end()))
+                write!(
+                    f,
+                    "error node at {}..{}",
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
             ParseError::UnexpectedExtra(range) => {
-                write!(f, "unexpected token at {}..{}", usize::from(range.start()), usize::from(range.end()))
+                write!(
+                    f,
+                    "unexpected token at {}..{}",
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
             ParseError::UnexpectedWanted(got, range, kinds) => write!(
                 f,
@@ -54,7 +64,12 @@ impl fmt::Display for ParseError {
                 kinds
             ),
             ParseError::UnexpectedDoubleBind(range) => {
-                write!(f, "unexpected double bind at {}..{}", usize::from(range.start()), usize::from(range.end()))
+                write!(
+                    f,
+                    "unexpected double bind at {}..{}",
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
             ParseError::UnexpectedEOF => write!(f, "unexpected end of file"),
             ParseError::UnexpectedEOFWanted(kinds) => {
@@ -376,10 +391,18 @@ where
                         self.finish_node();
                     }
 
-                    while self.peek() != Some(TOKEN_SEMICOLON) {
-                        self.parse_val();
-                        if self.errors.last().map_or(false, |x| *x == ParseError::UnexpectedEOF) {
-                            break;
+                    loop {
+                        match self.peek() {
+                            Some(t) if t != TOKEN_SEMICOLON => {
+                                self.next_attr();
+                            }
+                            Some(_) => {
+                                break;
+                            }
+                            None => {
+                                self.errors.push(ParseError::UnexpectedEOF);
+                                break;
+                            }
                         }
                     }
 
@@ -727,7 +750,7 @@ where
 mod tests {
     use super::*;
 
-    use std::{ffi::OsStr, fmt::Write, fs, path::PathBuf};
+    use std::{env, ffi::OsStr, fmt::Write, fs, path::PathBuf};
 
     #[test]
     fn whitespace_attachment_for_incomplete_code1() {
@@ -798,6 +821,8 @@ NODE_ROOT 0..5 {
     }
 
     fn test_dir(name: &str) {
+        let should_update = env::var("UPDATE_TESTS").map(|s| s == "1").unwrap_or(false);
+
         let dir: PathBuf = ["test_data", name].iter().collect();
 
         for entry in dir.read_dir().unwrap() {
@@ -812,6 +837,9 @@ NODE_ROOT 0..5 {
             }
             let ast = crate::parse(&code);
             path.set_extension("expect");
+            if !path.exists() {
+                fs::File::create(&path).expect("Failed to create .expect file");
+            }
             let expected = fs::read_to_string(&path).unwrap();
 
             let mut actual = String::new();
@@ -819,6 +847,14 @@ NODE_ROOT 0..5 {
                 writeln!(actual, "error: {}", error).unwrap();
             }
             writeln!(actual, "{}", ast.root().dump()).unwrap();
+
+            if should_update {
+                use std::io::Write;
+                let mut file =
+                    fs::OpenOptions::new().write(true).truncate(true).open(&path).unwrap();
+                write!(file, "{}", actual).unwrap();
+                continue;
+            }
 
             if actual != expected {
                 path.set_extension("nix");
