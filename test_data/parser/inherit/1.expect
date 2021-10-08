@@ -1,5 +1,5 @@
-NODE_ROOT 0..52 {
-  NODE_ATTR_SET 0..52 {
+NODE_ROOT 0..95 {
+  NODE_ATTR_SET 0..95 {
     TOKEN_CURLY_B_OPEN("{") 0..1
     NODE_KEY_VALUE 1..5 {
       NODE_KEY 1..2 {
@@ -60,6 +60,41 @@ NODE_ROOT 0..52 {
       }
       TOKEN_SEMICOLON(";") 50..51
     }
-    TOKEN_CURLY_B_CLOSE("}") 51..52
+    TOKEN_WHITESPACE(" ") 51..52
+    NODE_INHERIT 52..66 {
+      TOKEN_INHERIT("inherit") 52..59
+      TOKEN_WHITESPACE(" ") 59..60
+      NODE_STRING 60..65 {
+        TOKEN_STRING_START("\"") 60..61
+        TOKEN_STRING_CONTENT("foo") 61..64
+        TOKEN_STRING_END("\"") 64..65
+      }
+      TOKEN_SEMICOLON(";") 65..66
+    }
+    TOKEN_WHITESPACE(" ") 66..67
+    NODE_INHERIT 67..85 {
+      TOKEN_INHERIT("inherit") 67..74
+      TOKEN_WHITESPACE(" ") 74..75
+      NODE_INHERIT_FROM 75..78 {
+        TOKEN_PAREN_OPEN("(") 75..76
+        NODE_IDENT 76..77 {
+          TOKEN_IDENT("a") 76..77
+        }
+        TOKEN_PAREN_CLOSE(")") 77..78
+      }
+      TOKEN_WHITESPACE(" ") 78..79
+      NODE_STRING 79..84 {
+        TOKEN_STRING_START("\"") 79..80
+        TOKEN_STRING_CONTENT("bar") 80..83
+        TOKEN_STRING_END("\"") 83..84
+      }
+      TOKEN_SEMICOLON(";") 84..85
+    }
+    TOKEN_WHITESPACE(" ") 85..86
+    NODE_INHERIT 86..94 {
+      TOKEN_INHERIT("inherit") 86..93
+      TOKEN_SEMICOLON(";") 93..94
+    }
+    TOKEN_CURLY_B_CLOSE("}") 94..95
   }
 }
