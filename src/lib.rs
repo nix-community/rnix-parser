@@ -91,14 +91,14 @@ mod tests {
         let root = ast.root().inner().and_then(BinOp::cast).unwrap();
         let operation = root.lhs().and_then(BinOp::cast).unwrap();
 
-        assert_eq!(root.operator(), BinOpKind::Add);
-        assert_eq!(operation.operator(), BinOpKind::Add);
+        assert_eq!(root.operator().unwrap(), BinOpKind::Add);
+        assert_eq!(operation.operator().unwrap(), BinOpKind::Add);
 
         let lhs = operation.lhs().and_then(Value::cast).unwrap();
         assert_eq!(lhs.to_value(), Ok(NixValue::Integer(1)));
 
         let rhs = operation.rhs().and_then(BinOp::cast).unwrap();
-        assert_eq!(rhs.operator(), BinOpKind::Mul);
+        assert_eq!(rhs.operator().unwrap(), BinOpKind::Mul);
     }
     #[test]
     fn t_macro() {

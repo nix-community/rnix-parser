@@ -428,8 +428,8 @@ typed! [
             nth!(self; 0)
         }
         /// Return the operator
-        pub fn operator(&self) -> BinOpKind {
-            self.first_token().and_then(|t| BinOpKind::from_token(t.kind())).expect("invalid ast")
+        pub fn operator(&self) -> Option<BinOpKind> {
+            self.first_token().and_then(|t| BinOpKind::from_token(t.kind()))
         }
         /// Return the right hand side of the binary operation
         pub fn rhs(&self) -> Option<SyntaxNode> {
