@@ -40,10 +40,20 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ParseError::Unexpected(range) => {
-                write!(f, "error node at {}..{}", usize::from(range.start()), usize::from(range.end()))
+                write!(
+                    f,
+                    "error node at {}..{}",
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
             ParseError::UnexpectedExtra(range) => {
-                write!(f, "unexpected token at {}..{}", usize::from(range.start()), usize::from(range.end()))
+                write!(
+                    f,
+                    "unexpected token at {}..{}",
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
             ParseError::UnexpectedWanted(got, range, kinds) => write!(
                 f,
@@ -54,7 +64,12 @@ impl fmt::Display for ParseError {
                 kinds
             ),
             ParseError::UnexpectedDoubleBind(range) => {
-                write!(f, "unexpected double bind at {}..{}", usize::from(range.start()), usize::from(range.end()))
+                write!(
+                    f,
+                    "unexpected double bind at {}..{}",
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
             ParseError::UnexpectedEOF => write!(f, "unexpected end of file"),
             ParseError::UnexpectedEOFWanted(kinds) => {
@@ -376,10 +391,18 @@ where
                         self.finish_node();
                     }
 
-                    while self.peek() != Some(TOKEN_SEMICOLON) {
-                        self.parse_val();
-                        if self.errors.last().map_or(false, |x| *x == ParseError::UnexpectedEOF) {
-                            break;
+                    loop {
+                        match self.peek() {
+                            Some(t) if t != TOKEN_SEMICOLON => {
+                                self.next_attr();
+                            }
+                            Some(_) => {
+                                break;
+                            }
+                            None => {
+                                self.errors.push(ParseError::UnexpectedEOF);
+                                break;
+                            }
                         }
                     }
 
