@@ -211,7 +211,16 @@ pub trait Wrapper: TypedNode {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct ParsedTypeError(pub SyntaxKind);
+
+impl fmt::Display for ParsedTypeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "invalid cast from kind {:?}", self.0)
+    }
+}
+
+impl std::error::Error for ParsedTypeError {}
 
 #[derive(Clone, Debug)]
 pub enum ParsedType {
