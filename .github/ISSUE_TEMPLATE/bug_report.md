@@ -31,6 +31,6 @@ If applicable, a Nix expression that demonstrates the problem.
 ### Additional context
 
 <!--
-Anything else you consider relevant such as `rnix` version, related issues etc.
+Anything else you consider relevant such as `rnix` version (mandatory), related issues etc.
 -->
 
