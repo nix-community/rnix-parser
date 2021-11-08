@@ -28,11 +28,11 @@ pub enum ParseError {
     UnexpectedExtra(TextRange),
     /// UnexpectedWanted is used when specific tokens are expected, but different one is found
     UnexpectedWanted(SyntaxKind, TextRange, Box<[SyntaxKind]>),
-    /// UnexpectedWanted is used when a pattern is bound twice
+    /// UnexpectedDoubleBind is used when a pattern is bound twice
     UnexpectedDoubleBind(TextRange),
     /// UnexpectedEOF is used when the end of file is reached, while tokens are still expected
     UnexpectedEOF,
-    /// UnexpectedWanted is used when specific tokens are expected, but the end of file is reached
+    /// UnexpectedEOFWanted is used when specific tokens are expected, but the end of file is reached
     UnexpectedEOFWanted(Box<[SyntaxKind]>),
 }
 
