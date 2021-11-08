@@ -24,6 +24,13 @@ rnix nowadays uses [@matklad](https://github.com/matklad)'s
 
 Examples can be found in the `examples/` directory.
 
+You can parse Nix expressions from standard input using the `from-stdin` example.
+To try that, run the following in your shell:
+```sh
+echo "[hello nix]" | cargo run --quiet --example from-stdin
+```
+ 
+
 You may also want to see
 [nix-explorer](https://gitlab.com/jD91mZM2/nix-explorer): An example
 that highlights AST nodes in Nix code. This demonstrates how
