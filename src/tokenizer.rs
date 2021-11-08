@@ -309,7 +309,14 @@ impl<'a> Iterator for Tokenizer<'a> {
             '@' => Some((TOKEN_AT, self.string_since(start))),
             ':' => Some((TOKEN_COLON, self.string_since(start))),
             ',' => Some((TOKEN_COMMA, self.string_since(start))),
-            '.' => Some((TOKEN_DOT, self.string_since(start))),
+            '.' => {
+                if self.peek().map(|x| x >= '0' && x <= '9').unwrap_or(false) {
+                    self.consume(|c| c >= '0' && c <= '9');
+                    Some((TOKEN_FLOAT, self.string_since(start)))
+                } else {
+                    Some((TOKEN_DOT, self.string_since(start)))
+                }
+            },
             '=' => Some((TOKEN_ASSIGN, self.string_since(start))),
             '?' => Some((TOKEN_QUESTION, self.string_since(start))),
             ';' => Some((TOKEN_SEMICOLON, self.string_since(start))),
@@ -484,6 +491,16 @@ mod tests {
                 (TOKEN_SEMICOLON, ";"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_CURLY_B_CLOSE, "}"),
+            ],
+        );
+        assert_eq!(
+            tokenize(".5 + 0.5"),
+            tokens![
+                (TOKEN_FLOAT, ".5"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_ADD, "+"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_FLOAT, "0.5"),
             ],
         );
         assert_eq!(
