@@ -201,19 +201,25 @@ where
         self.get_text_position()
     }
     fn bump(&mut self) {
-        let next = self.buffer.pop_front().or_else(|| self.iter.next());
+        let next = self.try_next();
         match next {
             Some((token, s)) => {
                 if token.is_trivia() {
                     self.trivia_buffer.push((token, s))
                 } else {
-                    self.drain_trivia_buffer();
-                    self.consumed += TextSize::of(s.as_str());
-                    self.builder.token(NixLanguage::kind_to_raw(token), s.as_str())
+                    self.manual_bump(s, token);
                 }
             }
             None => self.errors.push(ParseError::UnexpectedEOF),
         }
+    }
+    fn try_next(&mut self) -> Option<(SyntaxKind, SmolStr)> {
+        self.buffer.pop_front().or_else(|| self.iter.next())
+    }
+    fn manual_bump(&mut self, s: SmolStr, token: SyntaxKind) {
+        self.drain_trivia_buffer();
+        self.consumed += TextSize::of(s.as_str());
+        self.builder.token(NixLanguage::kind_to_raw(token), s.as_str())
     }
     fn peek_data(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
         while self.peek_raw().map(|&(t, _)| t.is_trivia()).unwrap_or(false) {
@@ -507,6 +513,34 @@ where
             }
             TOKEN_DYNAMIC_START => self.parse_dynamic(),
             TOKEN_STRING_START => self.parse_string(),
+            TOKEN_PATH => {
+                let next = self.try_next();
+                if let Some((token, s)) = next {
+                    let is_complex_path = self
+                        .peek()
+                        .map_or(false, |t| t == TOKEN_INTERPOL_START);
+                    self.start_node(if is_complex_path { NODE_PATH_WITH_INTERPOL } else { NODE_LITERAL });
+                    self.manual_bump(s, token);
+                    if is_complex_path {
+                        loop {
+                            match self.peek_raw().map(|(t, _)| t) {
+                                Some(TOKEN_PATH) => self.bump(),
+                                Some(TOKEN_INTERPOL_START) => {
+                                    self.start_node(NODE_STRING_INTERPOL);
+                                    self.bump();
+                                    self.parse_expr();
+                                    self.expect(TOKEN_INTERPOL_END);
+                                    self.finish_node();
+                                },
+                                _ => break
+                            }
+                        }
+                    }
+                    self.finish_node();
+                } else {
+                    self.errors.push(ParseError::UnexpectedEOF);
+                }
+            },
             t if t.is_literal() => {
                 self.start_node(NODE_LITERAL);
                 self.bump();
