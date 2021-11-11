@@ -750,7 +750,7 @@ where
 mod tests {
     use super::*;
 
-    use std::{ffi::OsStr, fmt::Write, fs, path::PathBuf};
+    use std::{env, ffi::OsStr, fmt::Write, fs, io::Write as IoWrite, path::PathBuf};
 
     #[test]
     fn whitespace_attachment_for_incomplete_code1() {
@@ -821,6 +821,7 @@ NODE_ROOT 0..5 {
     }
 
     fn test_dir(name: &str) {
+        let should_update = env::var("UPDATE_TESTS").map(|s| s == "1").unwrap_or(false);
         let dir: PathBuf = ["test_data", name].iter().collect();
 
         for entry in dir.read_dir().unwrap() {
@@ -835,6 +836,9 @@ NODE_ROOT 0..5 {
             }
             let ast = crate::parse(&code);
             path.set_extension("expect");
+            if !path.exists() {
+                fs::File::create(&path).expect("Failed to create .expect file");
+            }
             let expected = fs::read_to_string(&path).unwrap();
 
             let mut actual = String::new();
@@ -842,6 +846,12 @@ NODE_ROOT 0..5 {
                 writeln!(actual, "error: {}", error).unwrap();
             }
             writeln!(actual, "{}", ast.root().dump()).unwrap();
+            if should_update {
+                let mut file =
+                    fs::OpenOptions::new().write(true).truncate(true).open(&path).unwrap();
+                write!(file, "{}", actual).unwrap();
+                continue;
+            }
 
             if actual != expected {
                 path.set_extension("nix");
@@ -859,9 +869,9 @@ NODE_ROOT 0..5 {
     #[rustfmt::skip]
     mod dir_tests {
         use super::test_dir;
-        #[test] 
-        fn general() { 
-            test_dir("general"); 
+        #[test]
+        fn general() {
+            test_dir("general");
         }
 
         #[test]

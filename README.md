@@ -22,19 +22,26 @@ rnix nowadays uses [@matklad](https://github.com/matklad)'s
 
 ## Demo
 
-Examples can be found in the `examples/` directory.
-
-You can parse Nix expressions from standard input using the `from-stdin` example.
-To try that, run the following in your shell:
-```sh
-echo "[hello nix]" | cargo run --quiet --example from-stdin
-```
- 
+Examples can be found in the `examples/` directory. 
 
 You may also want to see
 [nix-explorer](https://gitlab.com/jD91mZM2/nix-explorer): An example
 that highlights AST nodes in Nix code. This demonstrates how
 whitespaces and commands are preserved.
+
+## Hacking
+
+Tests can be run with `cargo test`.
+
+In order to update all `.expect`-files to the currently expected results,
+you may run `UPDATE_TESTS=1 cargo test`.
+
+You can parse Nix expressions from standard input using the `from-stdin` example.
+To try that, run the following in your shell:
+
+```sh
+echo "[hello nix]" | cargo run --quiet --example from-stdin
+```
 
 # RIP jd91mzm2
 
