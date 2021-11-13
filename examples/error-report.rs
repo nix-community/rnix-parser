@@ -23,6 +23,7 @@ fn main() {
             ParseError::UnexpectedExtra(range) => range,
             ParseError::UnexpectedWanted(_, range, _) => range,
             ParseError::UnexpectedDoubleBind(range) => range,
+            ParseError::DuplicatedArgs(range, _) => range,
             err => {
                 eprintln!("error: {}", err);
                 continue;

@@ -1,7 +1,7 @@
 //! The parser: turns a series of tokens into an AST
 
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{HashSet, HashMap, VecDeque},
     fmt,
 };
 
@@ -34,6 +34,8 @@ pub enum ParseError {
     UnexpectedEOF,
     /// UnexpectedEOFWanted is used when specific tokens are expected, but the end of file is reached
     UnexpectedEOFWanted(Box<[SyntaxKind]>),
+    /// DuplicatedArgs is used when formal arguments are duplicated, e.g. `{ a, a }`
+    DuplicatedArgs(TextRange, String),
 }
 
 impl fmt::Display for ParseError {
@@ -74,6 +76,15 @@ impl fmt::Display for ParseError {
             ParseError::UnexpectedEOF => write!(f, "unexpected end of file"),
             ParseError::UnexpectedEOFWanted(kinds) => {
                 write!(f, "unexpected end of file, wanted any of {:?}", kinds)
+            }
+            ParseError::DuplicatedArgs(range, ident) => {
+                write!(
+                    f,
+                    "argument `{}` is duplicated in {}..{}",
+                    ident,
+                    usize::from(range.start()),
+                    usize::from(range.end())
+                )
             }
         }
     }
@@ -326,6 +337,7 @@ where
         if self.peek().map(|t| t == TOKEN_CURLY_B_CLOSE).unwrap_or(true) {
             self.bump();
         } else {
+            let mut args = HashMap::<SmolStr, TextSize>::new();
             loop {
                 match self.expect_peek_any(&[TOKEN_CURLY_B_CLOSE, TOKEN_ELLIPSIS, TOKEN_IDENT]) {
                     Some(TOKEN_CURLY_B_CLOSE) => {
@@ -339,8 +351,28 @@ where
                     }
                     Some(TOKEN_IDENT) => {
                         self.start_node(NODE_PAT_ENTRY);
+                        let tp = self.get_text_position();
+                        let mut ident_done = false;
+                        if let Some((_, ident_name)) = self.peek_raw() {
+                            let contains = args.contains_key(ident_name);
+                            let id = ident_name.clone();
+                            let id_str = ident_name.to_string().clone();
+                            args.insert(id, tp);
+                            if contains {
+                                ident_done = true;
+                                self.start_error_node();
+                                self.expect_ident();
+                                let fin = self.finish_error_node();
+                                self.errors.push(ParseError::DuplicatedArgs(
+                                    TextRange::new(tp, fin),
+                                    id_str
+                                ));
+                            }
+                        }
 
-                        self.expect_ident();
+                        if !ident_done {
+                            self.expect_ident();
+                        }
 
                         if let Some(TOKEN_QUESTION) = self.peek() {
                             self.bump();
