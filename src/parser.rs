@@ -34,8 +34,8 @@ pub enum ParseError {
     UnexpectedEOF,
     /// UnexpectedEOFWanted is used when specific tokens are expected, but the end of file is reached
     UnexpectedEOFWanted(Box<[SyntaxKind]>),
-    /// UnexpectedDuplicatedArgs is used when formal arguments are duplicated, e.g. `{ a, a }`
-    UnexpectedDuplicatedArgs(TextRange, String),
+    /// DuplicatedArgs is used when formal arguments are duplicated, e.g. `{ a, a }`
+    DuplicatedArgs(TextRange, String),
 }
 
 impl fmt::Display for ParseError {
@@ -77,10 +77,10 @@ impl fmt::Display for ParseError {
             ParseError::UnexpectedEOFWanted(kinds) => {
                 write!(f, "unexpected end of file, wanted any of {:?}", kinds)
             }
-            ParseError::UnexpectedDuplicatedArgs(range, ident) => {
+            ParseError::DuplicatedArgs(range, ident) => {
                 write!(
                     f,
-                    "argument `{}' is duplicated in {}..{}",
+                    "argument `{}` is duplicated in {}..{}",
                     ident,
                     usize::from(range.start()),
                     usize::from(range.end())
@@ -363,7 +363,7 @@ where
                                 self.start_error_node();
                                 self.expect_ident();
                                 let fin = self.finish_error_node();
-                                self.errors.push(ParseError::UnexpectedDuplicatedArgs(
+                                self.errors.push(ParseError::DuplicatedArgs(
                                     TextRange::new(tp, fin),
                                     id_str
                                 ));
