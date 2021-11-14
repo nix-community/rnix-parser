@@ -57,7 +57,7 @@
   }
   // utils.lib.eachDefaultSystem (system:
     let
-      pkgs = import nixpkgs { inherit system; overlays = [ self.overlay ]; };
+      pkgs = import nixpkgs { inherit system; overlays = [ fenix.overlay self.overlay ]; };
     in
     {
       devShell = pkgs.mkShell {
@@ -66,6 +66,7 @@
         inputsFrom = pkgs.lib.attrValues self.packages.${system};
 
         nativeBuildInputs = with pkgs; [
+          rust-analyzer-nightly
           cargo-edit
         ];
       };
