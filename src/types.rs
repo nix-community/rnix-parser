@@ -251,6 +251,7 @@ pub enum ParsedType {
     UnaryOp(UnaryOp),
     Value(Value),
     With(With),
+    PathWithInterpol(PathWithInterpol),
 }
 
 impl TryFrom<SyntaxNode> for ParsedType {
@@ -285,6 +286,7 @@ impl TryFrom<SyntaxNode> for ParsedType {
             NODE_UNARY_OP => Ok(ParsedType::UnaryOp(UnaryOp::cast(node).unwrap())),
             NODE_LITERAL => Ok(ParsedType::Value(Value::cast(node).unwrap())),
             NODE_WITH => Ok(ParsedType::With(With::cast(node).unwrap())),
+            NODE_PATH_WITH_INTERPOL => Ok(ParsedType::PathWithInterpol(PathWithInterpol::cast(node).unwrap())),
             other => Err(ParsedTypeError(other)),
         }
     }
@@ -320,6 +322,7 @@ impl TypedNode for ParsedType {
             ParsedType::UnaryOp(n) => n.node(),
             ParsedType::Value(n) => n.node(),
             ParsedType::With(n) => n.node(),
+            ParsedType::PathWithInterpol(n) => n.node(),
         }
     }
 
@@ -539,5 +542,6 @@ typed! [
         pub fn body(&self) -> Option<SyntaxNode> {
             nth!(self; 1)
         }
-    }
+    },
+    NODE_PATH_WITH_INTERPOL => PathWithInterpol: Wrapper
 ];

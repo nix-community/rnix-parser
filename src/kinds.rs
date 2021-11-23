@@ -97,6 +97,7 @@ pub enum SyntaxKind {
     NODE_UNARY_OP,
     NODE_LITERAL,
     NODE_WITH,
+    NODE_PATH_WITH_INTERPOL,
 
     #[doc(hidden)]
     __LAST,

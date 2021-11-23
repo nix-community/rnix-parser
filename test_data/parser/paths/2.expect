@@ -1,0 +1,89 @@
+NODE_ROOT 0..72 {
+  NODE_LET_IN 0..72 {
+    TOKEN_LET("let") 0..3
+    TOKEN_WHITESPACE("\n  ") 3..6
+    NODE_KEY_VALUE 6..29 {
+      NODE_KEY 6..7 {
+        NODE_IDENT 6..7 {
+          TOKEN_IDENT("a") 6..7
+        }
+      }
+      TOKEN_WHITESPACE(" ") 7..8
+      TOKEN_ASSIGN("=") 8..9
+      TOKEN_WHITESPACE(" ") 9..10
+      NODE_LAMBDA 10..28 {
+        NODE_IDENT 10..11 {
+          TOKEN_IDENT("f") 10..11
+        }
+        TOKEN_COLON(":") 11..12
+        TOKEN_WHITESPACE(" ") 12..13
+        NODE_PATH_WITH_INTERPOL 13..28 {
+          TOKEN_PATH("./foo") 13..18
+          NODE_STRING_INTERPOL 18..24 {
+            TOKEN_INTERPOL_START("${") 18..20
+            NODE_IDENT 20..23 {
+              TOKEN_IDENT("bar") 20..23
+            }
+            TOKEN_INTERPOL_END("}") 23..24
+          }
+          TOKEN_PATH("/baz") 24..28
+        }
+      }
+      TOKEN_SEMICOLON(";") 28..29
+    }
+    TOKEN_WHITESPACE("\n  ") 29..32
+    NODE_KEY_VALUE 32..67 {
+      NODE_KEY 32..33 {
+        NODE_IDENT 32..33 {
+          TOKEN_IDENT("b") 32..33
+        }
+      }
+      TOKEN_WHITESPACE(" ") 33..34
+      TOKEN_ASSIGN("=") 34..35
+      TOKEN_WHITESPACE(" ") 35..36
+      NODE_APPLY 36..66 {
+        NODE_APPLY 36..53 {
+          NODE_APPLY 36..44 {
+            NODE_IDENT 36..37 {
+              TOKEN_IDENT("a") 36..37
+            }
+            TOKEN_WHITESPACE(" ") 37..38
+            TOKEN_WHITESPACE(" ") 38..39
+            NODE_LITERAL 39..44 {
+              TOKEN_PATH("./bar") 39..44
+            }
+          }
+          NODE_PATH_WITH_INTERPOL 44..53 {
+            TOKEN_PATH("./baz") 44..49
+            NODE_STRING_INTERPOL 49..53 {
+              TOKEN_INTERPOL_START("${") 49..51
+              NODE_IDENT 51..52 {
+                TOKEN_IDENT("x") 51..52
+              }
+              TOKEN_INTERPOL_END("}") 52..53
+            }
+          }
+        }
+        TOKEN_WHITESPACE(" ") 53..54
+        NODE_PATH_WITH_INTERPOL 54..66 {
+          TOKEN_PATH("./snens") 54..61
+          NODE_STRING_INTERPOL 61..65 {
+            TOKEN_INTERPOL_START("${") 61..63
+            NODE_IDENT 63..64 {
+              TOKEN_IDENT("x") 63..64
+            }
+            TOKEN_INTERPOL_END("}") 64..65
+          }
+          TOKEN_PATH("y") 65..66
+        }
+      }
+      TOKEN_SEMICOLON(";") 66..67
+    }
+    TOKEN_WHITESPACE("\n") 67..68
+    TOKEN_IN("in") 68..70
+    TOKEN_WHITESPACE(" ") 70..71
+    NODE_IDENT 71..72 {
+      TOKEN_IDENT("b") 71..72
+    }
+  }
+}
