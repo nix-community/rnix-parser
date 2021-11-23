@@ -196,14 +196,14 @@ impl Value {
             TOKEN_FLOAT => Value::Float(s.parse()?),
             TOKEN_INTEGER => Value::Integer(s.parse()?),
             TOKEN_PATH => {
-                if s.starts_with('<') {
-                    let len = s.len();
-                    if len < 2 || !s.ends_with('>') {
+                if let Some(tag) = s.strip_prefix('<') {
+                    let tag = tag.strip_suffix('>');
+                    if s.len() < 2 || tag.is_none() {
                         return Err(ValueError::StorePath);
                     }
-                    Value::Path(Anchor::Store, String::from(&s[1..len - 1]))
-                } else if s.starts_with("~/") {
-                    Value::Path(Anchor::Home, String::from(&s[2..]))
+                    Value::Path(Anchor::Store, String::from(tag.unwrap()))
+                } else if let Some(contents) = s.strip_prefix("~/") {
+                    Value::Path(Anchor::Home, String::from(contents))
                 } else if s.starts_with('/') {
                     Value::Path(Anchor::Absolute, String::from(s))
                 } else {
