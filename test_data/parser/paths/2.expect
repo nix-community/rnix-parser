@@ -43,16 +43,16 @@ NODE_ROOT 0..72 {
       TOKEN_WHITESPACE(" ") 35..36
       NODE_APPLY 36..66 {
         NODE_APPLY 36..53 {
-          NODE_APPLY 36..44 {
+          NODE_APPLY 36..43 {
             NODE_IDENT 36..37 {
               TOKEN_IDENT("a") 36..37
             }
             TOKEN_WHITESPACE(" ") 37..38
-            TOKEN_WHITESPACE(" ") 38..39
-            NODE_LITERAL 39..44 {
-              TOKEN_PATH("./bar") 39..44
+            NODE_LITERAL 38..43 {
+              TOKEN_PATH("./bar") 38..43
             }
           }
+          TOKEN_WHITESPACE(" ") 43..44
           NODE_PATH_WITH_INTERPOL 44..53 {
             TOKEN_PATH("./baz") 44..49
             NODE_STRING_INTERPOL 49..53 {

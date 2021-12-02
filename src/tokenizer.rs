@@ -890,6 +890,18 @@ mod tests {
         assert_eq!(tokenize("<hello/world>"), path("<hello/world>"));
     }
     #[test]
+    fn test_path_no_newline() {
+        assert_eq!(
+            tokenize("import ./.\n"),
+            tokens![
+                (TOKEN_IDENT, "import"),
+                (TOKEN_WHITESPACE, " "),
+                (TOKEN_PATH, "./."),
+                (TOKEN_WHITESPACE, "\n"),
+            ]
+        );
+    }
+    #[test]
     fn test_path_interpol() {
         assert_eq!(
             tokenize("./${foo}"),

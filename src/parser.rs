@@ -218,6 +218,7 @@ where
                 if token.is_trivia() {
                     self.trivia_buffer.push((token, s))
                 } else {
+                    self.drain_trivia_buffer();
                     self.manual_bump(s, token);
                 }
             }
@@ -228,7 +229,6 @@ where
         self.buffer.pop_front().or_else(|| self.iter.next())
     }
     fn manual_bump(&mut self, s: SmolStr, token: SyntaxKind) {
-        self.drain_trivia_buffer();
         self.consumed += TextSize::of(s.as_str());
         self.builder.token(NixLanguage::kind_to_raw(token), s.as_str())
     }
@@ -551,7 +551,9 @@ where
                     let is_complex_path = self
                         .peek()
                         .map_or(false, |t| t == TOKEN_INTERPOL_START);
-                    self.start_node(if is_complex_path { NODE_PATH_WITH_INTERPOL } else { NODE_LITERAL });
+                    self.builder.start_node(NixLanguage::kind_to_raw(
+                        if is_complex_path { NODE_PATH_WITH_INTERPOL } else { NODE_LITERAL }
+                    ));
                     self.manual_bump(s, token);
                     if is_complex_path {
                         loop {
