@@ -16,7 +16,7 @@ use crate::{
     SyntaxNode,
 };
 
-const OR: &'static str = "or";
+const OR: &str = "or";
 
 /// An error that occurred during parsing
 #[derive(Clone, Debug, PartialEq)]

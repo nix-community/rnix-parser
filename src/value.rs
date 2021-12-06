@@ -86,7 +86,7 @@ pub fn unescape(input: &str, multiline: bool) -> String {
     output
 }
 
-pub(crate) fn indention<'a>(s: &'a str) -> impl Iterator<Item = char> + 'a {
+pub(crate) fn indention(s: &str) -> impl Iterator<Item = char> + '_ {
     s.chars().take_while(|&c| c != '\n' && c.is_whitespace())
 }
 
