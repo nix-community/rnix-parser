@@ -75,7 +75,7 @@ echo "[hello nix]" | cargo run --quiet --example from-stdin
   __Note:__ API changes are OK (and fixes should be contributed to `nixpkgs-fmt`), behavioral changes
   are not unless explicitly discussed before.
 * Update the [CHANGELOG.md](https://github.com/nix-community/rnix-parser/blob/master/CHANGELOG.md).
-* Bump the version number in [Cargo.toml](https://github.com/nix-community/rnix-parser/blob/master/Cargo.toml).
+* Bump the version number in [Cargo.toml](https://github.com/nix-community/rnix-parser/blob/master/Cargo.toml) & re-run `cargo build` to refresh the lockfile.
 * Commit & run `nix build`.
 * Tag the release and push everything.
 * As soon as the CI has completed, run `cargo publish`.
