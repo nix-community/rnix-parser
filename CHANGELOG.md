@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [v0.10.1] - 2021-12-06
+
+### Fixed
+
+* Trivia tokens (i.e. ` `, `\r`, `\n` etc.) are no longer misplaced around path-expressions.
+  This is a regression from `v0.10.0` which would've broken `nixpkgs-fmt`.
+
+  (from [@Ma27](https://github.com/Ma27)).
+
 ## [v0.10.0] - 2021-11-30
 
 ### Added
@@ -75,6 +84,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 * Fixed a memory leak while parsing `inherit`-expressions with invalid syntax (from [@Ma27](https://github.com/Ma27/)).
 
-[Unreleased]: https://github.com/nix-community/rnix-parser/compare/v0.10.0...master
+[Unreleased]: https://github.com/nix-community/rnix-parser/compare/v0.10.1...master
+[v0.10.1]: https://github.com/nix-community/rnix-parser/compare/v0.10.0...v0.10.1
 [v0.10.0]: https://github.com/nix-community/rnix-parser/compare/v0.9.1...v0.10.0
 [v0.9.1]: https://github.com/nix-community/rnix-parser/compare/v0.9.0...v0.9.1
