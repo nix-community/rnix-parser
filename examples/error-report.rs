@@ -2,7 +2,7 @@ use rnix::parser::ParseError;
 use std::{env, fs};
 
 fn main() {
-    let file = match env::args().skip(1).next() {
+    let file = match env::args().nth(1) {
         Some(file) => file,
         None => {
             eprintln!("Usage: error-report <file>");

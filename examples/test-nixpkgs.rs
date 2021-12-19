@@ -32,7 +32,7 @@ fn recurse(path: &Path) -> Result<(), Box<dyn Error>> {
             println!("----------");
             println!("{}", parsed);
             println!("----------");
-            Err("parsing error")?;
+            return Err("parsing error".into());
         }
         return Ok(());
     } else {

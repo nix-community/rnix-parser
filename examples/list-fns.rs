@@ -4,7 +4,7 @@ use smol_str::SmolStr;
 use rnix::{types::*, NodeOrToken, SyntaxKind::*, SyntaxNode};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let file = match env::args().skip(1).next() {
+    let file = match env::args().nth(1) {
         Some(file) => file,
         None => {
             eprintln!("Usage: list-fns <file>");
@@ -69,5 +69,5 @@ fn find_comment(node: SyntaxNode) -> Option<String> {
         .map(|it| it.trim_start_matches('#').trim())
         .collect::<Vec<_>>()
         .join("\n        ");
-    return Some(doc).filter(|it| !it.is_empty());
+    Some(doc).filter(|it| !it.is_empty())
 }
