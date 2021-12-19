@@ -363,7 +363,7 @@ typed! [
     },
     NODE_KEY => Key: {
         /// Return the path as an iterator of identifiers
-        pub fn path<'a>(&'a self) -> impl Iterator<Item = SyntaxNode> + 'a {
+        pub fn path(&self) -> impl Iterator<Item = SyntaxNode> {
             self.node().children()
         }
     },
