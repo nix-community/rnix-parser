@@ -5,7 +5,6 @@ use crate::{
     types::{self, TypedNode},
     NodeOrToken,
     SyntaxKind::{self, *},
-    SyntaxNode,
 };
 
 /// An anchor point for a path, such as if it's relative or absolute
@@ -220,8 +219,9 @@ impl Value {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StrPart {
     Literal(String),
-    Ast(SyntaxNode),
+    Ast(types::StrInterpol),
 }
+
 pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
     let mut parts = Vec::new();
     let mut literals = 0;
@@ -255,7 +255,7 @@ pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
             }
             NodeOrToken::Node(node) => {
                 assert_eq!(node.kind(), NODE_STRING_INTERPOL);
-                parts.push(StrPart::Ast(node.clone()));
+                parts.push(StrPart::Ast(types::StrInterpol::cast(node.clone()).unwrap()));
                 last_was_ast = true;
             }
         }
@@ -310,9 +310,7 @@ mod tests {
             Str::cast(SyntaxNode::new_root(builder.finish())).unwrap()
         }
 
-        assert_eq!(
-            string_parts(&string_node(
-                r#"
+        let txtin = r#"
                         |trailing-whitespace
                               |trailing-whitespace
                     This is a multiline string :D
@@ -321,15 +319,17 @@ mod tests {
                     ''${ interpolation was escaped }
                     two single quotes: '''
                     three single quotes: ''''
-                "#.replace("|trailing-whitespace", "").as_str()
-            )),
-            vec![
-                StrPart::Literal(String::from(
-                    // Get the below with nix repl
-                    "    \n          \nThis is a multiline string :D\n  indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\ntwo single quotes: ''\nthree single quotes: '''\n"
-                ))
-            ]
-        );
+                "#
+            .replace("|trailing-whitespace", "");
+
+        if let [StrPart::Literal(lit)] = &string_parts(&string_node(txtin.as_str()))[..] {
+            assert_eq!(lit,
+                // Get the below with nix repl
+                "    \n          \nThis is a multiline string :D\n  indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\ntwo single quotes: ''\nthree single quotes: '''\n"
+            );
+        } else {
+            unreachable!();
+        }
     }
     #[test]
     fn values() {
