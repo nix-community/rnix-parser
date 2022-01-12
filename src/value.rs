@@ -13,7 +13,13 @@ use crate::{
 pub enum Anchor {
     Absolute,
     Relative,
+
+    /// Anchor for paths relative to `~/`, usually resolved via
+    /// the environment variable `HOME` or such.
     Home,
+
+    /// Anchor for [Nix angle-paths](https://nixos.org/guides/nix-pills/nix-search-paths.html),
+    /// e.g. `<nixpkgs>`, usually resolved via iterating through the environment variable `NIX_PATH`.
     Store,
 }
 
