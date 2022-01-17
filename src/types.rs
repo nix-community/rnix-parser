@@ -12,7 +12,7 @@ use crate::{
 macro_rules! typed {
     ($($kind:expr => $name:ident$(: $trait:ident)*$(: { $($block:tt)* })*),*) => {
         $(
-            #[derive(Clone, Debug)]
+            #[derive(Clone, Debug, PartialEq, Eq, Hash)]
             pub struct $name(SyntaxNode);
 
             impl TypedNode for $name {
@@ -248,6 +248,7 @@ pub enum ParsedType {
     AttrSet(AttrSet),
     KeyValue(KeyValue),
     Str(Str),
+    StrInterpol(StrInterpol),
     UnaryOp(UnaryOp),
     Value(Value),
     With(With),
@@ -270,6 +271,7 @@ impl TryFrom<SyntaxNode> for ParsedType {
             NODE_INHERIT => Ok(ParsedType::Inherit(Inherit::cast(node).unwrap())),
             NODE_INHERIT_FROM => Ok(ParsedType::InheritFrom(InheritFrom::cast(node).unwrap())),
             NODE_STRING => Ok(ParsedType::Str(Str::cast(node).unwrap())),
+            NODE_STRING_INTERPOL => Ok(ParsedType::StrInterpol(StrInterpol::cast(node).unwrap())),
             NODE_LAMBDA => Ok(ParsedType::Lambda(Lambda::cast(node).unwrap())),
             NODE_LEGACY_LET => Ok(ParsedType::LegacyLet(LegacyLet::cast(node).unwrap())),
             NODE_LET_IN => Ok(ParsedType::LetIn(LetIn::cast(node).unwrap())),
@@ -319,6 +321,7 @@ impl TypedNode for ParsedType {
             ParsedType::AttrSet(n) => n.node(),
             ParsedType::KeyValue(n) => n.node(),
             ParsedType::Str(n) => n.node(),
+            ParsedType::StrInterpol(n) => n.node(),
             ParsedType::UnaryOp(n) => n.node(),
             ParsedType::Value(n) => n.node(),
             ParsedType::With(n) => n.node(),
@@ -411,6 +414,7 @@ typed! [
             value::string_parts(self)
         }
     },
+    NODE_STRING_INTERPOL => StrInterpol: Wrapper,
     NODE_LAMBDA => Lambda: {
         /// Return the argument of the lambda
         pub fn arg(&self) -> Option<SyntaxNode> {
