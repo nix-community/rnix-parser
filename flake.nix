@@ -3,8 +3,8 @@
 
   inputs = {
     utils.url = "github:numtide/flake-utils";
-    nixpkgs.url = github:NixOS/nixpkgs/nixos-unstable;
-    import-cargo.url = github:edolstra/import-cargo;
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    import-cargo.url = "github:edolstra/import-cargo";
   };
 
   outputs = { self, nixpkgs, utils, import-cargo }:
