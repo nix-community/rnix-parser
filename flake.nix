@@ -1,63 +1,50 @@
 {
   description = "Rust-based parser for nix files";
 
+  # Stolen from https://gist.github.com/573/885a062ca49d2db355c22004cc395066
   inputs = {
-    utils.url = "github:numtide/flake-utils";
-    nixpkgs.url = github:NixOS/nixpkgs/nixos-unstable;
-    import-cargo.url = github:edolstra/import-cargo;
+    nixpkgs = { url = "github:nixos/nixpkgs/nixos-unstable"; };
+    rust-overlay = { url = "github:oxalica/rust-overlay"; };
   };
 
-  outputs = { self, nixpkgs, utils, import-cargo }:
+  outputs = { nixpkgs, rust-overlay, ... }:
+    let system = "x86_64-linux";
+    in
     {
-      overlay = final: prev: let
-        target = final.rust.toRustTarget final.stdenv.hostPlatform;
-        flags = "--release --offline --target ${target}";
-        inherit (import-cargo.builders) importCargo;
-      in {
-        rnix-parser = final.stdenv.mkDerivation {
-          pname = "rnix-parser";
-          version = "0.9.1";
-          src = final.lib.cleanSource ./.;
-          nativeBuildInputs = with final; [
-            rustc cargo
-            (importCargo { lockFile = ./Cargo.lock; inherit (final) pkgs; }).cargoHome
-          ];
+      devShell.${system} =
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ rust-overlay.overlay ];
+          };
+        in
+        (({ pkgs, ... }:
+          pkgs.mkShell {
+            buildInputs = with pkgs; [
+              cargo
+              cargo-watch
+              nodejs
+              wasm-pack
 
-          outputs = [ "out" "doc" ];
-          doCheck = true;
+              # Note: to use stable, just replace `nightly` with `stable`
+              (rust-bin.stable.latest.default.override {
+                extensions = [ "rust-src" ];
+                targets = [ "wasm32-unknown-unknown" ];
+              })
 
-          buildPhase = ''
-            cargo build ${flags}
-            cargo doc ${flags}
-          '';
+              # Add some extra dependencies from `pkgs`
+              pkg-config
+              openssl
+            ];
 
-          checkPhase = ''
-            cargo test ${flags}
-            cargo bench
-          '';
+            shellHook = "";
+          }) {
+          pkgs = pkgs;
 
-          installPhase = ''
-            mkdir -p $out/lib
-            mkdir -p $doc/share/doc/rnix
-
-            cp -r ./target/${target}/doc $doc/share/doc/rnix
-            cp ./target/${target}/release/librnix.rlib $out/lib/
-          '';
-        };
-      };
-    }
-    // utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = import nixpkgs { inherit system; overlays = [ self.overlay ]; };
-      in
-      rec {
-        # `nix develop`
-        devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [ rustfmt rustc cargo ];
-        };
-
-        packages.rnix-parser = pkgs.rnix-parser;
-        defaultPackage = packages.rnix-parser;
-      }
-    );
+          # Set Environment Variables
+          RUST_BACKTRACE = 1;
+          PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+          RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+        });
+    };
 }
