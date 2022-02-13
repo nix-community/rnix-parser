@@ -55,17 +55,17 @@ NODE_ROOT 0..62 {
       TOKEN_ASSIGN("=") 38..39
       TOKEN_WHITESPACE(" ") 39..40
       NODE_BIN_OP 40..59 {
-        NODE_BIN_OP 40..52 {
-          NODE_LIST 40..43 {
-            TOKEN_SQUARE_B_OPEN("[") 40..41
-            NODE_LITERAL 41..42 {
-              TOKEN_INTEGER("1") 41..42
-            }
-            TOKEN_SQUARE_B_CLOSE("]") 42..43
+        NODE_LIST 40..43 {
+          TOKEN_SQUARE_B_OPEN("[") 40..41
+          NODE_LITERAL 41..42 {
+            TOKEN_INTEGER("1") 41..42
           }
-          TOKEN_WHITESPACE(" ") 43..44
-          TOKEN_CONCAT("++") 44..46
-          TOKEN_WHITESPACE(" ") 46..47
+          TOKEN_SQUARE_B_CLOSE("]") 42..43
+        }
+        TOKEN_WHITESPACE(" ") 43..44
+        TOKEN_CONCAT("++") 44..46
+        TOKEN_WHITESPACE(" ") 46..47
+        NODE_BIN_OP 47..59 {
           NODE_LIST 47..52 {
             TOKEN_SQUARE_B_OPEN("[") 47..48
             NODE_LITERAL 48..49 {
@@ -77,16 +77,16 @@ NODE_ROOT 0..62 {
             }
             TOKEN_SQUARE_B_CLOSE("]") 51..52
           }
-        }
-        TOKEN_WHITESPACE(" ") 52..53
-        TOKEN_CONCAT("++") 53..55
-        TOKEN_WHITESPACE(" ") 55..56
-        NODE_LIST 56..59 {
-          TOKEN_SQUARE_B_OPEN("[") 56..57
-          NODE_LITERAL 57..58 {
-            TOKEN_INTEGER("4") 57..58
+          TOKEN_WHITESPACE(" ") 52..53
+          TOKEN_CONCAT("++") 53..55
+          TOKEN_WHITESPACE(" ") 55..56
+          NODE_LIST 56..59 {
+            TOKEN_SQUARE_B_OPEN("[") 56..57
+            NODE_LITERAL 57..58 {
+              TOKEN_INTEGER("4") 57..58
+            }
+            TOKEN_SQUARE_B_CLOSE("]") 58..59
           }
-          TOKEN_SQUARE_B_CLOSE("]") 58..59
         }
       }
       TOKEN_SEMICOLON(";") 59..60
