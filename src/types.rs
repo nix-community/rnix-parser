@@ -529,8 +529,8 @@ typed! [
     },
     NODE_UNARY_OP => UnaryOp: {
         /// Return the operator
-        pub fn operator(&self) -> UnaryOpKind {
-            self.first_token().and_then(|t| UnaryOpKind::from_token(t.kind())).expect("invalid ast")
+        pub fn operator(&self) -> Option<UnaryOpKind> {
+            self.first_token().and_then(|t| UnaryOpKind::from_token(t.kind()))
         }
         /// Return the value in the operation
         pub fn value(&self) -> Option<SyntaxNode> {
