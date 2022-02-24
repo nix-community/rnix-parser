@@ -372,7 +372,7 @@ mod tests {
 
     If you need further help, see https://nixos.org/nixos/support.html
   ''"#;
-        let parsed = crate::parse(&inp);
+        let parsed = crate::parse(inp);
         assert!(parsed.errors().is_empty());
         match ParsedType::try_from(parsed.root().inner().expect("root")) {
             Ok(ParsedType::Str(s)) => {
