@@ -103,9 +103,6 @@ mod tests {
     #[test]
     fn t_macro() {
         assert_eq!(T![@], SyntaxKind::TOKEN_AT);
-        assert!(match SyntaxKind::TOKEN_PAREN_OPEN {
-            T!["("] => true,
-            _ => false,
-        });
+        assert!(matches!(SyntaxKind::TOKEN_PAREN_OPEN, T!["("]));
     }
 }

@@ -13,10 +13,7 @@ enum IdentType {
 }
 
 fn is_valid_path_char(c: char) -> bool {
-    match c {
-        'a'..='z' | 'A'..='Z' | '0'..='9' | '/' | '_' | '.' | '+' | '-' => true,
-        _ => false,
-    }
+    matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9' | '/' | '_' | '.' | '+' | '-')
 }
 
 fn is_valid_uri_char(c: char) -> bool {
