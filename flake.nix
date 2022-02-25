@@ -53,7 +53,7 @@
       rec {
         # `nix develop`
         devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [ rustfmt rustc cargo ];
+          buildInputs = with pkgs; [ rustfmt rustc cargo clippy ];
         };
 
         packages.rnix-parser = pkgs.rnix-parser;

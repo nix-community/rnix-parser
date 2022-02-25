@@ -797,7 +797,7 @@ pub fn parse<I>(iter: I) -> AST
 where
     I: Iterator<Item = (SyntaxKind, SmolStr)>,
 {
-    let mut parser = Parser::new(iter.into_iter());
+    let mut parser = Parser::new(iter);
     parser.builder.start_node(NixLanguage::kind_to_raw(NODE_ROOT));
     parser.parse_expr();
     parser.eat_trivia();
@@ -828,7 +828,7 @@ mod tests {
     pred:
 
 ";
-        let ast = crate::parse(&code);
+        let ast = crate::parse(code);
         let actual = format!("{}", ast.root().dump());
         // The core thing we want to check here is that `\n\n` belongs to the
         // root node, and not to some incomplete inner node.
@@ -868,7 +868,7 @@ NODE_ROOT 0..50 {
     fn whitespace_attachment_for_incomplete_code2() {
         let code = "{} =
 ";
-        let ast = crate::parse(&code);
+        let ast = crate::parse(code);
         let actual = format!("{}", ast.root().dump());
         assert_eq!(
             actual.trim(),

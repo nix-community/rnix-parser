@@ -336,8 +336,8 @@ impl<'a> Iterator for Tokenizer<'a> {
             ':' => Some((TOKEN_COLON, self.string_since(start))),
             ',' => Some((TOKEN_COMMA, self.string_since(start))),
             '.' => {
-                if self.peek().map(|x| x >= '0' && x <= '9').unwrap_or(false) {
-                    self.consume(|c| c >= '0' && c <= '9');
+                if self.peek().map(|x| ('0'..='9').contains(&x)).unwrap_or(false) {
+                    self.consume(|c| ('0'..='9').contains(&c));
                     Some((TOKEN_FLOAT, self.string_since(start)))
                 } else {
                     Some((TOKEN_DOT, self.string_since(start)))
@@ -444,10 +444,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                 Some((TOKEN_STRING_START, self.string_since(start)))
             }
             '0'..='9' => {
-                self.consume(|c| c >= '0' && c <= '9');
+                self.consume(|c| ('0'..='9').contains(&c));
                 if self.peek() == Some('.') {
                     self.next().unwrap();
-                    if self.consume(|c| c >= '0' && c <= '9') == 0 {
+                    if self.consume(|c| ('0'..='9').contains(&c)) == 0 {
                         return Some((TOKEN_ERROR, self.string_since(start)));
                     }
                     if self.peek() == Some('e') || self.peek() == Some('E') {
@@ -455,7 +455,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                         if self.peek() == Some('-') {
                             self.next().unwrap();
                         }
-                        if self.consume(|c| c >= '0' && c <= '9') == 0 {
+                        if self.consume(|c| ('0'..='9').contains(&c)) == 0 {
                             return Some((TOKEN_ERROR, self.string_since(start)));
                         }
                     }
