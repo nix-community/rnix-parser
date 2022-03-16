@@ -90,8 +90,8 @@ NODE_ROOT 0..150 {
               TOKEN_WHITESPACE(" ") 105..106
               TOKEN_ASSIGN("=") 106..107
               TOKEN_WHITESPACE(" ") 107..108
-              NODE_IDENT 108..112 {
-                TOKEN_IDENT("true") 108..112
+              NODE_LITERAL 108..112 {
+                TOKEN_BOOLEAN("true") 108..112
               }
               TOKEN_SEMICOLON(";") 112..113
             }

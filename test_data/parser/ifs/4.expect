@@ -2,8 +2,8 @@ NODE_ROOT 0..44 {
   NODE_IF_ELSE 0..44 {
     TOKEN_IF("if") 0..2
     TOKEN_WHITESPACE(" ") 2..3
-    NODE_IDENT 3..8 {
-      TOKEN_IDENT("false") 3..8
+    NODE_LITERAL 3..8 {
+      TOKEN_BOOLEAN("false") 3..8
     }
     TOKEN_WHITESPACE(" ") 8..9
     TOKEN_THEN("then") 9..13
@@ -17,8 +17,8 @@ NODE_ROOT 0..44 {
     NODE_IF_ELSE 21..44 {
       TOKEN_IF("if") 21..23
       TOKEN_WHITESPACE(" ") 23..24
-      NODE_IDENT 24..28 {
-        TOKEN_IDENT("true") 24..28
+      NODE_LITERAL 24..28 {
+        TOKEN_BOOLEAN("true") 24..28
       }
       TOKEN_WHITESPACE(" ") 28..29
       TOKEN_THEN("then") 29..33

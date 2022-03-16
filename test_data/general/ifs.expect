@@ -145,8 +145,8 @@ NODE_ROOT 0..284 {
         TOKEN_WHITESPACE(" ") 208..209
         TOKEN_ASSIGN("=") 209..210
         TOKEN_WHITESPACE(" ") 210..211
-        NODE_IDENT 211..216 {
-          TOKEN_IDENT("false") 211..216
+        NODE_LITERAL 211..216 {
+          TOKEN_BOOLEAN("false") 211..216
         }
         TOKEN_SEMICOLON(";") 216..217
       }
@@ -199,8 +199,8 @@ NODE_ROOT 0..284 {
           }
           TOKEN_SEMICOLON(";") 275..276
           TOKEN_WHITESPACE(" ") 276..277
-          NODE_IDENT 277..281 {
-            TOKEN_IDENT("true") 277..281
+          NODE_LITERAL 277..281 {
+            TOKEN_BOOLEAN("true") 277..281
           }
         }
         TOKEN_SEMICOLON(";") 281..282

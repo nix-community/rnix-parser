@@ -25,6 +25,7 @@ pub enum Anchor {
 /// A value, such as a string or integer
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
+    Boolean(bool),
     Float(f64),
     Integer(i64),
     String(String),
@@ -159,6 +160,7 @@ pub fn remove_trailing(string: &mut String) {
 pub enum ValueError {
     Float(std::num::ParseFloatError),
     Integer(std::num::ParseIntError),
+    Boolean,
     StorePath,
     Unknown,
 }
@@ -178,6 +180,7 @@ impl fmt::Display for ValueError {
         match self {
             ValueError::Float(err) => write!(f, "failed to parse float: {}", err),
             ValueError::Integer(err) => write!(f, "failed to parse int: {}", err),
+            ValueError::Boolean => write!(f, "failed to parse bool"),
             ValueError::StorePath => write!(f, "failed to parse store path"),
             ValueError::Unknown => write!(f, "unknown value kind"),
         }
@@ -189,7 +192,7 @@ impl std::error::Error for ValueError {
         match self {
             ValueError::Float(err) => Some(err),
             ValueError::Integer(err) => Some(err),
-            ValueError::StorePath | ValueError::Unknown => None,
+            ValueError::Boolean | ValueError::StorePath | ValueError::Unknown => None,
         }
     }
 }
@@ -198,6 +201,15 @@ impl Value {
     /// Parse a token kind and string into a typed value
     pub fn from_token(token: SyntaxKind, s: &str) -> Result<Self, ValueError> {
         let value = match token {
+            TOKEN_BOOLEAN => {
+                if s == "true" {
+                    Value::Boolean(true)
+                } else if s == "false" {
+                    Value::Boolean(false)
+                } else {
+                    return Err(ValueError::Boolean);
+                }
+            }
             TOKEN_FLOAT => Value::Float(s.parse()?),
             TOKEN_INTEGER => Value::Integer(s.parse()?),
             TOKEN_PATH => {
@@ -417,5 +429,8 @@ mod tests {
 
         assert_eq!(Value::from_token(TOKEN_INTEGER, "123"), Ok(Value::Integer(123)));
         assert_eq!(Value::from_token(TOKEN_FLOAT, "1.234"), Ok(Value::Float(1.234)));
+
+        assert_eq!(Value::from_token(TOKEN_BOOLEAN, "true"), Ok(Value::Boolean(true)));
+        assert_eq!(Value::from_token(TOKEN_BOOLEAN, "false"), Ok(Value::Boolean(false)));
     }
 }

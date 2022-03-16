@@ -12,8 +12,8 @@ NODE_ROOT 0..11 {
       }
     }
     TOKEN_AND("&&") 5..7
-    NODE_IDENT 7..11 {
-      TOKEN_IDENT("true") 7..11
+    NODE_LITERAL 7..11 {
+      TOKEN_BOOLEAN("true") 7..11
     }
   }
 }

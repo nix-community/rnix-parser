@@ -55,6 +55,7 @@ pub enum SyntaxKind {
     TOKEN_OR,
 
     // Identifiers and values
+    TOKEN_BOOLEAN,
     TOKEN_DYNAMIC_END,
     TOKEN_DYNAMIC_START,
     TOKEN_FLOAT,
@@ -108,7 +109,7 @@ impl SyntaxKind {
     /// Returns true if this token is a literal, such as an integer or a string
     pub fn is_literal(self) -> bool {
         match self {
-            TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI => true,
+            TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI | TOKEN_BOOLEAN => true,
             _ => false,
         }
     }

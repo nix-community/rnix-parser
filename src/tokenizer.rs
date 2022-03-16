@@ -417,9 +417,11 @@ impl<'a> Iterator for Tokenizer<'a> {
                         "if" => TOKEN_IF,
                         "in" => TOKEN_IN,
                         "inherit" => TOKEN_INHERIT,
+                        "false" => TOKEN_BOOLEAN,
                         "let" => TOKEN_LET,
                         "rec" => TOKEN_REC,
                         "then" => TOKEN_THEN,
+                        "true" => TOKEN_BOOLEAN,
                         "with" => TOKEN_WITH,
                         _ => {
                             if matches!(self.ctx.last_mut().unwrap().todo, Some(Todo::Path)) {
@@ -1066,24 +1068,24 @@ mod tests {
         assert_eq!(
             tokenize("false -> !false && false == true || true"),
             tokens![
-                (TOKEN_IDENT, "false"),
+                (TOKEN_BOOLEAN, "false"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IMPLICATION, "->"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INVERT, "!"),
-                (TOKEN_IDENT, "false"),
+                (TOKEN_BOOLEAN, "false"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_IDENT, "false"),
+                (TOKEN_BOOLEAN, "false"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_EQUAL, "=="),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_IDENT, "true"),
+                (TOKEN_BOOLEAN, "true"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_OR, "||"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_IDENT, "true"),
+                (TOKEN_BOOLEAN, "true"),
             ]
         );
         assert_eq!(
@@ -1167,7 +1169,7 @@ mod tests {
             tokens![
                 (TOKEN_IF, "if"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_IDENT, "false"),
+                (TOKEN_BOOLEAN, "false"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_THEN, "then"),
                 (TOKEN_WHITESPACE, " "),
@@ -1177,7 +1179,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IF, "if"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_IDENT, "true"),
+                (TOKEN_BOOLEAN, "true"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_THEN, "then"),
                 (TOKEN_WHITESPACE, " "),
