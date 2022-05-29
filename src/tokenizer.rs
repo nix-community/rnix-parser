@@ -98,7 +98,7 @@ impl<'a> Tokenizer<'a> {
         F: FnMut(char) -> bool,
     {
         let mut len = 0;
-        while self.peek().map(|c| f(c)).unwrap_or(false) {
+        while self.peek().map_or(false, |c| f(c)) {
             self.next().unwrap();
             len += 1;
         }
@@ -154,6 +154,17 @@ impl<'a> Tokenizer<'a> {
             }
         }
     }
+
+    fn path_since(&mut self, past: State) -> Option<(SyntaxKind, SmolStr)> {
+        self.consume(is_valid_path_char);
+        let path = self.string_since(past);
+        if self.remaining().starts_with("${") {
+            self.ctx.last_mut().unwrap().todo = Some(Todo::Path);
+        } else if path.ends_with('/') {
+            return Some((TOKEN_ERROR, path));
+        }
+        return Some((TOKEN_PATH, path));
+    }
 }
 impl<'a> Iterator for Tokenizer<'a> {
     type Item = (SyntaxKind, SmolStr);
@@ -171,7 +182,6 @@ impl<'a> Iterator for Tokenizer<'a> {
                     }
                 }
                 Some(Todo::Path) => {
-                    *todo = Some(Todo::Path);
                     if self.starts_with_bump("${") {
                         self.ctx.push(Context {
                             interpol: Some(Interpol {
@@ -183,6 +193,8 @@ impl<'a> Iterator for Tokenizer<'a> {
                             todo: None,
                         });
                         return Some((TOKEN_INTERPOL_START, self.string_since(start)));
+                    } else if self.peek().map_or(false, is_valid_path_char) {
+                        return self.path_since(start);
                     }
                 }
                 Some(Todo::StringBody { multiline }) => {
@@ -223,10 +235,6 @@ impl<'a> Iterator for Tokenizer<'a> {
         }
 
         if self.consume(char::is_whitespace) > 0 {
-            let ctx = self.ctx.last_mut().unwrap();
-            if matches!(ctx.todo, Some(Todo::Path)) {
-                ctx.todo = None;
-            }
             return Some((TOKEN_WHITESPACE, self.string_since(start)));
         }
 
@@ -256,10 +264,9 @@ impl<'a> Iterator for Tokenizer<'a> {
         // Check if it's a path
         let store_path = self.peek() == Some('<');
         let kind = {
-            let mut lookahead = self.remaining().chars().skip_while(|c| match c {
-                'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.' | '+' | '-' => true,
+            let mut lookahead = self.remaining().chars().skip_while(|&c| match c {
                 '<' | '/' => store_path,
-                _ => false,
+                _ => is_valid_path_char(c),
             });
             match (lookahead.next(), lookahead.next()) {
                 // a//b parses as Update(a, b)
@@ -278,14 +285,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             if c == '~' && self.next() != Some('/') {
                 return Some((TOKEN_ERROR, self.string_since(start)));
             }
-            self.consume(is_valid_path_char);
-            let ident = self.string_since(start);
-            if self.remaining().starts_with("${") {
-                self.ctx.last_mut().unwrap().todo = Some(Todo::Path);
-            } else if ident.ends_with('/') {
-                return Some((TOKEN_ERROR, ident));
-            }
-            return Some((TOKEN_PATH, ident));
+            return self.path_since(start);
         }
 
         match c {
@@ -404,7 +404,6 @@ impl<'a> Iterator for Tokenizer<'a> {
                     Some(IdentType::Store) | None => IdentType::Ident,
                     Some(kind) => kind,
                 };
-                assert_ne!(kind, IdentType::Path, "paths are checked earlier");
                 self.consume(|c| match c {
                     'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '\'' => true,
                     c => kind == IdentType::Uri && is_valid_uri_char(c),
@@ -421,16 +420,11 @@ impl<'a> Iterator for Tokenizer<'a> {
                         "rec" => TOKEN_REC,
                         "then" => TOKEN_THEN,
                         "with" => TOKEN_WITH,
-                        _ => {
-                            if matches!(self.ctx.last_mut().unwrap().todo, Some(Todo::Path)) {
-                                TOKEN_PATH
-                            } else {
-                                TOKEN_IDENT
-                            }
-                        },
+                        _ => TOKEN_IDENT,
                     },
-                    IdentType::Path | IdentType::Store => TOKEN_PATH,
                     IdentType::Uri => TOKEN_URI,
+                    IdentType::Path => panic!("paths are checked earlier"),
+                    IdentType::Store => panic!("store paths are checked earlier"),
                 };
                 Some((syntax_kind, ident))
             }
@@ -488,6 +482,13 @@ mod tests {
         ($(($token:expr, $str:expr)),*) => {
             vec![$(($token, $str.into())),*]
         };
+    }
+
+    fn path(path: &str) -> Vec<(SyntaxKind, SmolStr)> {
+        tokens![(TOKEN_PATH, path)]
+    }
+    fn error(token: &str) -> Vec<(SyntaxKind, SmolStr)> {
+        tokens![(TOKEN_ERROR, token)]
     }
 
     #[test]
@@ -878,9 +879,6 @@ mod tests {
     }
     #[test]
     fn paths() {
-        fn path(path: &str) -> Vec<(SyntaxKind, SmolStr)> {
-            tokens![(TOKEN_PATH, path)]
-        }
         assert_eq!(tokenize("/hello/world"), path("/hello/world"));
         assert_eq!(tokenize("hello/world"), path("hello/world"));
         assert_eq!(tokenize("a+3/5+b"), path("a+3/5+b"));
@@ -888,6 +886,9 @@ mod tests {
         assert_eq!(tokenize("./hello/world"), path("./hello/world"));
         assert_eq!(tokenize("~/hello/world"), path("~/hello/world"));
         assert_eq!(tokenize("<hello/world>"), path("<hello/world>"));
+        assert_eq!(tokenize("~"), error("~"));
+        assert_eq!(tokenize("~/"), error("~/"));
+        assert_eq!(tokenize("/a/"), error("/a/"));
     }
     #[test]
     fn test_path_no_newline() {
@@ -933,6 +934,36 @@ mod tests {
                 (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "bar"),
                 (TOKEN_INTERPOL_END, "}"),
+            ]
+        );
+        assert_eq!(
+            tokenize("./${foo}let"),
+            tokens![
+                (TOKEN_PATH, "./"),
+                (TOKEN_INTERPOL_START, "${"),
+                (TOKEN_IDENT, "foo"),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_PATH, "let"),
+            ]
+        );
+        assert_eq!(
+            tokenize("./${foo}.jpg"),
+            tokens![
+                (TOKEN_PATH, "./"),
+                (TOKEN_INTERPOL_START, "${"),
+                (TOKEN_IDENT, "foo"),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_PATH, ".jpg"),
+            ]
+        );
+        assert_eq!(
+            tokenize("./${foo}/"),
+            tokens![
+                (TOKEN_PATH, "./"),
+                (TOKEN_INTERPOL_START, "${"),
+                (TOKEN_IDENT, "foo"),
+                (TOKEN_INTERPOL_END, "}"),
+                (TOKEN_ERROR, "/"),
             ]
         );
         assert_eq!(
