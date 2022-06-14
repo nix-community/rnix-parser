@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [v0.10.2] - 2022-06-14
+
+* Correctly parse every possible case of path-interpolation in Nix code ([#85](https://github.com/nix-community/rnix-parser/issues/85)).
+
+  (from [@ncfavier](https://github.com/ncfavier)).
+
 ## [v0.10.1] - 2021-12-06
 
 ### Fixed
@@ -84,7 +90,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 * Fixed a memory leak while parsing `inherit`-expressions with invalid syntax (from [@Ma27](https://github.com/Ma27/)).
 
-[Unreleased]: https://github.com/nix-community/rnix-parser/compare/v0.10.1...master
+[Unreleased]: https://github.com/nix-community/rnix-parser/compare/v0.10.2...master
+[v0.10.2]: https://github.com/nix-community/rnix-parser/compare/v0.10.1...v0.10.2
 [v0.10.1]: https://github.com/nix-community/rnix-parser/compare/v0.10.0...v0.10.1
 [v0.10.0]: https://github.com/nix-community/rnix-parser/compare/v0.9.1...v0.10.0
 [v0.9.1]: https://github.com/nix-community/rnix-parser/compare/v0.9.0...v0.9.1
