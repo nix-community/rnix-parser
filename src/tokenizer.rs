@@ -264,17 +264,20 @@ impl<'a> Iterator for Tokenizer<'a> {
         // Check if it's a path
         let store_path = self.peek() == Some('<');
         let kind = {
-            let mut lookahead = self.remaining().chars().skip_while(|&c| match c {
+            let skipped = self.remaining().chars().take_while(|&c| match c {
                 '<' | '/' => store_path,
                 _ => is_valid_path_char(c),
-            });
+            }).collect::<String>();
+
+            let mut lookahead = self.remaining().chars().skip(skipped.chars().count());
+
             match (lookahead.next(), lookahead.next()) {
                 // a//b parses as Update(a, b)
                 (Some('/'), Some('/')) => None,
                 (Some('/'), Some('*')) => None,
                 (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
                 (Some('>'), _) => Some(IdentType::Store),
-                (Some(':'), Some(c)) if is_valid_uri_char(c) => Some(IdentType::Uri),
+                (Some(':'), Some(c)) if is_valid_uri_char(c) && !skipped.contains('_') => Some(IdentType::Uri),
                 _ => None,
             }
         };
@@ -881,6 +884,7 @@ mod tests {
     fn paths() {
         assert_eq!(tokenize("/hello/world"), path("/hello/world"));
         assert_eq!(tokenize("hello/world"), path("hello/world"));
+        assert_eq!(tokenize("hello_/world"), path("hello_/world"));
         assert_eq!(tokenize("a+3/5+b"), path("a+3/5+b"));
         assert_eq!(tokenize("1-2/3"), path("1-2/3"));
         assert_eq!(tokenize("./hello/world"), path("./hello/world"));
@@ -999,6 +1003,13 @@ mod tests {
         );
     }
     #[test]
+    fn uri_with_underscore() {
+        assert_eq!(
+            tokenize("https://goo_gle.com/?q=Hello+World"),
+            tokens![(TOKEN_URI, "https://goo_gle.com/?q=Hello+World")]
+        );
+    }
+    #[test]
     fn list() {
         assert_eq!(
             tokenize(r#"[a 2 3 "lol"]"#),
@@ -1053,6 +1064,17 @@ mod tests {
                 (TOKEN_ADD, "+"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "b"),
+            ]
+        );
+    }
+    #[test]
+    fn lambda_arg_underscore() {
+        assert_eq!(
+            tokenize("_:null"),
+            tokens![
+                (TOKEN_IDENT, "_"),
+                (TOKEN_COLON, ":"),
+                (TOKEN_IDENT, "null"),
             ]
         );
     }
