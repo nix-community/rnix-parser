@@ -10,6 +10,7 @@ pub use self::{
     kinds::SyntaxKind,
     parser::AST,
     value::{StrPart, Value as NixValue},
+    tokenizer::tokenize,
 };
 
 pub use rowan::{

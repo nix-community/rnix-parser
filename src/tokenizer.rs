@@ -58,6 +58,11 @@ impl PartialEq for State<'_> {
 }
 impl Eq for State<'_> {}
 
+/// A convenience function for tokenizing the given input
+pub fn tokenize(input: &str) -> Vec<(SyntaxKind, SmolStr)> {
+    Tokenizer::new(input).collect()
+}
+
 /// The tokenizer. You may want to use the `tokenize` convenience function from this module instead.
 pub struct Tokenizer<'a> {
     ctx: Vec<Context>,
@@ -468,15 +473,10 @@ impl<'a> Iterator for Tokenizer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        SyntaxKind::{self, *},
-        Tokenizer,
-    };
-    use smol_str::SmolStr;
+    use crate::tokenizer::tokenize;
 
-    fn tokenize(input: &str) -> Vec<(SyntaxKind, SmolStr)> {
-        Tokenizer::new(input).collect()
-    }
+    use super::SyntaxKind::{self, *};
+    use smol_str::SmolStr;
 
     macro_rules! tokens {
         ($(($token:expr, $str:expr),)*) => {
