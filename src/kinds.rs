@@ -107,10 +107,7 @@ use SyntaxKind::*;
 impl SyntaxKind {
     /// Returns true if this token is a literal, such as an integer or a string
     pub fn is_literal(self) -> bool {
-        match self {
-            TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI => true,
-            _ => false,
-        }
+        matches!(self, TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI)
     }
     /// Returns true if this token should be used as a function argument.
     /// ```ignore
@@ -132,9 +129,6 @@ impl SyntaxKind {
     /// Returns true if this token is a comment, whitespace, or similar, and
     /// should be skipped over by the parser.
     pub fn is_trivia(self) -> bool {
-        match self {
-            TOKEN_COMMENT | TOKEN_ERROR | TOKEN_WHITESPACE => true,
-            _ => false,
-        }
+        matches!(self, TOKEN_COMMENT | TOKEN_ERROR | TOKEN_WHITESPACE)
     }
 }
