@@ -16,7 +16,7 @@
       in {
         rnix-parser = final.stdenv.mkDerivation {
           pname = "rnix-parser";
-          version = "0.9.1";
+          version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
           src = final.lib.cleanSource ./.;
           nativeBuildInputs = with final; [
             rustc cargo
