@@ -1,7 +1,5 @@
 //! The tokenizer: turns a string into tokens, such as numbers, strings, and keywords
 
-use smol_str::SmolStr;
-
 use crate::SyntaxKind::{self, *};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -55,8 +53,10 @@ impl PartialEq for State<'_> {
 }
 impl Eq for State<'_> {}
 
+pub type TokenizeItem = (SyntaxKind, String);
+
 /// A convenience function for tokenizing the given input
-pub fn tokenize(input: &str) -> Vec<(SyntaxKind, SmolStr)> {
+pub fn tokenize(input: &str) -> Vec<TokenizeItem> {
     Tokenizer::new(input).collect()
 }
 
@@ -91,8 +91,8 @@ impl<'a> Tokenizer<'a> {
         }
         starts_with
     }
-    fn string_since(&self, past: State) -> SmolStr {
-        SmolStr::new(&past.input[past.offset..self.state.offset])
+    fn string_since(&self, past: State) -> String {
+        past.input[past.offset..self.state.offset].to_string()
     }
 
     fn consume<F>(&mut self, mut f: F) -> usize
@@ -157,7 +157,7 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    fn path_since(&mut self, past: State) -> Option<(SyntaxKind, SmolStr)> {
+    fn path_since(&mut self, past: State) -> Option<TokenizeItem> {
         self.consume(is_valid_path_char);
         let path = self.string_since(past);
         if self.remaining().starts_with("${") {
@@ -169,7 +169,7 @@ impl<'a> Tokenizer<'a> {
     }
 }
 impl<'a> Iterator for Tokenizer<'a> {
-    type Item = (SyntaxKind, SmolStr);
+    type Item = TokenizeItem;
 
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.state;
@@ -470,10 +470,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tokenizer::tokenize;
-
-    use super::SyntaxKind::{self, *};
-    use smol_str::SmolStr;
+    use super::{TokenizeItem, tokenize, SyntaxKind::*};
 
     macro_rules! tokens {
         ($(($token:expr, $str:expr),)*) => {
@@ -484,10 +481,10 @@ mod tests {
         };
     }
 
-    fn path(path: &str) -> Vec<(SyntaxKind, SmolStr)> {
+    fn path(path: &str) -> Vec<TokenizeItem> {
         tokens![(TOKEN_PATH, path)]
     }
-    fn error(token: &str) -> Vec<(SyntaxKind, SmolStr)> {
+    fn error(token: &str) -> Vec<TokenizeItem> {
         tokens![(TOKEN_ERROR, token)]
     }
 

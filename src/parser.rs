@@ -7,9 +7,9 @@ use std::{
 
 use cbitset::BitSet256;
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, TextRange, TextSize};
-use smol_str::SmolStr;
 
 use crate::{
+    tokenizer::TokenizeItem,
     types::{Root, TypedNode},
     NixLanguage,
     SyntaxKind::{self, *},
@@ -141,19 +141,19 @@ impl AST {
 
 struct Parser<I>
 where
-    I: Iterator<Item = (SyntaxKind, SmolStr)>,
+    I: Iterator<Item = TokenizeItem>,
 {
     builder: GreenNodeBuilder<'static>,
     errors: Vec<ParseError>,
 
-    trivia_buffer: Vec<I::Item>,
-    buffer: VecDeque<I::Item>,
+    trivia_buffer: Vec<TokenizeItem>,
+    buffer: VecDeque<TokenizeItem>,
     iter: I,
     consumed: TextSize,
 }
 impl<I> Parser<I>
 where
-    I: Iterator<Item = (SyntaxKind, SmolStr)>,
+    I: Iterator<Item = TokenizeItem>,
 {
     fn new(iter: I) -> Self {
         Self {
@@ -171,7 +171,7 @@ where
         self.consumed
     }
 
-    fn peek_raw(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
+    fn peek_raw(&mut self) -> Option<&TokenizeItem> {
         if self.buffer.is_empty() {
             if let Some(token) = self.iter.next() {
                 self.buffer.push_back(token);
@@ -225,14 +225,14 @@ where
             None => self.errors.push(ParseError::UnexpectedEOF),
         }
     }
-    fn try_next(&mut self) -> Option<(SyntaxKind, SmolStr)> {
+    fn try_next(&mut self) -> Option<TokenizeItem> {
         self.buffer.pop_front().or_else(|| self.iter.next())
     }
-    fn manual_bump(&mut self, s: SmolStr, token: SyntaxKind) {
+    fn manual_bump(&mut self, s: String, token: SyntaxKind) {
         self.consumed += TextSize::of(s.as_str());
         self.builder.token(NixLanguage::kind_to_raw(token), s.as_str())
     }
-    fn peek_data(&mut self) -> Option<&(SyntaxKind, SmolStr)> {
+    fn peek_data(&mut self) -> Option<&TokenizeItem> {
         while self.peek_raw().map(|&(t, _)| t.is_trivia()).unwrap_or(false) {
             self.bump();
         }
@@ -343,7 +343,7 @@ where
         if self.peek().map(|t| t == TOKEN_CURLY_B_CLOSE).unwrap_or(true) {
             self.bump();
         } else {
-            let mut args = HashMap::<SmolStr, TextSize>::new();
+            let mut args = HashMap::<String, TextSize>::new();
             loop {
                 match self.expect_peek_any(&[TOKEN_CURLY_B_CLOSE, TOKEN_ELLIPSIS, TOKEN_IDENT]) {
                     Some(TOKEN_CURLY_B_CLOSE) => {
@@ -795,7 +795,7 @@ where
 /// Parse tokens into an AST
 pub fn parse<I>(iter: I) -> AST
 where
-    I: Iterator<Item = (SyntaxKind, SmolStr)>,
+    I: Iterator<Item = TokenizeItem>,
 {
     let mut parser = Parser::new(iter);
     parser.builder.start_node(NixLanguage::kind_to_raw(NODE_ROOT));

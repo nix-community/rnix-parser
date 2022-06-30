@@ -1,6 +1,5 @@
 use std::{env, error::Error, fs};
 
-use smol_str::SmolStr;
 use rnix::{types::*, NodeOrToken, SyntaxKind::*, SyntaxNode};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -57,7 +56,7 @@ fn find_comment(node: SyntaxNode) -> Option<String> {
 
         match node.kind() {
             TOKEN_COMMENT => match &node {
-                NodeOrToken::Token(token) => comments.push(SmolStr::new(token.text())),
+                NodeOrToken::Token(token) => comments.push(token.text().to_string()),
                 NodeOrToken::Node(_) => unreachable!(),
             },
             t if t.is_trivia() => (),
