@@ -1,14 +1,12 @@
-use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
-use rnix::parse;
+use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 
 fn all_packages(c: &mut Criterion) {
     let input = include_str!("all-packages.nix");
-    c.bench(
-        "all-packages",
-        Benchmark::new("all-packages", move |b| b.iter(|| parse(input)))
-            .throughput(Throughput::Bytes(input.len() as u64))
-            .sample_size(30),
-    );
+    let mut group = c.benchmark_group("all-packages");
+    group.throughput(Throughput::Bytes(input.len() as u64));
+    group.sample_size(30);
+    group.bench_with_input("all-packages", input, move |b, input| b.iter(|| rnix::parse(input)));
+    group.finish();
 }
 
 criterion_group!(benches, all_packages);
