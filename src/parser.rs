@@ -1,7 +1,7 @@
 //! The parser: turns a series of tokens into an AST
 
 use std::{
-    collections::{HashSet, HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     fmt,
 };
 
@@ -370,7 +370,7 @@ where
                                 let fin = self.finish_error_node();
                                 self.errors.push(ParseError::DuplicatedArgs(
                                     TextRange::new(tp, fin),
-                                    id_str
+                                    id_str,
                                 ));
                             }
                         }
@@ -547,12 +547,12 @@ where
             TOKEN_PATH => {
                 let next = self.try_next();
                 if let Some((token, s)) = next {
-                    let is_complex_path = self
-                        .peek()
-                        .map_or(false, |t| t == TOKEN_INTERPOL_START);
-                    self.builder.start_node(NixLanguage::kind_to_raw(
-                        if is_complex_path { NODE_PATH_WITH_INTERPOL } else { NODE_LITERAL }
-                    ));
+                    let is_complex_path = self.peek().map_or(false, |t| t == TOKEN_INTERPOL_START);
+                    self.builder.start_node(NixLanguage::kind_to_raw(if is_complex_path {
+                        NODE_PATH_WITH_INTERPOL
+                    } else {
+                        NODE_LITERAL
+                    }));
                     self.manual_bump(&s, token);
                     if is_complex_path {
                         loop {
@@ -564,8 +564,8 @@ where
                                     self.parse_expr();
                                     self.expect(TOKEN_INTERPOL_END);
                                     self.finish_node();
-                                },
-                                _ => break
+                                }
+                                _ => break,
                             }
                         }
                     }
@@ -573,7 +573,7 @@ where
                 } else {
                     self.errors.push(ParseError::UnexpectedEOF);
                 }
-            },
+            }
             t if t.is_literal() => {
                 self.start_node(NODE_LITERAL);
                 self.bump();

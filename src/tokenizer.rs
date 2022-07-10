@@ -99,12 +99,8 @@ impl<'a> Tokenizer<'a> {
     where
         F: FnMut(char) -> bool,
     {
-        let len: usize = self
-            .remaining()
-            .chars()
-            .take_while(|&c| f(c))
-            .map(|c| c.len_utf8())
-            .sum::<usize>();
+        let len: usize =
+            self.remaining().chars().take_while(|&c| f(c)).map(|c| c.len_utf8()).sum::<usize>();
         self.state.offset += len;
         len
     }
@@ -146,7 +142,12 @@ impl<'a> Tokenizer<'a> {
                     Some('{') => {
                         self.state = start;
                         self.ctx.push(Context {
-                            interpol: Some(Interpol { brackets: 0, string: true, multiline, path_interpol: false }),
+                            interpol: Some(Interpol {
+                                brackets: 0,
+                                string: true,
+                                multiline,
+                                path_interpol: false,
+                            }),
                             todo: Some(Todo::InterpolStart),
                             ..Default::default()
                         });
@@ -223,11 +224,7 @@ impl<'a> Tokenizer<'a> {
                         },
                         _ => false,
                     };
-                    return Some(if status {
-                        TOKEN_STRING_END
-                    } else {
-                        TOKEN_ERROR
-                    });
+                    return Some(if status { TOKEN_STRING_END } else { TOKEN_ERROR });
                 }
                 _ => (),
             }
@@ -264,10 +261,14 @@ impl<'a> Tokenizer<'a> {
         // Check if it's a path
         let store_path = self.peek() == Some('<');
         let kind = {
-            let skipped = self.remaining().chars().take_while(|&c| match c {
-                '<' | '/' => store_path,
-                _ => is_valid_path_char(c),
-            }).collect::<String>();
+            let skipped = self
+                .remaining()
+                .chars()
+                .take_while(|&c| match c {
+                    '<' | '/' => store_path,
+                    _ => is_valid_path_char(c),
+                })
+                .collect::<String>();
 
             let mut lookahead = self.remaining().chars().skip(skipped.chars().count());
 
@@ -277,7 +278,9 @@ impl<'a> Tokenizer<'a> {
                 (Some('/'), Some('*')) => None,
                 (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
                 (Some('>'), _) => Some(IdentType::Store),
-                (Some(':'), Some(c)) if is_valid_uri_char(c) && !skipped.contains('_') => Some(IdentType::Uri),
+                (Some(':'), Some(c)) if is_valid_uri_char(c) && !skipped.contains('_') => {
+                    Some(IdentType::Uri)
+                }
                 _ => None,
             }
         };
@@ -339,12 +342,14 @@ impl<'a> Tokenizer<'a> {
             '@' => TOKEN_AT,
             ':' => TOKEN_COLON,
             ',' => TOKEN_COMMA,
-            '.' => if self.peek().map_or(false, |x| ('0'..='9').contains(&x)) {
-                self.consume(|c| ('0'..='9').contains(&c));
-                TOKEN_FLOAT
-            } else {
-                TOKEN_DOT
-            },
+            '.' => {
+                if self.peek().map_or(false, |x| ('0'..='9').contains(&x)) {
+                    self.consume(|c| ('0'..='9').contains(&c));
+                    TOKEN_FLOAT
+                } else {
+                    TOKEN_DOT
+                }
+            }
             '=' => TOKEN_ASSIGN,
             '?' => TOKEN_QUESTION,
             ';' => TOKEN_SEMICOLON,
@@ -395,7 +400,12 @@ impl<'a> Tokenizer<'a> {
             '$' if self.peek() == Some('{') => {
                 self.next().unwrap();
                 self.ctx.push(Context {
-                    interpol: Some(Interpol { brackets: 0, string: false, multiline: false, path_interpol: false, }),
+                    interpol: Some(Interpol {
+                        brackets: 0,
+                        string: false,
+                        multiline: false,
+                        path_interpol: false,
+                    }),
                     ..Default::default()
                 });
                 TOKEN_DYNAMIC_START
@@ -468,14 +478,13 @@ impl<'a> Iterator for Tokenizer<'a> {
     type Item = TokenizeItem<'a>;
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.state;
-        self.next_inner()
-            .map(|syntax_kind| (syntax_kind, self.str_since(start)))
+        self.next_inner().map(|syntax_kind| (syntax_kind, self.str_since(start)))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{TokenizeItem, tokenize, SyntaxKind::*};
+    use super::{tokenize, SyntaxKind::*, TokenizeItem};
 
     macro_rules! tokens {
         ($(($token:expr, $str:expr),)*) => {
@@ -1070,11 +1079,7 @@ mod tests {
     fn lambda_arg_underscore() {
         assert_eq!(
             tokenize("_:null"),
-            tokens![
-                (TOKEN_IDENT, "_"),
-                (TOKEN_COLON, ":"),
-                (TOKEN_IDENT, "null"),
-            ]
+            tokens![(TOKEN_IDENT, "_"), (TOKEN_COLON, ":"), (TOKEN_IDENT, "null"),]
         );
     }
     #[test]
