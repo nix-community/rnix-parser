@@ -1,14 +1,14 @@
 NODE_ROOT 0..15 {
   NODE_BIN_OP 0..15 {
-    NODE_BIN_OP 0..10 {
-      NODE_LIST 0..3 {
-        TOKEN_SQUARE_B_OPEN("[") 0..1
-        NODE_LITERAL 1..2 {
-          TOKEN_INTEGER("1") 1..2
-        }
-        TOKEN_SQUARE_B_CLOSE("]") 2..3
+    NODE_LIST 0..3 {
+      TOKEN_SQUARE_B_OPEN("[") 0..1
+      NODE_LITERAL 1..2 {
+        TOKEN_INTEGER("1") 1..2
       }
-      TOKEN_CONCAT("++") 3..5
+      TOKEN_SQUARE_B_CLOSE("]") 2..3
+    }
+    TOKEN_CONCAT("++") 3..5
+    NODE_BIN_OP 5..15 {
       NODE_LIST 5..10 {
         TOKEN_SQUARE_B_OPEN("[") 5..6
         NODE_IDENT 6..9 {
@@ -16,14 +16,14 @@ NODE_ROOT 0..15 {
         }
         TOKEN_SQUARE_B_CLOSE("]") 9..10
       }
-    }
-    TOKEN_CONCAT("++") 10..12
-    NODE_LIST 12..15 {
-      TOKEN_SQUARE_B_OPEN("[") 12..13
-      NODE_LITERAL 13..14 {
-        TOKEN_INTEGER("3") 13..14
+      TOKEN_CONCAT("++") 10..12
+      NODE_LIST 12..15 {
+        TOKEN_SQUARE_B_OPEN("[") 12..13
+        NODE_LITERAL 13..14 {
+          TOKEN_INTEGER("3") 13..14
+        }
+        TOKEN_SQUARE_B_CLOSE("]") 14..15
       }
-      TOKEN_SQUARE_B_CLOSE("]") 14..15
     }
   }
 }
