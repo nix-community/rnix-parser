@@ -686,7 +686,6 @@ where
     }
     fn handle_operation_right(
         &mut self,
-        once: bool,
         next: fn(&mut Self) -> Checkpoint,
         ops: &[SyntaxKind],
     ) -> Checkpoint {
@@ -694,11 +693,7 @@ where
         if self.peek().map(|t| ops.contains(&t)).unwrap_or(false) {
             self.start_node_at(checkpoint, NODE_BIN_OP);
             self.bump();
-            if once {
-                next(self);
-            } else {
-                self.handle_operation_right(once, next, ops);
-            }
+            self.handle_operation_right(next, ops);
             self.finish_node();
         }
         checkpoint
@@ -707,7 +702,7 @@ where
         self.handle_operation_left(false, Self::parse_negate, &[TOKEN_QUESTION])
     }
     fn parse_concat(&mut self) -> Checkpoint {
-        self.handle_operation_right(false, Self::parse_isset, &[TOKEN_CONCAT])
+        self.handle_operation_right(Self::parse_isset, &[TOKEN_CONCAT])
     }
     fn parse_mul(&mut self) -> Checkpoint {
         self.handle_operation_left(false, Self::parse_concat, &[TOKEN_MUL, TOKEN_DIV])
@@ -728,7 +723,7 @@ where
         }
     }
     fn parse_merge(&mut self) -> Checkpoint {
-        self.handle_operation_right(false, Self::parse_invert, &[TOKEN_UPDATE])
+        self.handle_operation_right(Self::parse_invert, &[TOKEN_UPDATE])
     }
     fn parse_compare(&mut self) -> Checkpoint {
         self.handle_operation_left(
@@ -747,7 +742,7 @@ where
         self.handle_operation_left(false, Self::parse_and, &[TOKEN_OR])
     }
     fn parse_implication(&mut self) -> Checkpoint {
-        self.handle_operation_right(false, Self::parse_or, &[TOKEN_IMPLICATION])
+        self.handle_operation_right(Self::parse_or, &[TOKEN_IMPLICATION])
     }
     #[inline(always)]
     fn parse_math(&mut self) -> Checkpoint {
