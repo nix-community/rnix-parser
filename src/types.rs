@@ -184,11 +184,19 @@ pub trait TypedNode: Clone {
 }
 
 pub trait TokenWrapper: TypedNode {
-    fn as_str(&self) -> &str {
-        match &self.node().green().children().next() {
-            Some(rowan::NodeOrToken::Token(token)) => token.text(),
-            _ => unreachable!(),
-        }
+    fn to_inner_token(&self) -> SyntaxToken {
+        self.node()
+            .children_with_tokens()
+            .filter_map(|element| element.into_token())
+            .next()
+            .unwrap()
+    }
+
+    /// ### Migration note about `as_str` (from `v0.10`)
+    /// `TokenWrapper::as_str` usage (`x.as_str()`) should be replaced with (`x.to_inner_string()`).
+    /// Note that the original usage used references, but the new API returns an owned string
+    fn to_inner_string(&self) -> String {
+        self.to_inner_token().text().to_string()
     }
 }
 
@@ -340,7 +348,8 @@ typed! [
     NODE_LITERAL => Value: TokenWrapper: {
         /// Parse the value
         pub fn to_value(&self) -> Result<ParsedValue, ValueError> {
-            ParsedValue::from_token(self.first_token().expect("invalid ast").kind(), self.as_str())
+            let token = self.to_inner_token();
+            ParsedValue::from_token(token.kind(), token.text())
         }
     },
 

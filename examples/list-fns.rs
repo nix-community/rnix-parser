@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(lambda) = entry.value().and_then(Lambda::cast) {
             if let Some(attr) = entry.key() {
                 let ident = attr.path().last().and_then(Ident::cast);
-                let s = ident.as_ref().map_or("error", Ident::as_str);
+                let s = ident.as_ref().map_or_else(|| "error".to_string(), Ident::to_inner_string);
                 println!("Function name: {}", s);
                 if let Some(comment) = find_comment(attr.node().clone()) {
                     println!("-> Doc: {}", comment);
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let mut value = Some(lambda);
                 while let Some(lambda) = value {
                     let ident = lambda.arg().and_then(Ident::cast);
-                    let s = ident.as_ref().map_or("error", Ident::as_str);
+                    let s = ident.as_ref().map_or_else(|| "error".to_string(), Ident::to_inner_string);
                     println!("-> Arg: {}", s);
                     if let Some(comment) = lambda.arg().and_then(find_comment) {
                         println!("--> Doc: {}", comment);

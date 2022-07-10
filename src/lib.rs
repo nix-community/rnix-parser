@@ -80,10 +80,10 @@ mod tests {
         let inherit = set.inherits().nth(1).unwrap();
 
         let from = inherit.from().unwrap().inner().and_then(Ident::cast).unwrap();
-        assert_eq!(from.as_str(), "set");
+        assert_eq!(from.to_inner_token().text(), "set");
         let mut children = inherit.idents();
-        assert_eq!(children.next().unwrap().as_str(), "z");
-        assert_eq!(children.next().unwrap().as_str(), "a");
+        assert_eq!(children.next().unwrap().to_inner_token().text(), "z");
+        assert_eq!(children.next().unwrap().to_inner_token().text(), "a");
         assert!(children.next().is_none());
     }
     #[test]
