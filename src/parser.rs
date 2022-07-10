@@ -181,8 +181,9 @@ where
     }
     fn drain_trivia_buffer(&mut self) {
         for (t, s) in self.trivia_buffer.drain(..) {
-            self.consumed += TextSize::of(s.as_str());
-            self.builder.token(NixLanguage::kind_to_raw(t), s.as_str())
+            let s = &s;
+            self.consumed += TextSize::of(s);
+            self.builder.token(NixLanguage::kind_to_raw(t), s);
         }
     }
     fn eat_trivia(&mut self) {
@@ -219,7 +220,7 @@ where
                     self.trivia_buffer.push((token, s))
                 } else {
                     self.drain_trivia_buffer();
-                    self.manual_bump(s, token);
+                    self.manual_bump(&s, token);
                 }
             }
             None => self.errors.push(ParseError::UnexpectedEOF),
@@ -228,9 +229,9 @@ where
     fn try_next(&mut self) -> Option<TokenizeItem> {
         self.buffer.pop_front().or_else(|| self.iter.next())
     }
-    fn manual_bump(&mut self, s: String, token: SyntaxKind) {
-        self.consumed += TextSize::of(s.as_str());
-        self.builder.token(NixLanguage::kind_to_raw(token), s.as_str())
+    fn manual_bump(&mut self, s: &str, token: SyntaxKind) {
+        self.consumed += TextSize::of(s);
+        self.builder.token(NixLanguage::kind_to_raw(token), s)
     }
     fn peek_data(&mut self) -> Option<&TokenizeItem> {
         while self.peek_raw().map(|&(t, _)| t.is_trivia()).unwrap_or(false) {
@@ -361,8 +362,8 @@ where
                         let mut ident_done = false;
                         if let Some((_, ident_name)) = self.peek_raw() {
                             let contains = args.contains_key(ident_name);
-                            let id = ident_name.clone();
-                            let id_str = ident_name.to_string().clone();
+                            let id: String = ident_name.clone();
+                            let id_str = ident_name.clone();
                             args.insert(id, tp);
                             if contains {
                                 ident_done = true;
@@ -554,7 +555,7 @@ where
                     self.builder.start_node(NixLanguage::kind_to_raw(
                         if is_complex_path { NODE_PATH_WITH_INTERPOL } else { NODE_LITERAL }
                     ));
-                    self.manual_bump(s, token);
+                    self.manual_bump(&s, token);
                     if is_complex_path {
                         loop {
                             match self.peek_raw().map(|(t, _)| t) {

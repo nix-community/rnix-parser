@@ -91,19 +91,21 @@ impl<'a> Tokenizer<'a> {
         }
         starts_with
     }
-    fn string_since(&self, past: State) -> String {
-        past.input[past.offset..self.state.offset].to_string()
+    fn str_since<'p>(&self, past: State<'p>) -> &'p str {
+        &past.input[past.offset..self.state.offset]
     }
 
     fn consume<F>(&mut self, mut f: F) -> usize
     where
         F: FnMut(char) -> bool,
     {
-        let mut len = 0;
-        while self.peek().map_or(false, |c| f(c)) {
-            self.next().unwrap();
-            len += 1;
-        }
+        let len: usize = self
+            .remaining()
+            .chars()
+            .take_while(|&c| f(c))
+            .map(|c| c.len_utf8())
+            .sum::<usize>();
+        self.state.offset += len;
         len
     }
     fn next_string(&mut self, multiline: bool) -> SyntaxKind {
@@ -159,7 +161,7 @@ impl<'a> Tokenizer<'a> {
 
     fn path_since(&mut self, past: State) -> Option<TokenizeItem> {
         self.consume(is_valid_path_char);
-        let path = self.string_since(past);
+        let path = self.str_since(past).to_string();
         if self.remaining().starts_with("${") {
             self.ctx.last_mut().unwrap().todo = Some(Todo::Path);
         } else if path.ends_with('/') {
@@ -180,7 +182,10 @@ impl<'a> Iterator for Tokenizer<'a> {
             match todo.take() {
                 Some(Todo::InterpolStart) => {
                     if self.starts_with_bump("${") {
-                        return Some((TOKEN_INTERPOL_START, self.string_since(start)));
+                        return Some((
+                            TOKEN_INTERPOL_START,
+                            self.str_since(start).to_string(),
+                        ));
                     }
                 }
                 Some(Todo::Path) => {
@@ -194,7 +199,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                             }),
                             todo: None,
                         });
-                        return Some((TOKEN_INTERPOL_START, self.string_since(start)));
+                        return Some((
+                            TOKEN_INTERPOL_START,
+                            self.str_since(start).to_string(),
+                        ));
                     } else if self.peek().map_or(false, is_valid_path_char) {
                         return self.path_since(start);
                     }
@@ -205,7 +213,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     if self.state == start {
                         continue;
                     }
-                    return Some((token, self.string_since(start)));
+                    return Some((token, self.str_since(start).to_string()));
                 }
                 Some(Todo::StringEnd) => {
                     let status = match self.peek() {
@@ -226,10 +234,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                         _ => false,
                     };
                     if !status {
-                        return Some((TOKEN_ERROR, self.string_since(start)));
+                        return Some((TOKEN_ERROR, self.str_since(start).to_string()));
                     }
 
-                    return Some((TOKEN_STRING_END, self.string_since(start)));
+                    return Some((TOKEN_STRING_END, self.str_since(start).to_string()));
                 }
                 _ => (),
             }
@@ -237,22 +245,22 @@ impl<'a> Iterator for Tokenizer<'a> {
         }
 
         if self.consume(char::is_whitespace) > 0 {
-            return Some((TOKEN_WHITESPACE, self.string_since(start)));
+            return Some((TOKEN_WHITESPACE, self.str_since(start).to_string()));
         }
 
         if self.peek() == Some('#') {
             self.consume(|c| c != '\n');
-            return Some((TOKEN_COMMENT, self.string_since(start)));
+            return Some((TOKEN_COMMENT, self.str_since(start).to_string()));
         }
         if self.starts_with_bump("/*") {
             loop {
                 self.consume(|c| c != '*');
                 self.next(); // consume the '*', if any
                 match self.peek() {
-                    None => return Some((TOKEN_ERROR, self.string_since(start))),
+                    None => return Some((TOKEN_ERROR, self.str_since(start).to_string())),
                     Some('/') => {
                         self.next().unwrap();
-                        return Some((TOKEN_COMMENT, self.string_since(start)));
+                        return Some((TOKEN_COMMENT, self.str_since(start).to_string()));
                     }
                     _ => (),
                 }
@@ -260,7 +268,7 @@ impl<'a> Iterator for Tokenizer<'a> {
         }
 
         if self.starts_with_bump("...") {
-            return Some((TOKEN_ELLIPSIS, self.string_since(start)));
+            return Some((TOKEN_ELLIPSIS, self.str_since(start).to_string()));
         }
 
         // Check if it's a path
@@ -288,7 +296,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 
         if c == '~' || kind == Some(IdentType::Path) {
             if c == '~' && self.next() != Some('/') {
-                return Some((TOKEN_ERROR, self.string_since(start)));
+                return Some((TOKEN_ERROR, self.str_since(start).to_string()));
             }
             return self.path_since(start);
         }
@@ -296,20 +304,20 @@ impl<'a> Iterator for Tokenizer<'a> {
         match c {
             '=' if self.peek() == Some('=') => {
                 self.next().unwrap();
-                Some((TOKEN_EQUAL, self.string_since(start)))
+                Some((TOKEN_EQUAL, self.str_since(start).to_string()))
             }
             '!' if self.peek() == Some('=') => {
                 self.next().unwrap();
-                Some((TOKEN_NOT_EQUAL, self.string_since(start)))
+                Some((TOKEN_NOT_EQUAL, self.str_since(start).to_string()))
             }
-            '!' => Some((TOKEN_INVERT, self.string_since(start))),
+            '!' => Some((TOKEN_INVERT, self.str_since(start).to_string())),
             '{' => {
                 if let Some(Interpol { ref mut brackets, .. }) =
                     self.ctx.last_mut().unwrap().interpol
                 {
                     *brackets += 1;
                 }
-                Some((TOKEN_CURLY_B_OPEN, self.string_since(start)))
+                Some((TOKEN_CURLY_B_OPEN, self.str_since(start).to_string()))
             }
             '}' => {
                 if let Some(Interpol { ref mut brackets, string, multiline, path_interpol }) =
@@ -320,87 +328,89 @@ impl<'a> Iterator for Tokenizer<'a> {
                         None => {
                             self.ctx.pop().unwrap();
 
-                            if string {
+                            let token_kind = if string {
                                 self.ctx.last_mut().unwrap().todo =
                                     Some(Todo::StringBody { multiline });
-                                return Some((TOKEN_INTERPOL_END, self.string_since(start)));
+                                TOKEN_INTERPOL_END
                             } else if path_interpol {
                                 self.ctx.last_mut().unwrap().todo = Some(Todo::Path);
-                                return Some((TOKEN_INTERPOL_END, self.string_since(start)));
+                                TOKEN_INTERPOL_END
                             } else {
-                                return Some((TOKEN_DYNAMIC_END, self.string_since(start)));
-                            }
+                                TOKEN_DYNAMIC_END
+                            };
+                            return Some((token_kind, self.str_since(start).to_string()));
                         }
                     }
                 }
-                Some((TOKEN_CURLY_B_CLOSE, self.string_since(start)))
+                Some((TOKEN_CURLY_B_CLOSE, self.str_since(start).to_string()))
             }
-            '[' => Some((TOKEN_SQUARE_B_OPEN, self.string_since(start))),
-            ']' => Some((TOKEN_SQUARE_B_CLOSE, self.string_since(start))),
-            '@' => Some((TOKEN_AT, self.string_since(start))),
-            ':' => Some((TOKEN_COLON, self.string_since(start))),
-            ',' => Some((TOKEN_COMMA, self.string_since(start))),
+            '[' => Some((TOKEN_SQUARE_B_OPEN, self.str_since(start).to_string())),
+            ']' => Some((TOKEN_SQUARE_B_CLOSE, self.str_since(start).to_string())),
+            '@' => Some((TOKEN_AT, self.str_since(start).to_string())),
+            ':' => Some((TOKEN_COLON, self.str_since(start).to_string())),
+            ',' => Some((TOKEN_COMMA, self.str_since(start).to_string())),
             '.' => {
-                if self.peek().map_or(false, |x| ('0'..='9').contains(&x)) {
+                let token_kind = if self.peek().map_or(false, |x| ('0'..='9').contains(&x)) {
                     self.consume(|c| ('0'..='9').contains(&c));
-                    Some((TOKEN_FLOAT, self.string_since(start)))
+                    TOKEN_FLOAT
                 } else {
-                    Some((TOKEN_DOT, self.string_since(start)))
-                }
+                    TOKEN_DOT
+                };
+                Some((token_kind, self.str_since(start).to_string()))
             },
-            '=' => Some((TOKEN_ASSIGN, self.string_since(start))),
-            '?' => Some((TOKEN_QUESTION, self.string_since(start))),
-            ';' => Some((TOKEN_SEMICOLON, self.string_since(start))),
-            '(' => Some((TOKEN_PAREN_OPEN, self.string_since(start))),
-            ')' => Some((TOKEN_PAREN_CLOSE, self.string_since(start))),
+            '=' => Some((TOKEN_ASSIGN, self.str_since(start).to_string())),
+            '?' => Some((TOKEN_QUESTION, self.str_since(start).to_string())),
+            ';' => Some((TOKEN_SEMICOLON, self.str_since(start).to_string())),
+            '(' => Some((TOKEN_PAREN_OPEN, self.str_since(start).to_string())),
+            ')' => Some((TOKEN_PAREN_CLOSE, self.str_since(start).to_string())),
             '+' if self.peek() == Some('+') => {
                 self.next().unwrap();
-                Some((TOKEN_CONCAT, self.string_since(start)))
+                Some((TOKEN_CONCAT, self.str_since(start).to_string()))
             }
             '-' if self.peek() == Some('>') => {
                 self.next().unwrap();
-                Some((TOKEN_IMPLICATION, self.string_since(start)))
+                Some((TOKEN_IMPLICATION, self.str_since(start).to_string()))
             }
             '/' if self.peek() == Some('/') => {
                 self.next().unwrap();
-                Some((TOKEN_UPDATE, self.string_since(start)))
+                Some((TOKEN_UPDATE, self.str_since(start).to_string()))
             }
-            '+' => Some((TOKEN_ADD, self.string_since(start))),
-            '-' => Some((TOKEN_SUB, self.string_since(start))),
-            '*' => Some((TOKEN_MUL, self.string_since(start))),
-            '/' => Some((TOKEN_DIV, self.string_since(start))),
+            '+' => Some((TOKEN_ADD, self.str_since(start).to_string())),
+            '-' => Some((TOKEN_SUB, self.str_since(start).to_string())),
+            '*' => Some((TOKEN_MUL, self.str_since(start).to_string())),
+            '/' => Some((TOKEN_DIV, self.str_since(start).to_string())),
             '<' if kind == Some(IdentType::Store) => {
                 self.consume(is_valid_path_char);
                 if self.next() != Some('>') {
-                    return Some((TOKEN_ERROR, self.string_since(start)));
+                    return Some((TOKEN_ERROR, self.str_since(start).to_string()));
                 }
-                Some((TOKEN_PATH, self.string_since(start)))
+                Some((TOKEN_PATH, self.str_since(start).to_string()))
             }
             '&' if self.peek() == Some('&') => {
                 self.next().unwrap();
-                Some((TOKEN_AND, self.string_since(start)))
+                Some((TOKEN_AND, self.str_since(start).to_string()))
             }
             '|' if self.peek() == Some('|') => {
                 self.next().unwrap();
-                Some((TOKEN_OR, self.string_since(start)))
+                Some((TOKEN_OR, self.str_since(start).to_string()))
             }
             '<' if self.peek() == Some('=') => {
                 self.next().unwrap();
-                Some((TOKEN_LESS_OR_EQ, self.string_since(start)))
+                Some((TOKEN_LESS_OR_EQ, self.str_since(start).to_string()))
             }
-            '<' => Some((TOKEN_LESS, self.string_since(start))),
+            '<' => Some((TOKEN_LESS, self.str_since(start).to_string())),
             '>' if self.peek() == Some('=') => {
                 self.next().unwrap();
-                Some((TOKEN_MORE_OR_EQ, self.string_since(start)))
+                Some((TOKEN_MORE_OR_EQ, self.str_since(start).to_string()))
             }
-            '>' => Some((TOKEN_MORE, self.string_since(start))),
+            '>' => Some((TOKEN_MORE, self.str_since(start).to_string())),
             '$' if self.peek() == Some('{') => {
                 self.next().unwrap();
                 self.ctx.push(Context {
                     interpol: Some(Interpol { brackets: 0, string: false, multiline: false, path_interpol: false, }),
                     ..Default::default()
                 });
-                Some((TOKEN_DYNAMIC_START, self.string_since(start)))
+                Some((TOKEN_DYNAMIC_START, self.str_since(start).to_string()))
             }
             'a'..='z' | 'A'..='Z' | '_' => {
                 let kind = match kind {
@@ -413,9 +423,9 @@ impl<'a> Iterator for Tokenizer<'a> {
                     'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '\'' => true,
                     c => kind == IdentType::Uri && is_valid_uri_char(c),
                 });
-                let ident = self.string_since(start);
+                let ident = self.str_since(start);
                 let syntax_kind = match kind {
-                    IdentType::Ident => match &*ident {
+                    IdentType::Ident => match ident {
                         "assert" => TOKEN_ASSERT,
                         "else" => TOKEN_ELSE,
                         "if" => TOKEN_IF,
@@ -431,23 +441,23 @@ impl<'a> Iterator for Tokenizer<'a> {
                     IdentType::Path => panic!("paths are checked earlier"),
                     IdentType::Store => panic!("store paths are checked earlier"),
                 };
-                Some((syntax_kind, ident))
+                Some((syntax_kind, ident.to_string()))
             }
             '"' => {
                 self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: false });
-                Some((TOKEN_STRING_START, self.string_since(start)))
+                Some((TOKEN_STRING_START, self.str_since(start).to_string()))
             }
             '\'' if self.peek() == Some('\'') => {
                 self.next().unwrap();
                 self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: true });
-                Some((TOKEN_STRING_START, self.string_since(start)))
+                Some((TOKEN_STRING_START, self.str_since(start).to_string()))
             }
             '0'..='9' => {
                 self.consume(|c| ('0'..='9').contains(&c));
                 if self.peek() == Some('.') {
                     self.next().unwrap();
                     if self.consume(|c| ('0'..='9').contains(&c)) == 0 {
-                        return Some((TOKEN_ERROR, self.string_since(start)));
+                        return Some((TOKEN_ERROR, self.str_since(start).to_string()));
                     }
                     if self.peek() == Some('e') || self.peek() == Some('E') {
                         self.next().unwrap();
@@ -455,15 +465,15 @@ impl<'a> Iterator for Tokenizer<'a> {
                             self.next().unwrap();
                         }
                         if self.consume(|c| ('0'..='9').contains(&c)) == 0 {
-                            return Some((TOKEN_ERROR, self.string_since(start)));
+                            return Some((TOKEN_ERROR, self.str_since(start).to_string()));
                         }
                     }
-                    Some((TOKEN_FLOAT, self.string_since(start)))
+                    Some((TOKEN_FLOAT, self.str_since(start).to_string()))
                 } else {
-                    Some((TOKEN_INTEGER, self.string_since(start)))
+                    Some((TOKEN_INTEGER, self.str_since(start).to_string()))
                 }
             }
-            _ => Some((TOKEN_ERROR, self.string_since(start))),
+            _ => Some((TOKEN_ERROR, self.str_since(start).to_string())),
         }
     }
 }
