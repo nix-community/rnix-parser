@@ -9,7 +9,7 @@ pub mod value;
 pub use self::{
     kinds::SyntaxKind,
     parser::AST,
-    value::{StrPart, Value as NixValue},
+    value::{PathPart, StrPart, Value as NixValue},
     tokenizer::tokenize,
 };
 
