@@ -127,7 +127,12 @@ impl fmt::Display for TextDump {
                     if let NodeOrToken::Token(token) = enter {
                         write!(f, "(\"{}\")", token.text().escape_default())?
                     }
-                    write!(f, " {}..{}", usize::from(enter.text_range().start()), usize::from(enter.text_range().end()))?;
+                    write!(
+                        f,
+                        " {}..{}",
+                        usize::from(enter.text_range().start()),
+                        usize::from(enter.text_range().end())
+                    )?;
                     if let NodeOrToken::Node(_) = enter {
                         write!(f, " {{")?;
                     }
@@ -296,7 +301,9 @@ impl TryFrom<SyntaxNode> for ParsedType {
             NODE_UNARY_OP => Ok(ParsedType::UnaryOp(UnaryOp::cast(node).unwrap())),
             NODE_LITERAL => Ok(ParsedType::Value(Value::cast(node).unwrap())),
             NODE_WITH => Ok(ParsedType::With(With::cast(node).unwrap())),
-            NODE_PATH_WITH_INTERPOL => Ok(ParsedType::PathWithInterpol(PathWithInterpol::cast(node).unwrap())),
+            NODE_PATH_WITH_INTERPOL => {
+                Ok(ParsedType::PathWithInterpol(PathWithInterpol::cast(node).unwrap()))
+            }
             other => Err(ParsedTypeError(other)),
         }
     }

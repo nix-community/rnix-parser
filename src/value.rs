@@ -326,7 +326,7 @@ mod tests {
                     two single quotes: '''
                     three single quotes: ''''
                 "#
-            .replace("|trailing-whitespace", "");
+        .replace("|trailing-whitespace", "");
 
         if let [StrPart::Literal(lit)] = &string_parts(&string_node(txtin.as_str()))[..] {
             assert_eq!(lit,
@@ -377,17 +377,22 @@ mod tests {
         match ParsedType::try_from(parsed.root().inner().expect("root")) {
             Ok(ParsedType::Str(s)) => {
                 let mut it = s.parts().into_iter();
-                assert_eq!(it.next().unwrap(), StrPart::Literal(
-                    "\nThis version of Nixpkgs requires Nix >= ".to_string()
-                ));
+                assert_eq!(
+                    it.next().unwrap(),
+                    StrPart::Literal("\nThis version of Nixpkgs requires Nix >= ".to_string())
+                );
                 assert_eq_ast_ctn(&mut it, "requiredVersion");
                 assert_eq!(it.next().unwrap(), StrPart::Literal(
                     ", please upgrade:\n\n- If you are running NixOS, `nixos-rebuild' can be used to upgrade your system.\n\n- Alternatively, with Nix > 2.0 `nix upgrade-nix' can be used to imperatively\n  upgrade Nix. You may use `nix-env --version' to check which version you have.\n\n- If you installed Nix using the install script (https://nixos.org/nix/install),\n  it is safe to upgrade by running it again:\n\n      curl -L https://nixos.org/nix/install | sh\n\nFor more information, please see the NixOS release notes at\nhttps://nixos.org/nixos/manual or locally at\n".to_string()
                 ));
                 assert_eq_ast_ctn(&mut it, "toString ./nixos/doc/manual/release-notes");
-                assert_eq!(it.next().unwrap(), StrPart::Literal(
-                    ".\n\nIf you need further help, see https://nixos.org/nixos/support.html\n".to_string()
-                ));
+                assert_eq!(
+                    it.next().unwrap(),
+                    StrPart::Literal(
+                        ".\n\nIf you need further help, see https://nixos.org/nixos/support.html\n"
+                            .to_string()
+                    )
+                );
             }
             _ => unreachable!(),
         }
