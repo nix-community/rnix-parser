@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::fmt;
 
 use crate::{
-    value::{self, StrPart, Value as ParsedValue, ValueError},
+    value::{self, StrPart, Value as ParsedValue, ValueError, PathPart},
     NodeOrToken, SyntaxElement,
     SyntaxKind::{self, *},
     SyntaxNode, SyntaxToken, WalkEvent,
@@ -556,5 +556,10 @@ typed! [
             nth!(self; 1)
         }
     },
-    NODE_PATH_WITH_INTERPOL => PathWithInterpol: Wrapper
+    NODE_PATH_WITH_INTERPOL => PathWithInterpol: {
+        /// Parse the interpolation into a series of parts
+        pub fn parts(&self) -> Vec<PathPart> {
+            value::path_parts(self)
+        }
+    }
 ];

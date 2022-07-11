@@ -285,6 +285,31 @@ pub(crate) fn string_parts(string: &types::Str) -> Vec<StrPart> {
     parts
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum PathPart {
+    Literal(String),
+    Ast(types::StrInterpol),
+}
+
+pub(crate) fn path_parts(path: &types::PathWithInterpol) -> Vec<PathPart> {
+    let mut parts = Vec::new();
+
+    for child in path.node().children_with_tokens() {
+        match child {
+            NodeOrToken::Token(token) => {
+                assert_eq!(token.kind(), TOKEN_PATH);
+                parts.push(PathPart::Literal(token.text().to_string()));   
+            }
+            NodeOrToken::Node(node) => {
+                assert_eq!(node.kind(), NODE_STRING_INTERPOL);
+                parts.push(PathPart::Ast(types::StrInterpol::cast(node.clone()).unwrap()));
+            }
+        }
+    }
+
+    parts
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -417,5 +442,36 @@ mod tests {
 
         assert_eq!(Value::from_token(TOKEN_INTEGER, "123"), Ok(Value::Integer(123)));
         assert_eq!(Value::from_token(TOKEN_FLOAT, "1.234"), Ok(Value::Float(1.234)));
+    }
+
+    #[test]
+    fn path_parts() {
+        use crate::types::{ParsedType, Wrapper};
+        use crate::value::PathPart;
+        use std::convert::TryFrom;
+
+        fn assert_eq_ast_ctn(it: &mut dyn Iterator<Item = PathPart>, x: &str) {
+            let tmp = it.next().expect("unexpected EOF");
+            if let PathPart::Ast(astn) = tmp {
+                assert_eq!(astn.inner().unwrap().text().to_string(), x);
+            } else {
+                unreachable!("unexpected literal {:?}", tmp);
+            }
+        }
+
+        let inp = r#"./a/b/${"c"}/${d}/e/f"#;
+        let parsed = crate::parse(inp);
+        assert!(parsed.errors().is_empty());
+        match ParsedType::try_from(parsed.root().inner().expect("root")) {
+            Ok(ParsedType::PathWithInterpol(p)) => {
+                let mut it = p.parts().into_iter();
+                assert_eq!(it.next().unwrap(), PathPart::Literal("./a/b/".to_string()));
+                assert_eq_ast_ctn(&mut it, "\"c\"");
+                assert_eq!(it.next().unwrap(), PathPart::Literal("/".to_string()));
+                assert_eq_ast_ctn(&mut it, "d");
+                assert_eq!(it.next().unwrap(), PathPart::Literal("/e/f".to_string()));
+            }
+            _ => unreachable!(),
+        }
     }
 }
