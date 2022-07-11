@@ -1,7 +1,7 @@
 //! The parser: turns a series of tokens into an AST
 
 use std::{
-    collections::{HashSet, HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     fmt,
 };
 
@@ -9,7 +9,7 @@ use cbitset::BitSet256;
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, TextRange, TextSize};
 
 use crate::{
-    tokenizer::TokenizeItem,
+    tokenizer::Token,
     types::{Root, TypedNode},
     NixLanguage,
     SyntaxKind::{self, *},
@@ -139,21 +139,21 @@ impl AST {
     }
 }
 
-struct Parser<I>
+struct Parser<'s, I>
 where
-    I: Iterator<Item = TokenizeItem>,
+    I: Iterator<Item = Token<'s>>,
 {
     builder: GreenNodeBuilder<'static>,
     errors: Vec<ParseError>,
 
-    trivia_buffer: Vec<TokenizeItem>,
-    buffer: VecDeque<TokenizeItem>,
+    trivia_buffer: Vec<Token<'s>>,
+    buffer: VecDeque<Token<'s>>,
     iter: I,
     consumed: TextSize,
 }
-impl<I> Parser<I>
+impl<'s, I> Parser<'s, I>
 where
-    I: Iterator<Item = TokenizeItem>,
+    I: Iterator<Item = Token<'s>>,
 {
     fn new(iter: I) -> Self {
         Self {
@@ -171,7 +171,7 @@ where
         self.consumed
     }
 
-    fn peek_raw(&mut self) -> Option<&TokenizeItem> {
+    fn peek_raw(&mut self) -> Option<&Token<'s>> {
         if self.buffer.is_empty() {
             if let Some(token) = self.iter.next() {
                 self.buffer.push_back(token);
@@ -181,8 +181,8 @@ where
     }
     fn drain_trivia_buffer(&mut self) {
         for (t, s) in self.trivia_buffer.drain(..) {
-            self.consumed += TextSize::of(s.as_str());
-            self.builder.token(NixLanguage::kind_to_raw(t), s.as_str())
+            self.consumed += TextSize::of(s);
+            self.builder.token(NixLanguage::kind_to_raw(t), s);
         }
     }
     fn eat_trivia(&mut self) {
@@ -212,8 +212,7 @@ where
         self.get_text_position()
     }
     fn bump(&mut self) {
-        let next = self.try_next();
-        match next {
+        match self.try_next() {
             Some((token, s)) => {
                 if token.is_trivia() {
                     self.trivia_buffer.push((token, s))
@@ -225,14 +224,14 @@ where
             None => self.errors.push(ParseError::UnexpectedEOF),
         }
     }
-    fn try_next(&mut self) -> Option<TokenizeItem> {
+    fn try_next(&mut self) -> Option<Token<'s>> {
         self.buffer.pop_front().or_else(|| self.iter.next())
     }
-    fn manual_bump(&mut self, s: String, token: SyntaxKind) {
-        self.consumed += TextSize::of(s.as_str());
-        self.builder.token(NixLanguage::kind_to_raw(token), s.as_str())
+    fn manual_bump(&mut self, s: &str, token: SyntaxKind) {
+        self.consumed += TextSize::of(s);
+        self.builder.token(NixLanguage::kind_to_raw(token), s)
     }
-    fn peek_data(&mut self) -> Option<&TokenizeItem> {
+    fn peek_data(&mut self) -> Option<&Token<'s>> {
         while self.peek_raw().map(|&(t, _)| t.is_trivia()).unwrap_or(false) {
             self.bump();
         }
@@ -343,7 +342,7 @@ where
         if self.peek().map(|t| t == TOKEN_CURLY_B_CLOSE).unwrap_or(true) {
             self.bump();
         } else {
-            let mut args = HashMap::<String, TextSize>::new();
+            let mut args = HashMap::<&str, TextSize>::new();
             loop {
                 match self.expect_peek_any(&[TOKEN_CURLY_B_CLOSE, TOKEN_ELLIPSIS, TOKEN_IDENT]) {
                     Some(TOKEN_CURLY_B_CLOSE) => {
@@ -360,18 +359,17 @@ where
                         let tp = self.get_text_position();
                         let mut ident_done = false;
                         if let Some((_, ident_name)) = self.peek_raw() {
-                            let contains = args.contains_key(ident_name);
-                            let id = ident_name.clone();
-                            let id_str = ident_name.to_string().clone();
-                            args.insert(id, tp);
+                            let contains = args.contains_key(*ident_name);
+                            args.insert(ident_name, tp);
                             if contains {
+                                let id_str = ident_name.to_string();
                                 ident_done = true;
                                 self.start_error_node();
                                 self.expect_ident();
                                 let fin = self.finish_error_node();
                                 self.errors.push(ParseError::DuplicatedArgs(
                                     TextRange::new(tp, fin),
-                                    id_str
+                                    id_str,
                                 ));
                             }
                         }
@@ -491,9 +489,9 @@ where
             TOKEN_CURLY_B_OPEN => {
                 // Do a lookahead:
                 let mut peek = [None, None];
-                for i in 0..2 {
+                for i in &mut peek {
                     let mut token;
-                    peek[i] = loop {
+                    *i = loop {
                         token = self.iter.next();
                         let kind = token.as_ref().map(|&(t, _)| t);
                         if let Some(token) = token {
@@ -548,12 +546,12 @@ where
             TOKEN_PATH => {
                 let next = self.try_next();
                 if let Some((token, s)) = next {
-                    let is_complex_path = self
-                        .peek()
-                        .map_or(false, |t| t == TOKEN_INTERPOL_START);
-                    self.builder.start_node(NixLanguage::kind_to_raw(
-                        if is_complex_path { NODE_PATH_WITH_INTERPOL } else { NODE_LITERAL }
-                    ));
+                    let is_complex_path = self.peek().map_or(false, |t| t == TOKEN_INTERPOL_START);
+                    self.builder.start_node(NixLanguage::kind_to_raw(if is_complex_path {
+                        NODE_PATH_WITH_INTERPOL
+                    } else {
+                        NODE_LITERAL
+                    }));
                     self.manual_bump(s, token);
                     if is_complex_path {
                         loop {
@@ -565,8 +563,8 @@ where
                                     self.parse_expr();
                                     self.expect(TOKEN_INTERPOL_END);
                                     self.finish_node();
-                                },
-                                _ => break
+                                }
+                                _ => break,
                             }
                         }
                     }
@@ -574,7 +572,7 @@ where
                 } else {
                     self.errors.push(ParseError::UnexpectedEOF);
                 }
-            },
+            }
             t if t.is_literal() => {
                 self.start_node(NODE_LITERAL);
                 self.bump();
@@ -636,7 +634,7 @@ where
             self.next_attr();
             self.finish_node();
         }
-        if self.peek_data().map(|&(t, ref s)| t == TOKEN_IDENT && s == OR).unwrap_or(false) {
+        if self.peek_data().map(|&(t, s)| t == TOKEN_IDENT && s == OR).unwrap_or(false) {
             self.start_node_at(checkpoint, NODE_OR_DEFAULT);
             self.bump();
             self.parse_val();
@@ -807,9 +805,9 @@ where
 }
 
 /// Parse tokens into an AST
-pub fn parse<I>(iter: I) -> AST
+pub fn parse<'s, I>(iter: I) -> AST
 where
-    I: Iterator<Item = TokenizeItem>,
+    I: Iterator<Item = Token<'s>>,
 {
     let mut parser = Parser::new(iter);
     parser.builder.start_node(NixLanguage::kind_to_raw(NODE_ROOT));

@@ -9,13 +9,13 @@ pub mod value;
 pub use self::{
     kinds::SyntaxKind,
     parser::AST,
-    value::{StrPart, Value as NixValue},
     tokenizer::tokenize,
+    value::{StrPart, Value as NixValue},
 };
 
 pub use rowan::{
-    NodeOrToken, SyntaxElementChildren, SyntaxNodeChildren, TextRange, TextSize,
-    TokenAtOffset, WalkEvent,
+    NodeOrToken, SyntaxElementChildren, SyntaxNodeChildren, TextRange, TextSize, TokenAtOffset,
+    WalkEvent,
 };
 
 use self::tokenizer::Tokenizer;
