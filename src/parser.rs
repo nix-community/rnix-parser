@@ -9,7 +9,7 @@ use cbitset::BitSet256;
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, TextRange, TextSize};
 
 use crate::{
-    tokenizer::TokenizeItem,
+    tokenizer::Token,
     types::{Root, TypedNode},
     NixLanguage,
     SyntaxKind::{self, *},
@@ -141,19 +141,19 @@ impl AST {
 
 struct Parser<'s, I>
 where
-    I: Iterator<Item = TokenizeItem<'s>>,
+    I: Iterator<Item = Token<'s>>,
 {
     builder: GreenNodeBuilder<'static>,
     errors: Vec<ParseError>,
 
-    trivia_buffer: Vec<TokenizeItem<'s>>,
-    buffer: VecDeque<TokenizeItem<'s>>,
+    trivia_buffer: Vec<Token<'s>>,
+    buffer: VecDeque<Token<'s>>,
     iter: I,
     consumed: TextSize,
 }
 impl<'s, I> Parser<'s, I>
 where
-    I: Iterator<Item = TokenizeItem<'s>>,
+    I: Iterator<Item = Token<'s>>,
 {
     fn new(iter: I) -> Self {
         Self {
@@ -171,7 +171,7 @@ where
         self.consumed
     }
 
-    fn peek_raw(&mut self) -> Option<&TokenizeItem<'s>> {
+    fn peek_raw(&mut self) -> Option<&Token<'s>> {
         if self.buffer.is_empty() {
             if let Some(token) = self.iter.next() {
                 self.buffer.push_back(token);
@@ -224,14 +224,14 @@ where
             None => self.errors.push(ParseError::UnexpectedEOF),
         }
     }
-    fn try_next(&mut self) -> Option<TokenizeItem<'s>> {
+    fn try_next(&mut self) -> Option<Token<'s>> {
         self.buffer.pop_front().or_else(|| self.iter.next())
     }
     fn manual_bump(&mut self, s: &str, token: SyntaxKind) {
         self.consumed += TextSize::of(s);
         self.builder.token(NixLanguage::kind_to_raw(token), s)
     }
-    fn peek_data(&mut self) -> Option<&TokenizeItem<'s>> {
+    fn peek_data(&mut self) -> Option<&Token<'s>> {
         while self.peek_raw().map(|&(t, _)| t.is_trivia()).unwrap_or(false) {
             self.bump();
         }
@@ -808,7 +808,7 @@ where
 /// Parse tokens into an AST
 pub fn parse<'s, I>(iter: I) -> AST
 where
-    I: Iterator<Item = TokenizeItem<'s>>,
+    I: Iterator<Item = Token<'s>>,
 {
     let mut parser = Parser::new(iter);
     parser.builder.start_node(NixLanguage::kind_to_raw(NODE_ROOT));

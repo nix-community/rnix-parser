@@ -53,10 +53,10 @@ impl PartialEq for State<'_> {
 }
 impl Eq for State<'_> {}
 
-pub type TokenizeItem<'a> = (SyntaxKind, &'a str);
+pub type Token<'a> = (SyntaxKind, &'a str);
 
 /// A convenience function for tokenizing the given input
-pub fn tokenize(input: &str) -> Vec<TokenizeItem<'_>> {
+pub fn tokenize(input: &str) -> Vec<Token<'_>> {
     Tokenizer::new(input).collect()
 }
 
@@ -475,7 +475,7 @@ impl<'a> Tokenizer<'a> {
 }
 
 impl<'a> Iterator for Tokenizer<'a> {
-    type Item = TokenizeItem<'a>;
+    type Item = Token<'a>;
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.state;
         self.next_inner().map(|syntax_kind| (syntax_kind, self.str_since(start)))
@@ -484,7 +484,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{tokenize, SyntaxKind::*, TokenizeItem};
+    use super::{tokenize, SyntaxKind::*, Token};
 
     macro_rules! tokens {
         ($(($token:expr, $str:expr),)*) => {
@@ -495,10 +495,10 @@ mod tests {
         };
     }
 
-    fn path(path: &str) -> Vec<TokenizeItem<'_>> {
+    fn path(path: &str) -> Vec<Token<'_>> {
         tokens![(TOKEN_PATH, path)]
     }
-    fn error(token: &str) -> Vec<TokenizeItem<'_>> {
+    fn error(token: &str) -> Vec<Token<'_>> {
         tokens![(TOKEN_ERROR, token)]
     }
 
