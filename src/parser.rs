@@ -342,7 +342,7 @@ where
         if self.peek().map(|t| t == TOKEN_CURLY_B_CLOSE).unwrap_or(true) {
             self.bump();
         } else {
-            let mut args = HashMap::<String, TextSize>::new();
+            let mut args = HashMap::<&str, TextSize>::new();
             loop {
                 match self.expect_peek_any(&[TOKEN_CURLY_B_CLOSE, TOKEN_ELLIPSIS, TOKEN_IDENT]) {
                     Some(TOKEN_CURLY_B_CLOSE) => {
@@ -360,10 +360,9 @@ where
                         let mut ident_done = false;
                         if let Some((_, ident_name)) = self.peek_raw() {
                             let contains = args.contains_key(*ident_name);
-                            let id: String = ident_name.to_string();
-                            let id_str = id.clone();
-                            args.insert(id, tp);
+                            args.insert(ident_name, tp);
                             if contains {
+                                let id_str = ident_name.to_string();
                                 ident_done = true;
                                 self.start_error_node();
                                 self.expect_ident();
