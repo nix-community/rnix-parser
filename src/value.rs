@@ -22,13 +22,20 @@ pub enum Anchor {
     Store,
 }
 
+/// A path value
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Path {
+    pub anchor: Anchor,
+    pub path: String,
+}
+
 /// A value, such as a string or integer
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Float(f64),
     Integer(i64),
     String(String),
-    Path(Anchor, String),
+    Path(Path),
 }
 
 impl From<i64> for Value {
@@ -194,27 +201,31 @@ impl std::error::Error for ValueError {
     }
 }
 
+pub(crate) fn parse_path(s: &str) -> Result<Path, ValueError> {
+    let path = if let Some(tag) = s.strip_prefix('<') {
+        let tag = tag.strip_suffix('>');
+        if s.len() < 2 || tag.is_none() {
+            return Err(ValueError::StorePath);
+        }
+        Path { anchor: Anchor::Store, path: String::from(tag.unwrap()) }
+    } else if let Some(contents) = s.strip_prefix("~/") {
+        Path { anchor: Anchor::Home, path: String::from(contents) }
+    } else if s.starts_with('/') {
+        Path { anchor: Anchor::Absolute, path: String::from(s) }
+    } else {
+        Path { anchor: Anchor::Relative, path: String::from(s) }
+    };
+
+    Ok(path)
+}
+
 impl Value {
     /// Parse a token kind and string into a typed value
     pub fn from_token(token: SyntaxKind, s: &str) -> Result<Self, ValueError> {
         let value = match token {
             TOKEN_FLOAT => Value::Float(s.parse()?),
             TOKEN_INTEGER => Value::Integer(s.parse()?),
-            TOKEN_PATH => {
-                if let Some(tag) = s.strip_prefix('<') {
-                    let tag = tag.strip_suffix('>');
-                    if s.len() < 2 || tag.is_none() {
-                        return Err(ValueError::StorePath);
-                    }
-                    Value::Path(Anchor::Store, String::from(tag.unwrap()))
-                } else if let Some(contents) = s.strip_prefix("~/") {
-                    Value::Path(Anchor::Home, String::from(contents))
-                } else if s.starts_with('/') {
-                    Value::Path(Anchor::Absolute, String::from(s))
-                } else {
-                    Value::Path(Anchor::Relative, String::from(s))
-                }
-            }
+            TOKEN_PATH => Value::Path(parse_path(s)?),
             TOKEN_URI => Value::String(String::from(s)),
             _ => return Err(ValueError::Unknown),
         };
@@ -426,19 +437,19 @@ mod tests {
     fn values() {
         assert_eq!(
             Value::from_token(TOKEN_PATH, "<nixpkgs>"),
-            Ok(Value::Path(Anchor::Store, "nixpkgs".into()))
+            Ok(Value::Path(Path { anchor: Anchor::Store, path: "nixpkgs".into() }))
         );
         assert_eq!(
             Value::from_token(TOKEN_PATH, "~/path/to/thing"),
-            Ok(Value::Path(Anchor::Home, "path/to/thing".into()))
+            Ok(Value::Path(Path { anchor: Anchor::Home, path: "path/to/thing".into() }))
         );
         assert_eq!(
             Value::from_token(TOKEN_PATH, "/path/to/thing"),
-            Ok(Value::Path(Anchor::Absolute, "/path/to/thing".into()))
+            Ok(Value::Path(Path { anchor: Anchor::Absolute, path: "/path/to/thing".into() }))
         );
         assert_eq!(
             Value::from_token(TOKEN_PATH, "path/to/thing"),
-            Ok(Value::Path(Anchor::Relative, "path/to/thing".into()))
+            Ok(Value::Path(Path { anchor: Anchor::Relative, path: "path/to/thing".into() }))
         );
         assert_eq!(
             Value::from_token(TOKEN_URI, "https:path"),
