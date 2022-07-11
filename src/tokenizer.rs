@@ -149,7 +149,6 @@ impl<'a> Tokenizer<'a> {
                                 path_interpol: false,
                             }),
                             todo: Some(Todo::InterpolStart),
-                            ..Default::default()
                         });
                         return TOKEN_STRING_CONTENT;
                     }

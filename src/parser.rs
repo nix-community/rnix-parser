@@ -218,7 +218,7 @@ where
                     self.trivia_buffer.push((token, s))
                 } else {
                     self.drain_trivia_buffer();
-                    self.manual_bump(&s, token);
+                    self.manual_bump(s, token);
                 }
             }
             None => self.errors.push(ParseError::UnexpectedEOF),
@@ -489,9 +489,9 @@ where
             TOKEN_CURLY_B_OPEN => {
                 // Do a lookahead:
                 let mut peek = [None, None];
-                for i in 0..2 {
+                for i in &mut peek {
                     let mut token;
-                    peek[i] = loop {
+                    *i = loop {
                         token = self.iter.next();
                         let kind = token.as_ref().map(|&(t, _)| t);
                         if let Some(token) = token {
@@ -552,7 +552,7 @@ where
                     } else {
                         NODE_LITERAL
                     }));
-                    self.manual_bump(&s, token);
+                    self.manual_bump(s, token);
                     if is_complex_path {
                         loop {
                             match self.peek_raw().map(|(t, _)| t) {

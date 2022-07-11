@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// An anchor point for a path, such as if it's relative or absolute
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Anchor {
     Absolute,
     Relative,
@@ -151,7 +151,7 @@ pub fn remove_trailing(string: &mut String) {
         .map(char::len_utf8)
         .sum();
     let len = string.len();
-    string.drain(len - trailing..);
+    string.truncate(len - trailing);
 }
 
 /// An error that occured when parsing a value from a string
