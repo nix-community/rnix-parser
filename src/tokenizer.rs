@@ -344,7 +344,7 @@ impl<'a> Tokenizer<'a> {
             '.' => {
                 if self.peek().map_or(false, |x| ('0'..='9').contains(&x)) {
                     self.consume(|c| ('0'..='9').contains(&c));
-                    TOKEN_FLOAT
+                    self.consume_scientific()
                 } else {
                     TOKEN_DOT
                 }
@@ -454,22 +454,26 @@ impl<'a> Tokenizer<'a> {
                     if self.consume(|c| ('0'..='9').contains(&c)) == 0 {
                         return Some(TOKEN_ERROR);
                     }
-                    if self.peek() == Some('e') || self.peek() == Some('E') {
-                        self.next().unwrap();
-                        if self.peek() == Some('-') {
-                            self.next().unwrap();
-                        }
-                        if self.consume(|c| ('0'..='9').contains(&c)) == 0 {
-                            return Some(TOKEN_ERROR);
-                        }
-                    }
-                    TOKEN_FLOAT
+                    self.consume_scientific()
                 } else {
                     TOKEN_INTEGER
                 }
             }
             _ => TOKEN_ERROR,
         })
+    }
+
+    fn consume_scientific(&mut self) -> SyntaxKind {
+        if self.peek() == Some('e') || self.peek() == Some('E') {
+            self.next().unwrap();
+            if self.peek() == Some('-') {
+                self.next().unwrap();
+            }
+            if self.consume(|c| ('0'..='9').contains(&c)) == 0 {
+                return TOKEN_ERROR;
+            }
+        }
+        TOKEN_FLOAT
     }
 }
 
@@ -568,6 +572,10 @@ mod tests {
                 (TOKEN_CURLY_B_CLOSE, "}"),
             ],
         );
+    }
+    #[test]
+    fn float_scientific_no_leading_zero() {
+        assert_eq!(tokenize(".5e1"), tokens![(TOKEN_FLOAT, ".5e1")]);
     }
     #[test]
     fn basic_string_set() {
