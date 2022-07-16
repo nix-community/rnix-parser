@@ -124,7 +124,11 @@ impl<'a> Tokenizer<'a> {
                         self.next();
                         self.peek()
                     } {
-                        Some('\'') | Some('\\') | Some('$') => {
+                        Some('\'') | Some('$') => {
+                            self.next().unwrap();
+                        }
+                        Some('\\') => {
+                            self.next().unwrap();
                             self.next().unwrap();
                         }
                         _ => {
@@ -599,6 +603,7 @@ mod tests {
           indented by two
         \'\'\'\'\
         ''${ interpolation was escaped }
+        ''\${ interpolation was escaped }
         two single quotes: '''
         three single quotes: ''''
     '';
@@ -619,6 +624,7 @@ mod tests {
           indented by two
         \'\'\'\'\
         ''${ interpolation was escaped }
+        ''\${ interpolation was escaped }
         two single quotes: '''
         three single quotes: ''''
     "#
