@@ -1,24 +1,25 @@
 use crate::{NixLanguage, SyntaxKind, SyntaxKind::*, SyntaxNode, SyntaxToken};
 
-use super::{operators::BinOpKind, support::*, AstNode, AstNodeChildren, UnaryOpKind};
+use super::{operators::BinOpKind, support::*, AstNode,  UnaryOpKind};
 use rowan::ast::AstNode as OtherAstNode;
+use rowan::ast::AstChildren;
 
 pub trait EntryHolder: AstNode {
-    fn entries(&self) -> AstNodeChildren<Entry>
+    fn entries(&self) -> AstChildren<Entry>
     where
         Self: Sized,
     {
         children(self)
     }
 
-    fn key_values(&self) -> AstNodeChildren<KeyValue>
+    fn key_values(&self) -> AstChildren<KeyValue>
     where
         Self: Sized,
     {
         children(self)
     }
 
-    fn inherits(&self) -> AstNodeChildren<Inherit>
+    fn inherits(&self) -> AstChildren<Inherit>
     where
         Self: Sized,
     {
@@ -196,7 +197,7 @@ ast_nodes! {
     },
     NODE_KEY => Key: {
         /// Return the path as an iterator of identifiers
-        pub fn attrs(&self) -> AstNodeChildren<Attr> {
+        pub fn attrs(&self) -> AstChildren<Attr> {
             children(self)
         }
     },
@@ -292,7 +293,7 @@ ast_nodes! {
         }
 
         /// Return an iterator over items in the list
-        pub fn items(&self) -> AstNodeChildren<Expr> {
+        pub fn items(&self) -> AstChildren<Expr> {
             children(self)
         }
 

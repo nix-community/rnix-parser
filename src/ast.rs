@@ -7,12 +7,10 @@ mod operators;
 mod token_ext;
 mod tokens;
 
-use std::marker::PhantomData;
-
 use crate::{
     NixLanguage,
     SyntaxKind::{self, *},
-    SyntaxNode, SyntaxNodeChildren, SyntaxToken,
+    SyntaxToken,
 };
 
 pub use nodes::*;
@@ -23,28 +21,10 @@ pub trait AstNode: rowan::ast::AstNode<Language = NixLanguage> {}
 
 impl<T> AstNode for T where T: rowan::ast::AstNode<Language = NixLanguage> {}
 
-#[derive(Debug, Clone)]
-pub struct AstNodeChildren<N> {
-    inner: SyntaxNodeChildren,
-    _p: PhantomData<N>,
-}
-
-impl<N> AstNodeChildren<N> {
-    fn new(parent: &SyntaxNode) -> Self {
-        AstNodeChildren { inner: parent.children(), _p: PhantomData }
-    }
-}
-
-impl<N: AstNode> Iterator for AstNodeChildren<N> {
-    type Item = N;
-
-    fn next(&mut self) -> Option<N> {
-        self.inner.find_map(N::cast)
-    }
-}
-
 mod support {
-    use super::{AstNode, AstNodeChildren, AstToken};
+    use rowan::ast::AstChildren;
+
+    use super::{AstNode, AstToken};
     use crate::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
 
     pub(super) fn first<N: AstNode, NN: AstNode>(parent: &N) -> Option<NN> {
@@ -55,8 +35,8 @@ mod support {
         parent.syntax().children().flat_map(NN::cast).nth(n)
     }
 
-    pub(super) fn children<N: AstNode, NN: AstNode>(parent: &N) -> AstNodeChildren<NN> {
-        AstNodeChildren::new(parent.syntax())
+    pub(super) fn children<N: AstNode, NN: AstNode>(parent: &N) -> AstChildren<NN> {
+        rowan::ast::support::children(parent.syntax())
     }
 
     pub(super) fn token<N: AstNode, T: AstToken>(parent: &N) -> Option<T> {
