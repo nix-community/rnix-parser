@@ -1,8 +1,8 @@
 use crate::{NixLanguage, SyntaxKind, SyntaxKind::*, SyntaxNode, SyntaxToken};
 
-use super::{operators::BinOpKind, support::*, AstNode,  UnaryOpKind};
-use rowan::ast::AstNode as OtherAstNode;
+use super::{operators::BinOpKind, support::*, AstNode, UnaryOpKind};
 use rowan::ast::AstChildren;
+use rowan::ast::AstNode as OtherAstNode;
 
 pub trait EntryHolder: AstNode {
     fn entries(&self) -> AstChildren<Entry>
@@ -131,6 +131,14 @@ macro_rules! ast_nodes {
     () => { };
 }
 
+macro_rules! token_getter {
+    ($name:ident, $token:tt) => {
+        pub fn $name(&self) -> Option<SyntaxToken> {
+            token_u(self, T![$token])
+        }
+    };
+}
+
 ast_nodes! {
      {
         NODE_APPLY => Apply,
@@ -181,7 +189,7 @@ ast_nodes! {
         }
     },
     NODE_ASSERT => Assert: {
-        pub fn assert(&self) -> Option<SyntaxToken> {
+        pub fn assert_token(&self) -> Option<SyntaxToken> {
             token_u(self, T![assert])
         }
 
@@ -281,11 +289,17 @@ ast_nodes! {
             first(self)
         }
     },
-    NODE_LEGACY_LET => LegacyLet: EntryHolder,
+    NODE_LEGACY_LET => LegacyLet: EntryHolder: {
+        token_getter! { let_token, let }
+        token_getter! { curly_open_token, "{" }
+        token_getter! { curly_close_token, "}" }
+    },
     NODE_LET_IN => LetIn: EntryHolder: {
-         pub fn body(&self) -> Option<Expr> {
-             first(self)
-         }
+        token_getter! { let_token, let }
+        token_getter! { in_token, in }
+        pub fn body(&self) -> Option<Expr> {
+            first(self)
+        }
     },
     NODE_LIST => List: {
         pub fn l_brack_token(&self) -> Option<SyntaxToken> {
@@ -356,9 +370,13 @@ ast_nodes! {
             first(self)
         }
 
+        pub fn question_token(&self) -> Option<SyntaxToken> {
+            token_u(self, T![?])
+        }
+
         /// Return the default value, if any
-        pub fn default(&self) -> Option<SyntaxNode> {
-            self.syntax().children().nth(1)
+        pub fn default(&self) -> Option<Expr> {
+            nth(self, 1)
         }
     },
 
@@ -373,7 +391,7 @@ ast_nodes! {
         }
 
         /// Return an iterator over all pattern entries
-        pub fn entries(&self) -> impl Iterator<Item = PatEntry> {
+        pub fn pat_entries(&self) -> impl Iterator<Item = PatEntry> {
             children(self)
         }
 
