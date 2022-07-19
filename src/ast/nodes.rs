@@ -107,6 +107,12 @@ macro_rules! ast_nodes {
                 }
             }
         }
+        
+        $(
+            impl From<$typed> for $name {
+                fn from(node: $typed) -> $name { $name::$typed(node) }
+            }
+        )*
 
         ast_nodes! { @impl $name $($tt)* }
     };
