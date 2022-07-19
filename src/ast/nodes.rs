@@ -107,7 +107,7 @@ macro_rules! ast_nodes {
                 }
             }
         }
-        
+
         $(
             impl From<$typed> for $name {
                 fn from(node: $typed) -> $name { $name::$typed(node) }
@@ -158,9 +158,10 @@ ast_nodes! {
     NODE_LITERAL => Literal,
 
     {
+        NODE_IDENT => Ident,
         NODE_DYNAMIC => Dynamic,
         NODE_STRING => Str,
-    } => Key,
+    } => Attr,
 
      NODE_IDENT => Ident: {
         pub fn ident_token(&self) -> Option<SyntaxToken> {
@@ -193,12 +194,12 @@ ast_nodes! {
             nth(self, 1)
         }
     },
-    //  NODE_KEY => Key: {
-        // /// Return the path as an iterator of identifiers
-        // pub fn path<'a>(&'a self) -> impl Iterator<Item = SyntaxNode> + 'a {
-        //     self.node().children()
-        // }
-    // },
+    NODE_KEY => Key: {
+        /// Return the path as an iterator of identifiers
+        pub fn attrs(&self) -> AstNodeChildren<Attr> {
+            children(self)
+        }
+    },
      NODE_DYNAMIC => Dynamic,
      NODE_ERROR => Error,
      NODE_IF_ELSE => IfElse: {
@@ -240,7 +241,7 @@ ast_nodes! {
         }
 
         /// Return the index
-        pub fn key(&self) -> Option<Key> {
+        pub fn attr(&self) -> Option<Attr> {
             first(self)
         }
     },
@@ -250,21 +251,22 @@ ast_nodes! {
             token_u(self, T![inherit])
         }
 
-        // pub fn from(&self) -> Option<InheritFrom> {
-        //     self.node().children()
-        //         .find_map(InheritFrom::cast)
-        // }
-        // /// Return all the identifiers being inherited
-        // pub fn idents(&self) -> impl Iterator<Item = Ident> {
-        //     self.node().children().filter_map(Ident::cast)
-        // }
+        pub fn inherit_from(&self) -> Option<InheritFrom> {
+            first(self)
+        }
+
+        /// Return all the identifiers being inherited
+        pub fn idents(&self) -> impl Iterator<Item = Ident> {
+            children(self)
+        }
     },
 
      NODE_INHERIT_FROM => InheritFrom: { },
      NODE_STRING => Str: {
+        // TODO: make string_parts take type from here
         // /// Parse the interpolation into a series of parts
         // pub fn parts(&self) -> Vec<StrPart> {
-            // value::string_parts(self)
+        //     value::string_parts(self)
         // }
     },
      NODE_LAMBDA => Lambda: {
@@ -412,8 +414,7 @@ ast_nodes! {
         NODE_INHERIT => Inherit,
         NODE_KEY_VALUE => KeyValue,
     } => Entry,
-
-     NODE_KEY_VALUE => KeyValue: {
+    NODE_KEY_VALUE => KeyValue: {
         /// Return this entry's key
         pub fn key(&self) -> Option<Key> {
             first(self)

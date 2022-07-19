@@ -366,17 +366,17 @@ where
 
         self.finish_node();
     }
-    fn next_attr(&mut self) {
+    fn parse_attr(&mut self) {
         match self.peek() {
             Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
             Some(TOKEN_STRING_START) => self.parse_string(),
             _ => self.expect_ident(),
         }
     }
-    fn parse_attr(&mut self) {
+    fn parse_key(&mut self) {
         self.start_node(NODE_KEY);
         loop {
-            self.next_attr();
+            self.parse_attr();
 
             if self.peek() == Some(TOKEN_DOT) {
                 self.bump();
@@ -478,7 +478,7 @@ where
                     loop {
                         match self.peek() {
                             Some(t) if t != TOKEN_SEMICOLON => {
-                                self.next_attr();
+                                self.parse_attr();
                             }
                             Some(_) => {
                                 break;
@@ -495,7 +495,7 @@ where
                 }
                 Some(_) => {
                     self.start_node(NODE_KEY_VALUE);
-                    self.parse_attr();
+                    self.parse_key();
                     self.expect(TOKEN_ASSIGN);
                     self.parse_expr();
                     self.expect(TOKEN_SEMICOLON);
@@ -683,7 +683,7 @@ where
         while self.peek() == Some(TOKEN_DOT) {
             self.start_node_at(checkpoint, NODE_SELECT);
             self.bump();
-            self.next_attr();
+            self.parse_attr();
             self.finish_node();
         }
         if self.peek_data().map(|&(t, s)| t == TOKEN_IDENT && s == OR).unwrap_or(false) {
