@@ -19,7 +19,7 @@ use crate::{
 const OR: &str = "or";
 
 /// An error that occurred during parsing
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ParseError {
     /// Unexpected is used when the cause cannot be specified further
@@ -93,7 +93,7 @@ impl fmt::Display for ParseError {
 impl std::error::Error for ParseError {}
 
 /// The result of a parse
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AST {
     node: GreenNode,
     errors: Vec<ParseError>,
