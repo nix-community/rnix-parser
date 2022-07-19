@@ -60,58 +60,22 @@ mod support {
     }
 
     pub(super) fn token<N: AstNode, T: AstToken>(parent: &N) -> Option<T> {
-        parent
-            .syntax()
-            .children_with_tokens()
-            .filter_map(SyntaxElement::into_token)
-            .find_map(T::cast)
+        children_tokens(parent).find_map(T::cast)
     }
 
     /// Token untyped
     pub(super) fn token_u<N: AstNode>(parent: &N, kind: SyntaxKind) -> Option<SyntaxToken> {
-        parent
-            .syntax()
-            .children_with_tokens()
-            .filter_map(SyntaxElement::into_token)
-            .find(|it| it.kind() == kind)
+        children_tokens(parent).find(|it| it.kind() == kind)
+    }
+
+    pub(super) fn children_tokens<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
+        parent.syntax().children_with_tokens().filter_map(SyntaxElement::into_token)
     }
 
     pub(super) fn children_tokens_u<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
         parent.syntax().children_with_tokens().filter_map(SyntaxElement::into_token)
     }
 }
-
-// /// A TypedNode is simply a wrapper around an untyped node to provide a type
-// /// system in some sense.
-// pub trait AstNode {
-//     fn can_cast(from: &SyntaxNode) -> bool
-//     where
-//         Self: Sized;
-
-//     /// Cast an untyped node into this strongly-typed node. This will return
-//     /// None if the type was not correct.
-//     fn cast(from: SyntaxNode) -> Option<Self>
-//     where
-//         Self: Sized;
-
-//     /// Return a reference to the inner untyped node
-//     fn node(&self) -> &SyntaxNode;
-
-//     /// Return all errors of all children, recursively
-//     fn errors(&self) -> Vec<SyntaxElement> {
-//         self.node()
-//             .descendants_with_tokens()
-//             // Empty errors can happen if it encounteres EOF while
-//             // creating them, which in case a root error is added.
-//             .filter(|node| !node.text_range().is_empty())
-//             .filter(|node| node.kind() == NODE_ERROR || node.kind() == TOKEN_ERROR)
-//             .collect()
-//     }
-
-//     // fn dump(&self) -> TextDump {
-//     //     TextDump(self.node().clone())
-//     // }
-// }
 
 pub trait AstToken {
     fn can_cast(from: SyntaxKind) -> bool

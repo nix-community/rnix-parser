@@ -9,7 +9,7 @@ pub mod value;
 
 pub use self::{
     kinds::SyntaxKind,
-    parser::AST,
+    parser::Parse,
     tokenizer::tokenize,
     value::{StrPart, Value as NixValue},
 };
@@ -39,9 +39,19 @@ pub type SyntaxElement = rowan::NodeOrToken<SyntaxNode, SyntaxToken>;
 pub type SyntaxElementChildren = rowan::SyntaxElementChildren<NixLanguage>;
 pub type SyntaxNodeChildren = rowan::SyntaxNodeChildren<NixLanguage>;
 
+/// TODO: remove this
 /// A convenience function for first tokenizing and then parsing given input
-pub fn parse(input: &str) -> AST {
+pub fn parse(input: &str) -> crate::parser::AST {
     parser::parse(Tokenizer::new(input))
+}
+
+pub use ast::Root;
+
+impl Root {
+    pub fn parse(s: &str) -> Parse<Root> {
+        todo!()
+        // parser::parse(Tokenizer::new(s))
+    }
 }
 
 /// Matches a `SyntaxNode` against an `ast` type.

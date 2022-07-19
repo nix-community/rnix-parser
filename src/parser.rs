@@ -3,6 +3,7 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     fmt,
+    marker::PhantomData,
 };
 
 use cbitset::BitSet256;
@@ -91,6 +92,53 @@ impl fmt::Display for ParseError {
 }
 
 impl std::error::Error for ParseError {}
+/// The result of a parse
+#[derive(Clone)]
+pub struct Parse<T> {
+    node: GreenNode,
+    errors: Vec<ParseError>,
+    _ty: PhantomData<fn() -> T>,
+}
+impl<T> Parse<T> {
+    /// Return the root node
+    pub fn node(&self) -> SyntaxNode {
+        SyntaxNode::new_root(self.node.clone())
+    }
+    /// Return a borrowed typed root node
+    pub fn root(&self) -> Root {
+        Root::cast(self.node()).unwrap()
+    }
+    /// Return all errors in the tree, if any
+    pub fn errors(&self) -> Vec<ParseError> {
+        let ranges: HashSet<_> = self
+            .errors
+            .iter()
+            .filter_map(|e| match e {
+                ParseError::UnexpectedWanted(_, t, _) => Some(t),
+                ParseError::UnexpectedDoubleBind(t) => Some(t),
+                ParseError::UnexpectedExtra(t) => Some(t),
+                _ => None,
+            })
+            .collect();
+        let mut errors = self.errors.clone();
+        errors.extend(
+            self.root()
+                .errors()
+                .into_iter()
+                .filter(|node| !ranges.contains(&node.text_range()))
+                .map(|node| ParseError::Unexpected(node.text_range())),
+        );
+
+        errors
+    }
+    /// Either return the first error in the tree, or if there are none return self
+    pub fn as_result(self) -> Result<Self, ParseError> {
+        if let Some(err) = self.errors().first() {
+            return Err(err.clone());
+        }
+        Ok(self)
+    }
+}
 
 /// The result of a parse
 #[derive(Clone)]
