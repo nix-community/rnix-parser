@@ -15,12 +15,12 @@ fn main() {
                 return;
             }
         };
-        let ast = rnix::parse(&content);
+        let ast = rnix::Root::parse(&content);
 
         for error in ast.errors() {
             println!("error: {}", error);
         }
 
-        println!("{}", ast.root().dump());
+        println!("{}", ast.tree());
     }
 }

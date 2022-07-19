@@ -408,7 +408,12 @@ ast_nodes! {
             first(self)
         }
     },
-    NODE_ROOT => Root,
+
+    NODE_ROOT => Root: {
+        pub fn expr(&self) -> Option<Expr> {
+            first(self)
+        }
+    },
 
     NODE_ATTR_SET => AttrSet: EntryHolder: {
          pub fn rec_token(&self) -> Option<SyntaxToken> {

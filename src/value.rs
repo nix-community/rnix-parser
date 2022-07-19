@@ -337,66 +337,68 @@ mod tests {
             unreachable!();
         }
     }
-    #[test]
-    fn parts_ast() {
-        use crate::types::{ParsedType, Wrapper};
-        use crate::value::StrPart;
-        use std::convert::TryFrom;
 
-        fn assert_eq_ast_ctn(it: &mut dyn Iterator<Item = StrPart>, x: &str) {
-            let tmp = it.next().expect("unexpected EOF");
-            if let StrPart::Ast(astn) = tmp {
-                assert_eq!(astn.inner().unwrap().text().to_string(), x);
-            } else {
-                unreachable!("unexpected literal {:?}", tmp);
-            }
-        }
+//     #[test]
+//     fn parts_ast() {
+//         use crate::types::{ParsedType, Wrapper};
+//         use crate::value::StrPart;
+//         use std::convert::TryFrom;
 
-        let inp = r#"''
+//         fn assert_eq_ast_ctn(it: &mut dyn Iterator<Item = StrPart>, x: &str) {
+//             let tmp = it.next().expect("unexpected EOF");
+//             if let StrPart::Ast(astn) = tmp {
+//                 assert_eq!(astn.inner().unwrap().text().to_string(), x);
+//             } else {
+//                 unreachable!("unexpected literal {:?}", tmp);
+//             }
+//         }
 
-    This version of Nixpkgs requires Nix >= ${requiredVersion}, please upgrade:
+//         let inp = r#"''
 
-    - If you are running NixOS, `nixos-rebuild' can be used to upgrade your system.
+//     This version of Nixpkgs requires Nix >= ${requiredVersion}, please upgrade:
 
-    - Alternatively, with Nix > 2.0 `nix upgrade-nix' can be used to imperatively
-      upgrade Nix. You may use `nix-env --version' to check which version you have.
+//     - If you are running NixOS, `nixos-rebuild' can be used to upgrade your system.
 
-    - If you installed Nix using the install script (https://nixos.org/nix/install),
-      it is safe to upgrade by running it again:
+//     - Alternatively, with Nix > 2.0 `nix upgrade-nix' can be used to imperatively
+//       upgrade Nix. You may use `nix-env --version' to check which version you have.
 
-          curl -L https://nixos.org/nix/install | sh
+//     - If you installed Nix using the install script (https://nixos.org/nix/install),
+//       it is safe to upgrade by running it again:
 
-    For more information, please see the NixOS release notes at
-    https://nixos.org/nixos/manual or locally at
-    ${toString ./nixos/doc/manual/release-notes}.
+//           curl -L https://nixos.org/nix/install | sh
 
-    If you need further help, see https://nixos.org/nixos/support.html
-  ''"#;
-        let parsed = crate::parse(inp);
-        assert!(parsed.errors().is_empty());
-        match ParsedType::try_from(parsed.root().inner().expect("root")) {
-            Ok(ParsedType::Str(s)) => {
-                let mut it = s.parts().into_iter();
-                assert_eq!(
-                    it.next().unwrap(),
-                    StrPart::Literal("\nThis version of Nixpkgs requires Nix >= ".to_string())
-                );
-                assert_eq_ast_ctn(&mut it, "requiredVersion");
-                assert_eq!(it.next().unwrap(), StrPart::Literal(
-                    ", please upgrade:\n\n- If you are running NixOS, `nixos-rebuild' can be used to upgrade your system.\n\n- Alternatively, with Nix > 2.0 `nix upgrade-nix' can be used to imperatively\n  upgrade Nix. You may use `nix-env --version' to check which version you have.\n\n- If you installed Nix using the install script (https://nixos.org/nix/install),\n  it is safe to upgrade by running it again:\n\n      curl -L https://nixos.org/nix/install | sh\n\nFor more information, please see the NixOS release notes at\nhttps://nixos.org/nixos/manual or locally at\n".to_string()
-                ));
-                assert_eq_ast_ctn(&mut it, "toString ./nixos/doc/manual/release-notes");
-                assert_eq!(
-                    it.next().unwrap(),
-                    StrPart::Literal(
-                        ".\n\nIf you need further help, see https://nixos.org/nixos/support.html\n"
-                            .to_string()
-                    )
-                );
-            }
-            _ => unreachable!(),
-        }
-    }
+//     For more information, please see the NixOS release notes at
+//     https://nixos.org/nixos/manual or locally at
+//     ${toString ./nixos/doc/manual/release-notes}.
+
+//     If you need further help, see https://nixos.org/nixos/support.html
+//   ''"#;
+//         let parsed = crate::parse(inp);
+//         assert!(parsed.errors().is_empty());
+//         match ParsedType::try_from(parsed.root().inner().expect("root")) {
+//             Ok(ParsedType::Str(s)) => {
+//                 let mut it = s.parts().into_iter();
+//                 assert_eq!(
+//                     it.next().unwrap(),
+//                     StrPart::Literal("\nThis version of Nixpkgs requires Nix >= ".to_string())
+//                 );
+//                 assert_eq_ast_ctn(&mut it, "requiredVersion");
+//                 assert_eq!(it.next().unwrap(), StrPart::Literal(
+//                     ", please upgrade:\n\n- If you are running NixOS, `nixos-rebuild' can be used to upgrade your system.\n\n- Alternatively, with Nix > 2.0 `nix upgrade-nix' can be used to imperatively\n  upgrade Nix. You may use `nix-env --version' to check which version you have.\n\n- If you installed Nix using the install script (https://nixos.org/nix/install),\n  it is safe to upgrade by running it again:\n\n      curl -L https://nixos.org/nix/install | sh\n\nFor more information, please see the NixOS release notes at\nhttps://nixos.org/nixos/manual or locally at\n".to_string()
+//                 ));
+//                 assert_eq_ast_ctn(&mut it, "toString ./nixos/doc/manual/release-notes");
+//                 assert_eq!(
+//                     it.next().unwrap(),
+//                     StrPart::Literal(
+//                         ".\n\nIf you need further help, see https://nixos.org/nixos/support.html\n"
+//                             .to_string()
+//                     )
+//                 );
+//             }
+//             _ => unreachable!(),
+//         }
+//     }
+
     #[test]
     fn values() {
         assert_eq!(

@@ -14,6 +14,6 @@ fn main() {
                 return;
             }
         };
-        print!("{}", rnix::parse(&content).node());
+        print!("{}", rnix::Root::parse(&content).tree());
     }
 }
