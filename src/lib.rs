@@ -6,6 +6,7 @@ pub mod parser;
 pub mod tokenizer;
 pub mod types;
 pub mod value;
+mod string_parsing;
 
 use std::{collections::HashSet, marker::PhantomData};
 

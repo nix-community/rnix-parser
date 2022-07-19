@@ -278,6 +278,7 @@ ast_nodes! {
         //     value::string_parts(self)
         // }
     },
+    NODE_STRING_INTERPOL => StrInterpol,
     NODE_LAMBDA => Lambda: {
         /// Return the argument of the lambda
         pub fn param(&self) -> Option<Param> {
