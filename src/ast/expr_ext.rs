@@ -20,6 +20,8 @@ pub enum LiteralKind {
 
 impl ast::Literal {
     pub fn kind(&self) -> LiteralKind {
+        // the following "chain" of `if let Some(it) = token(self)` might look like a weird repetition,
+        // but `token` is generic over its return value and what exactly it decodes depends on that.
         if let Some(it) = first(self) {
             return LiteralKind::Str(it);
         }
