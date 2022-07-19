@@ -1,10 +1,7 @@
-use crate::{SyntaxElement, SyntaxKind::*, SyntaxNode, SyntaxToken};
+use crate::{NixLanguage, SyntaxKind, SyntaxKind::*, SyntaxNode, SyntaxToken};
 
-use super::{
-    operators::BinOpKind,
-    AstNodeChildren, UnaryOpKind,
-    {support::*, AstNode},
-};
+use super::{operators::BinOpKind, support::*, AstNode, AstNodeChildren, UnaryOpKind};
+use rowan::ast::AstNode as OtherAstNode;
 
 pub trait EntryHolder: AstNode {
     fn entries(&self) -> AstNodeChildren<Entry>
@@ -31,7 +28,7 @@ pub trait EntryHolder: AstNode {
 
 macro_rules! nth {
     ($self:expr; $index:expr) => {
-        $self.node().children()
+        $self.syntax().children()
             .nth($index)
     };
     ($self:expr; ($kind:ident) $index:expr) => {
@@ -46,23 +43,25 @@ macro_rules! ast_nodes {
 
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                std::fmt::Display::fmt(self.node(), f)
+                std::fmt::Display::fmt(self.syntax(), f)
             }
         }
 
-        impl AstNode for $name {
-            fn can_cast(from: &SyntaxNode) -> bool {
-                from.kind() == $kind
+        impl rowan::ast::AstNode for $name {
+            type Language = crate::NixLanguage;
+
+            fn can_cast(kind: crate::SyntaxKind) -> bool {
+                kind == $kind
             }
 
             fn cast(from: SyntaxNode) -> Option<Self> {
-                if Self::can_cast(&from) {
+                if Self::can_cast(from.kind()) {
                     Some(Self(from))
                 } else {
                     None
                 }
             }
-            fn node(&self) -> &SyntaxNode {
+            fn syntax(&self) -> &SyntaxNode {
                 &self.0
             }
         }
@@ -79,13 +78,15 @@ macro_rules! ast_nodes {
 
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                std::fmt::Display::fmt(self.node(), f)
+                std::fmt::Display::fmt(self.syntax(), f)
             }
         }
 
-        impl AstNode for $name {
-            fn can_cast(from: &SyntaxNode) -> bool {
-                matches!(from.kind(), $($kind)|*)
+        impl rowan::ast::AstNode for $name {
+            type Language = NixLanguage;
+
+            fn can_cast(kind: SyntaxKind) -> bool {
+                matches!(kind, $($kind)|*)
             }
 
             fn cast(syntax: SyntaxNode) -> Option<Self> {
@@ -98,7 +99,7 @@ macro_rules! ast_nodes {
                 Some(res)
             }
 
-            fn node(&self) -> &SyntaxNode {
+            fn syntax(&self) -> &SyntaxNode {
                 match self {
                     $(
                         $name::$typed(it) => &it.0,
@@ -348,7 +349,7 @@ ast_nodes! {
 
         /// Return the default value, if any
         pub fn default(&self) -> Option<SyntaxNode> {
-            self.node().children().nth(1)
+            self.syntax().children().nth(1)
         }
     },
 
