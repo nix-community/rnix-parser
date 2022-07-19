@@ -164,13 +164,13 @@ ast_nodes! {
         NODE_STRING => Str,
     } => Attr,
 
-     NODE_IDENT => Ident: {
+    NODE_IDENT => Ident: {
         pub fn ident_token(&self) -> Option<SyntaxToken> {
             token_u(self, T![ident])
         }
     },
 
-     NODE_APPLY => Apply: {
+    NODE_APPLY => Apply: {
         /// Return the lambda being applied
         pub fn lambda(&self) -> Option<Expr> {
             first(self)
@@ -180,7 +180,7 @@ ast_nodes! {
             nth(self, 1)
         }
     },
-     NODE_ASSERT => Assert: {
+    NODE_ASSERT => Assert: {
         pub fn assert(&self) -> Option<SyntaxToken> {
             token_u(self, T![assert])
         }
@@ -201,9 +201,9 @@ ast_nodes! {
             children(self)
         }
     },
-     NODE_DYNAMIC => Dynamic,
-     NODE_ERROR => Error,
-     NODE_IF_ELSE => IfElse: {
+    NODE_DYNAMIC => Dynamic,
+    NODE_ERROR => Error,
+    NODE_IF_ELSE => IfElse: {
         pub fn if_token(&self) -> Option<SyntaxToken> {
             token_u(self, T![if])
         }
@@ -231,7 +231,7 @@ ast_nodes! {
             nth(self, 2)
         }
     },
-     NODE_SELECT => Select: {
+    NODE_SELECT => Select: {
         /// Return the set being indexed
         pub fn expr(&self) -> Option<Expr> {
             first(self)
@@ -246,7 +246,7 @@ ast_nodes! {
             first(self)
         }
     },
-     NODE_INHERIT => Inherit: {
+    NODE_INHERIT => Inherit: {
         // /// Return the set where keys are being inherited from, if any
         pub fn inherit_token(&self) -> Option<SyntaxToken> {
             token_u(self, T![inherit])
@@ -262,15 +262,15 @@ ast_nodes! {
         }
     },
 
-     NODE_INHERIT_FROM => InheritFrom: { },
-     NODE_STRING => Str: {
+    NODE_INHERIT_FROM => InheritFrom: { },
+    NODE_STRING => Str: {
         // TODO: make string_parts take type from here
         // /// Parse the interpolation into a series of parts
         // pub fn parts(&self) -> Vec<StrPart> {
         //     value::string_parts(self)
         // }
     },
-     NODE_LAMBDA => Lambda: {
+    NODE_LAMBDA => Lambda: {
         /// Return the argument of the lambda
         pub fn param(&self) -> Option<Param> {
             first(self)
@@ -281,13 +281,13 @@ ast_nodes! {
             first(self)
         }
     },
-     NODE_LEGACY_LET => LegacyLet: EntryHolder,
-     NODE_LET_IN => LetIn: EntryHolder: {
+    NODE_LEGACY_LET => LegacyLet: EntryHolder,
+    NODE_LET_IN => LetIn: EntryHolder: {
          pub fn body(&self) -> Option<Expr> {
              first(self)
          }
-     },
-     NODE_LIST => List: {
+    },
+    NODE_LIST => List: {
         pub fn l_brack_token(&self) -> Option<SyntaxToken> {
             token_u(self, T!["["])
         }
@@ -301,7 +301,7 @@ ast_nodes! {
             token_u(self, T!["]"])
         }
     },
-     NODE_BIN_OP => BinOp: {
+    NODE_BIN_OP => BinOp: {
         /// Return the left hand side of the binary operation
         pub fn lhs(&self) -> Option<Expr> {
             first(self)
@@ -318,7 +318,7 @@ ast_nodes! {
             nth(self, 1)
         }
     },
-     NODE_OR_DEFAULT => OrDefault: {
+    NODE_OR_DEFAULT => OrDefault: {
         /// Return the indexing operation
         pub fn index(&self) -> Option<Select> {
             nth!(self; (Select) 0)
@@ -329,7 +329,7 @@ ast_nodes! {
         }
     },
 
-     NODE_PAREN => Paren: {
+    NODE_PAREN => Paren: {
          pub fn l_paren_token(&self) -> Option<SyntaxToken> {
              token_u(self, T!["("])
          }
@@ -343,14 +343,14 @@ ast_nodes! {
          }
      },
 
-     NODE_PAT_BIND => PatBind: {
+    NODE_PAT_BIND => PatBind: {
         /// Return the identifier the set is being bound as
         pub fn ident(&self) -> Option<Ident> {
             first(self)
         }
     },
 
-     NODE_PAT_ENTRY => PatEntry: {
+    NODE_PAT_ENTRY => PatEntry: {
         /// Return the identifier the argument is being bound as
         pub fn ident(&self) -> Option<Ident> {
             first(self)
@@ -367,7 +367,7 @@ ast_nodes! {
         NODE_IDENT => Ident,
     } => Param,
 
-     NODE_PATTERN => Pattern: {
+    NODE_PATTERN => Pattern: {
         pub fn at_token(&self) -> Option<SyntaxToken> {
             token_u(self, T![@])
         }
@@ -390,9 +390,9 @@ ast_nodes! {
             first(self)
         }
     },
-     NODE_ROOT => Root,
+    NODE_ROOT => Root,
 
-     NODE_ATTR_SET => AttrSet: EntryHolder: {
+    NODE_ATTR_SET => AttrSet: EntryHolder: {
          pub fn rec_token(&self) -> Option<SyntaxToken> {
              token_u(self, T![rec])
          }
@@ -426,7 +426,7 @@ ast_nodes! {
             first(self)
         }
     },
-     NODE_UNARY_OP => UnaryOp: {
+    NODE_UNARY_OP => UnaryOp: {
         /// Return the operator
         pub fn operator(&self) -> Option<UnaryOpKind> {
             children_tokens_u(self).find_map(|t| UnaryOpKind::from_kind(t.kind()))
@@ -437,7 +437,7 @@ ast_nodes! {
             first(self)
         }
     },
-     NODE_WITH => With: {
+    NODE_WITH => With: {
         /// Return the namespace
         pub fn namespace(&self) -> Option<Expr> {
             nth(self, 0)
