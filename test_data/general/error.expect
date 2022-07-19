@@ -53,10 +53,12 @@ NODE_ROOT 0..166 {
           TOKEN_WHITESPACE(" ") 54..55
           TOKEN_ASSIGN("=") 55..56
           TOKEN_WHITESPACE(" ") 56..57
-          NODE_STRING 57..64 {
-            TOKEN_STRING_START("\"") 57..58
-            TOKEN_STRING_CONTENT("entry") 58..63
-            TOKEN_STRING_END("\"") 63..64
+          NODE_LITERAL 57..64 {
+            NODE_STRING 57..64 {
+              TOKEN_STRING_START("\"") 57..58
+              TOKEN_STRING_CONTENT("entry") 58..63
+              TOKEN_STRING_END("\"") 63..64
+            }
           }
           TOKEN_SEMICOLON(";") 64..65
         }
@@ -79,10 +81,12 @@ NODE_ROOT 0..166 {
           TOKEN_WHITESPACE(" ") 98..99
           TOKEN_ASSIGN("=") 99..100
           TOKEN_WHITESPACE(" ") 100..101
-          NODE_STRING 101..114 {
-            TOKEN_STRING_START("\"") 101..102
-            TOKEN_STRING_CONTENT("valid entry") 102..113
-            TOKEN_STRING_END("\"") 113..114
+          NODE_LITERAL 101..114 {
+            NODE_STRING 101..114 {
+              TOKEN_STRING_START("\"") 101..102
+              TOKEN_STRING_CONTENT("valid entry") 102..113
+              TOKEN_STRING_END("\"") 113..114
+            }
           }
           TOKEN_SEMICOLON(";") 114..115
         }
@@ -113,10 +117,12 @@ NODE_ROOT 0..166 {
           TOKEN_WHITESPACE(" ") 142..143
           TOKEN_ASSIGN("=") 143..144
           TOKEN_WHITESPACE(" ") 144..145
-          NODE_STRING 145..149 {
-            TOKEN_STRING_START("\"") 145..146
-            TOKEN_STRING_CONTENT("hi") 146..148
-            TOKEN_STRING_END("\"") 148..149
+          NODE_LITERAL 145..149 {
+            NODE_STRING 145..149 {
+              TOKEN_STRING_START("\"") 145..146
+              TOKEN_STRING_CONTENT("hi") 146..148
+              TOKEN_STRING_END("\"") 148..149
+            }
           }
           TOKEN_SEMICOLON(";") 149..150
         }

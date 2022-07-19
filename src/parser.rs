@@ -785,7 +785,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use rowan::{WalkEvent, NodeOrToken};
+    use rowan::{NodeOrToken, WalkEvent};
 
     use crate::Root;
 

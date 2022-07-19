@@ -19,9 +19,11 @@ NODE_ROOT 0..10 {
     }
     TOKEN_COLON(":") 6..7
     TOKEN_WHITESPACE("\n") 7..8
-    NODE_STRING 8..10 {
-      TOKEN_STRING_START("\"") 8..9
-      TOKEN_STRING_END("\"") 9..10
+    NODE_LITERAL 8..10 {
+      NODE_STRING 8..10 {
+        TOKEN_STRING_START("\"") 8..9
+        TOKEN_STRING_END("\"") 9..10
+      }
     }
   }
 }

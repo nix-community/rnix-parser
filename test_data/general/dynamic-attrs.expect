@@ -61,10 +61,12 @@ NODE_ROOT 0..216 {
       TOKEN_WHITESPACE(" ") 51..52
       TOKEN_ASSIGN("=") 52..53
       TOKEN_WHITESPACE(" ") 53..54
-      NODE_STRING 54..61 {
-        TOKEN_STRING_START("\"") 54..55
-        TOKEN_STRING_CONTENT("hello") 55..60
-        TOKEN_STRING_END("\"") 60..61
+      NODE_LITERAL 54..61 {
+        NODE_STRING 54..61 {
+          TOKEN_STRING_START("\"") 54..55
+          TOKEN_STRING_CONTENT("hello") 55..60
+          TOKEN_STRING_END("\"") 60..61
+        }
       }
       TOKEN_SEMICOLON(";") 61..62
     }
@@ -125,10 +127,12 @@ NODE_ROOT 0..216 {
       TOKEN_WHITESPACE(" ") 103..104
       TOKEN_ASSIGN("=") 104..105
       TOKEN_WHITESPACE(" ") 105..106
-      NODE_STRING 106..109 {
-        TOKEN_STRING_START("\"") 106..107
-        TOKEN_STRING_CONTENT("c") 107..108
-        TOKEN_STRING_END("\"") 108..109
+      NODE_LITERAL 106..109 {
+        NODE_STRING 106..109 {
+          TOKEN_STRING_START("\"") 106..107
+          TOKEN_STRING_CONTENT("c") 107..108
+          TOKEN_STRING_END("\"") 108..109
+        }
       }
       TOKEN_SEMICOLON(";") 109..110
     }
@@ -142,17 +146,21 @@ NODE_ROOT 0..216 {
             TOKEN_IDENT("define") 116..122
           }
           TOKEN_WHITESPACE(" ") 122..123
-          NODE_STRING 123..128 {
-            TOKEN_STRING_START("\"") 123..124
-            TOKEN_STRING_CONTENT("key") 124..127
-            TOKEN_STRING_END("\"") 127..128
+          NODE_LITERAL 123..128 {
+            NODE_STRING 123..128 {
+              TOKEN_STRING_START("\"") 123..124
+              TOKEN_STRING_CONTENT("key") 124..127
+              TOKEN_STRING_END("\"") 127..128
+            }
           }
         }
         TOKEN_WHITESPACE(" ") 128..129
-        NODE_STRING 129..136 {
-          TOKEN_STRING_START("\"") 129..130
-          TOKEN_STRING_CONTENT("value") 130..135
-          TOKEN_STRING_END("\"") 135..136
+        NODE_LITERAL 129..136 {
+          NODE_STRING 129..136 {
+            TOKEN_STRING_START("\"") 129..130
+            TOKEN_STRING_CONTENT("value") 130..135
+            TOKEN_STRING_END("\"") 135..136
+          }
         }
       }
       TOKEN_WHITESPACE(" ") 136..137
@@ -182,10 +190,12 @@ NODE_ROOT 0..216 {
           TOKEN_WHITESPACE(" ") 160..161
           TOKEN_ASSIGN("=") 161..162
           TOKEN_WHITESPACE(" ") 162..163
-          NODE_STRING 163..167 {
-            TOKEN_STRING_START("\"") 163..164
-            TOKEN_STRING_CONTENT(":D") 164..166
-            TOKEN_STRING_END("\"") 166..167
+          NODE_LITERAL 163..167 {
+            NODE_STRING 163..167 {
+              TOKEN_STRING_START("\"") 163..164
+              TOKEN_STRING_CONTENT(":D") 164..166
+              TOKEN_STRING_END("\"") 166..167
+            }
           }
           TOKEN_SEMICOLON(";") 167..168
         }
