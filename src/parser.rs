@@ -590,7 +590,11 @@ where
                 self.finish_node();
             }
             TOKEN_DYNAMIC_START => self.parse_dynamic(),
-            TOKEN_STRING_START => self.parse_string(),
+            TOKEN_STRING_START => {
+                self.start_node(NODE_LITERAL);
+                self.parse_string();
+                self.finish_node();
+            }
             TOKEN_PATH => {
                 let next = self.try_next();
                 if let Some((token, s)) = next {
