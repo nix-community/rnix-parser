@@ -1,3 +1,5 @@
+use core::num;
+
 use crate::{
     ast::AstToken,
     SyntaxKind::{self, *},
@@ -12,7 +14,7 @@ macro_rules! ast_tokens {
 
             impl std::fmt::Display for $name {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    std::fmt::Display::fmt(self.token(), f)
+                    std::fmt::Display::fmt(self.syntax(), f)
                 }
             }
 
@@ -29,7 +31,7 @@ macro_rules! ast_tokens {
                     }
                 }
 
-                fn token(&self) -> &SyntaxToken {
+                fn syntax(&self) -> &SyntaxToken {
                     &self.0
                 }
             }
@@ -44,8 +46,16 @@ macro_rules! ast_tokens {
 ast_tokens! {
     TOKEN_WHITESPACE => Whitespace,
     TOKEN_COMMENT => Comment,
-    TOKEN_FLOAT => Float,
-    TOKEN_INTEGER => Integer,
+    TOKEN_FLOAT => Float: {
+        pub fn value(&self) -> Result<f64, num::ParseFloatError> {
+            self.syntax().text().parse()
+        }
+    },
+    TOKEN_INTEGER => Integer: { 
+        pub fn value(&self) -> Result<i64, num::ParseIntError> {
+            self.syntax().text().parse()
+        }
+    },
     TOKEN_PATH => Path,
     TOKEN_URI => Uri,
 }

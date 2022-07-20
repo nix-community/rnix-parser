@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::fmt;
 
 use crate::{
-    value::{self, StrPart, Value as ParsedValue, ValueError},
+    // value::{self, StrPart, Value as ParsedValue, ValueError},
     NodeOrToken, SyntaxElement,
     SyntaxKind::{self, *},
     SyntaxNode, SyntaxToken, WalkEvent,
@@ -261,10 +261,10 @@ pub enum ParsedType {
     Root(Root),
     AttrSet(AttrSet),
     KeyValue(KeyValue),
-    Str(Str),
+    // Str(Str),
     StrInterpol(StrInterpol),
     UnaryOp(UnaryOp),
-    Value(Value),
+    // Value(Value),
     With(With),
     PathWithInterpol(PathWithInterpol),
 }
@@ -284,7 +284,7 @@ impl TryFrom<SyntaxNode> for ParsedType {
             NODE_SELECT => Ok(ParsedType::Select(Select::cast(node).unwrap())),
             NODE_INHERIT => Ok(ParsedType::Inherit(Inherit::cast(node).unwrap())),
             NODE_INHERIT_FROM => Ok(ParsedType::InheritFrom(InheritFrom::cast(node).unwrap())),
-            NODE_STRING => Ok(ParsedType::Str(Str::cast(node).unwrap())),
+            // NODE_STRING => Ok(ParsedType::Str(Str::cast(node).unwrap())),
             NODE_STRING_INTERPOL => Ok(ParsedType::StrInterpol(StrInterpol::cast(node).unwrap())),
             NODE_LAMBDA => Ok(ParsedType::Lambda(Lambda::cast(node).unwrap())),
             NODE_LEGACY_LET => Ok(ParsedType::LegacyLet(LegacyLet::cast(node).unwrap())),
@@ -300,7 +300,7 @@ impl TryFrom<SyntaxNode> for ParsedType {
             NODE_ATTR_SET => Ok(ParsedType::AttrSet(AttrSet::cast(node).unwrap())),
             NODE_KEY_VALUE => Ok(ParsedType::KeyValue(KeyValue::cast(node).unwrap())),
             NODE_UNARY_OP => Ok(ParsedType::UnaryOp(UnaryOp::cast(node).unwrap())),
-            NODE_LITERAL => Ok(ParsedType::Value(Value::cast(node).unwrap())),
+            // NODE_LITERAL => Ok(ParsedType::Value(Value::cast(node).unwrap())),
             NODE_WITH => Ok(ParsedType::With(With::cast(node).unwrap())),
             NODE_PATH_WITH_INTERPOL => {
                 Ok(ParsedType::PathWithInterpol(PathWithInterpol::cast(node).unwrap()))
@@ -336,10 +336,10 @@ impl TypedNode for ParsedType {
             ParsedType::Root(n) => n.node(),
             ParsedType::AttrSet(n) => n.node(),
             ParsedType::KeyValue(n) => n.node(),
-            ParsedType::Str(n) => n.node(),
+            // ParsedType::Str(n) => n.node(),
             ParsedType::StrInterpol(n) => n.node(),
             ParsedType::UnaryOp(n) => n.node(),
-            ParsedType::Value(n) => n.node(),
+            // ParsedType::Value(n) => n.node(),
             ParsedType::With(n) => n.node(),
             ParsedType::PathWithInterpol(n) => n.node(),
         }
@@ -353,13 +353,13 @@ impl TypedNode for ParsedType {
 typed! [
     NODE_IDENT => Ident: TokenWrapper: {
     },
-    NODE_LITERAL => Value: TokenWrapper: {
-        /// Parse the value
-        pub fn to_value(&self) -> Result<ParsedValue, ValueError> {
-            let token = self.to_inner_token();
-            ParsedValue::from_token(token.kind(), token.text())
-        }
-    },
+    // NODE_LITERAL => Value: TokenWrapper: {
+    //     /// Parse the value
+    //     pub fn to_value(&self) -> Result<ParsedValue, ValueError> {
+    //         let token = self.to_inner_token();
+    //         ParsedValue::from_token(token.kind(), token.text())
+    //     }
+    // },
 
     NODE_APPLY => Apply: {
         /// Return the lambda being applied
@@ -425,12 +425,12 @@ typed! [
         }
     },
     NODE_INHERIT_FROM => InheritFrom: Wrapper,
-    NODE_STRING => Str: {
-        /// Parse the interpolation into a series of parts
-        pub fn parts(&self) -> Vec<StrPart> {
-            value::string_parts(self)
-        }
-    },
+    // NODE_STRING => Str: {
+    //     /// Parse the interpolation into a series of parts
+    //     pub fn parts(&self) -> Vec<StrPart> {
+    //         value::string_parts(self)
+    //     }
+    // },
     NODE_STRING_INTERPOL => StrInterpol: Wrapper,
     NODE_LAMBDA => Lambda: {
         /// Return the argument of the lambda

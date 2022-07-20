@@ -25,7 +25,7 @@ mod support {
     use rowan::ast::AstChildren;
 
     use super::{AstNode, AstToken};
-    use crate::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
+    use crate::{SyntaxElement, SyntaxKind, SyntaxToken};
 
     pub(super) fn first<N: AstNode, NN: AstNode>(parent: &N) -> Option<NN> {
         parent.syntax().children().find_map(|n| NN::cast(n))
@@ -68,5 +68,5 @@ pub trait AstToken {
     where
         Self: Sized;
 
-    fn token(&self) -> &SyntaxToken;
+    fn syntax(&self) -> &SyntaxToken;
 }

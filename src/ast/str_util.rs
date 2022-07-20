@@ -1,10 +1,81 @@
-use rowan::{ast::AstNode as OtherAstNode, NodeOrToken};
 use crate::kinds::SyntaxKind::*;
+use rowan::{ast::AstNode as OtherAstNode, NodeOrToken};
 
 use crate::{
     ast::{self, AstNode},
     SyntaxElement, SyntaxToken,
 };
+
+impl ast::Str {
+    fn string_parts(&self) -> Vec<StrPart> {
+        // temporary for now
+        fn children_tokens<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
+            parent.syntax().children_with_tokens().filter_map(SyntaxElement::into_token)
+        }
+
+        let mut parts = Vec::new();
+        let mut literals = 0;
+        let mut common = std::usize::MAX;
+        let multiline = children_tokens(self).next().map_or(false, |t| t.text() == "''");
+        let mut last_was_ast = false;
+
+        for child in self.syntax().children_with_tokens() {
+            match &child {
+                NodeOrToken::Token(token) if token.kind() == TOKEN_STRING_CONTENT => {
+                    let text: &str = token.text();
+
+                    let line_count = text.lines().count();
+                    let next_is_ast = child
+                        .next_sibling_or_token()
+                        .map_or(false, |child| child.kind() == NODE_STRING_INTERPOL);
+                    for (i, line) in text.lines().enumerate().skip(if last_was_ast { 1 } else { 0 })
+                    {
+                        let indent: usize = indention(line).count();
+                        if (i != line_count - 1 || !next_is_ast) && indent == line.chars().count() {
+                            // line is empty and not the start of an
+                            // interpolation, ignore indention
+                            continue;
+                        }
+                        common = common.min(indent);
+                    }
+                    parts.push(StrPart::Literal(text.to_string()));
+                    literals += 1;
+                }
+                NodeOrToken::Token(token) => {
+                    assert!(token.kind() == TOKEN_STRING_START || token.kind() == TOKEN_STRING_END)
+                }
+                NodeOrToken::Node(node) => {
+                    assert_eq!(node.kind(), NODE_STRING_INTERPOL);
+                    parts.push(StrPart::Ast(ast::StrInterpol::cast(node.clone()).unwrap()));
+                    last_was_ast = true;
+                }
+            }
+        }
+
+        let mut i = 0;
+        for part in parts.iter_mut() {
+            if let StrPart::Literal(ref mut text) = part {
+                if multiline {
+                    *text = remove_indent(text, i == 0, common);
+                    if i == literals - 1 {
+                        // Last index
+                        remove_trailing(text);
+                    }
+                }
+                *text = unescape(text, multiline);
+                i += 1;
+            }
+        }
+
+        parts
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum StrPart {
+    Literal(String),
+    Ast(ast::StrInterpol),
+}
 
 /// Interpret escape sequences in the nix string and return the converted value
 pub fn unescape(input: &str, multiline: bool) -> String {
@@ -106,6 +177,7 @@ pub fn remove_indent(input: &str, initial: bool, indent: usize) -> String {
     }
     output
 }
+
 /// Remove any trailing whitespace from a string
 pub fn remove_trailing(string: &mut String) {
     let trailing: usize = string
@@ -116,74 +188,6 @@ pub fn remove_trailing(string: &mut String) {
         .sum();
     let len = string.len();
     string.truncate(len - trailing);
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum StrPart {
-    Literal(String),
-    Ast(ast::StrInterpol),
-}
-
-pub(crate) fn string_parts(string: &ast::Str) -> Vec<StrPart> {
-    // temporary for now
-    fn children_tokens<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
-        parent.syntax().children_with_tokens().filter_map(SyntaxElement::into_token)
-    }
-
-    let mut parts = Vec::new();
-    let mut literals = 0;
-    let mut common = std::usize::MAX;
-    let multiline = children_tokens(string).next().map_or(false, |t| t.text() == "''");
-    let mut last_was_ast = false;
-
-    for child in string.syntax().children_with_tokens() {
-        match &child {
-            NodeOrToken::Token(token) if token.kind() == TOKEN_STRING_CONTENT => {
-                let text: &str = token.text();
-
-                let line_count = text.lines().count();
-                let next_is_ast = child
-                    .next_sibling_or_token()
-                    .map_or(false, |child| child.kind() == NODE_STRING_INTERPOL);
-                for (i, line) in text.lines().enumerate().skip(if last_was_ast { 1 } else { 0 }) {
-                    let indent: usize = indention(line).count();
-                    if (i != line_count - 1 || !next_is_ast) && indent == line.chars().count() {
-                        // line is empty and not the start of an
-                        // interpolation, ignore indention
-                        continue;
-                    }
-                    common = common.min(indent);
-                }
-                parts.push(StrPart::Literal(text.to_string()));
-                literals += 1;
-            }
-            NodeOrToken::Token(token) => {
-                assert!(token.kind() == TOKEN_STRING_START || token.kind() == TOKEN_STRING_END)
-            }
-            NodeOrToken::Node(node) => {
-                assert_eq!(node.kind(), NODE_STRING_INTERPOL);
-                parts.push(StrPart::Ast(ast::StrInterpol::cast(node.clone()).unwrap()));
-                last_was_ast = true;
-            }
-        }
-    }
-
-    let mut i = 0;
-    for part in parts.iter_mut() {
-        if let StrPart::Literal(ref mut text) = part {
-            if multiline {
-                *text = remove_indent(text, i == 0, common);
-                if i == literals - 1 {
-                    // Last index
-                    remove_trailing(text);
-                }
-            }
-            *text = unescape(text, multiline);
-            i += 1;
-        }
-    }
-
-    parts
 }
 
 #[cfg(test)]
@@ -229,7 +233,7 @@ mod tests {
                 "#
         .replace("|trailing-whitespace", "");
 
-        if let [StrPart::Literal(lit)] = &string_parts(&string_node(txtin.as_str()))[..] {
+        if let [StrPart::Literal(lit)] = &ast::Str::string_parts(&string_node(txtin.as_str()))[..] {
             assert_eq!(lit,
                 // Get the below with nix repl
                 "    \n          \nThis is a multiline string :D\n  indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\ntwo single quotes: ''\nthree single quotes: '''\n"

@@ -5,16 +5,10 @@ mod kinds;
 pub mod parser;
 pub mod tokenizer;
 pub mod types;
-pub mod value;
-mod string_parsing;
 
 use std::{collections::HashSet, marker::PhantomData};
 
-pub use self::{
-    kinds::SyntaxKind,
-    tokenizer::tokenize,
-    value::{StrPart, Value as NixValue},
-};
+pub use self::{kinds::SyntaxKind, tokenizer::tokenize};
 
 use ast::AstNode;
 use parser::ParseError;
@@ -115,8 +109,6 @@ macro_rules! match_ast {
 
 #[cfg(test)]
 mod tests {
-    use super::{types::*, value::StrPart, NixValue, SyntaxKind};
-
     // #[test]
     // fn interpolation() {
     //     let ast = parse(include_str!("../test_data/general/interpolation.nix"));
