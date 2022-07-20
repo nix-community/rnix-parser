@@ -4,12 +4,11 @@ mod expr_ext;
 mod node_ext;
 mod nodes;
 mod operators;
-mod token_ext;
 mod tokens;
 
 use crate::{
     NixLanguage,
-    SyntaxKind::{self, *},
+    SyntaxKind,
     SyntaxToken,
 };
 

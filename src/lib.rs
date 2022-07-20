@@ -5,7 +5,7 @@ mod kinds;
 pub mod parser;
 pub mod tokenizer;
 
-use std::{collections::HashSet, marker::PhantomData};
+use std::marker::PhantomData;
 
 pub use self::{kinds::SyntaxKind, tokenizer::tokenize};
 

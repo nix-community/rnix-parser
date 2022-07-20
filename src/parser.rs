@@ -1,9 +1,8 @@
 //! The parser: turns a series of tokens into an AST
 
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     fmt,
-    marker::PhantomData,
 };
 
 use cbitset::BitSet256;
@@ -13,7 +12,6 @@ use crate::{
     tokenizer::Token,
     NixLanguage,
     SyntaxKind::{self, *},
-    SyntaxNode,
 };
 
 const OR: &str = "or";
@@ -787,7 +785,7 @@ where
 mod tests {
     use rowan::{NodeOrToken, WalkEvent};
 
-    use crate::Root;
+    use crate::{Root, SyntaxNode};
 
     use super::*;
 

@@ -439,6 +439,7 @@ ast_nodes! {
         NODE_INHERIT => Inherit,
         NODE_KEY_VALUE => KeyValue,
     } => Entry,
+
     NODE_KEY_VALUE => KeyValue: {
         /// Return this entry's key
         pub fn key(&self) -> Option<Key> {
@@ -450,6 +451,7 @@ ast_nodes! {
             first(self)
         }
     },
+
     NODE_UNARY_OP => UnaryOp: {
         /// Return the operator
         pub fn operator(&self) -> Option<UnaryOpKind> {
