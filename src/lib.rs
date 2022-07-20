@@ -4,7 +4,6 @@ pub mod ast;
 mod kinds;
 pub mod parser;
 pub mod tokenizer;
-pub mod types;
 
 use std::{collections::HashSet, marker::PhantomData};
 

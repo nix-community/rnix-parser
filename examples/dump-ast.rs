@@ -1,4 +1,3 @@
-use rnix::types::*;
 use std::{env, fs};
 
 fn main() {

@@ -1,4 +1,3 @@
-use rnix::types::*;
 use std::{io, io::Read};
 
 fn main() {

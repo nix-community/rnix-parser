@@ -1,6 +1,5 @@
 use std::{env, error::Error, fs};
 
-use rnix::{types::*, NodeOrToken, SyntaxKind::*, SyntaxNode};
 
 fn main() -> Result<(), Box<dyn Error>> {
     todo!()
