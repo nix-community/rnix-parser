@@ -27,7 +27,7 @@ pub trait EntryHolder: AstNode {
     }
 }
 
-macro_rules! ast {
+macro_rules! node {
     (
         #[from($kind:ident)]
         $(#[$meta:meta])*
@@ -152,9 +152,9 @@ macro_rules! ng {
     };
 }
 
-ast! { #[from(NODE_LITERAL)] struct Literal; }
+node! { #[from(NODE_LITERAL)] struct Literal; }
 
-ast! {
+node! {
     #[case(
         NODE_APPLY => Apply,
         NODE_ASSERT => Assert,
@@ -182,7 +182,7 @@ ast! {
     enum Expr;
 }
 
-ast! {
+node! {
     #[case(
         NODE_IDENT => Ident,
         NODE_DYNAMIC => Dynamic,
@@ -191,20 +191,20 @@ ast! {
     enum Attr;
 }
 
-ast! { #[from(NODE_IDENT)] struct Ident; }
+node! { #[from(NODE_IDENT)] struct Ident; }
 
 impl Ident {
     tg! { ident_token, TOKEN_IDENT }
 }
 
-ast! { #[from(NODE_APPLY)] struct Apply; }
+node! { #[from(NODE_APPLY)] struct Apply; }
 
 impl Apply {
     ng! { lambda, Expr, 0 }
     ng! { argument, Expr, 1 }
 }
 
-ast! { #[from(NODE_ASSERT)] struct Assert; }
+node! { #[from(NODE_ASSERT)] struct Assert; }
 
 impl Assert {
     tg! { assert_token, assert }
@@ -212,17 +212,17 @@ impl Assert {
     ng! { body, Expr, 1 }
 }
 
-ast! { #[from(NODE_KEY)] struct Key; }
+node! { #[from(NODE_KEY)] struct Key; }
 
 impl Key {
     ng! { attrs, [Attr] }
 }
 
-ast! { #[from(NODE_DYNAMIC)] struct Dynamic; }
+node! { #[from(NODE_DYNAMIC)] struct Dynamic; }
 
-ast! { #[from(NODE_ERROR)] struct Error; }
+node! { #[from(NODE_ERROR)] struct Error; }
 
-ast! { #[from(NODE_IF_ELSE)] struct IfElse; }
+node! { #[from(NODE_IF_ELSE)] struct IfElse; }
 
 impl IfElse {
     tg! { if_token, if }
@@ -233,7 +233,7 @@ impl IfElse {
     ng! { else_body, Expr, 2 }
 }
 
-ast! { #[from(NODE_SELECT)] struct Select; }
+node! { #[from(NODE_SELECT)] struct Select; }
 
 impl Select {
     ng! { expr, Expr, 0 }
@@ -241,7 +241,7 @@ impl Select {
     ng! { attr, Expr, 1 }
 }
 
-ast! { #[from(NODE_INHERIT)] struct Inherit; }
+node! { #[from(NODE_INHERIT)] struct Inherit; }
 
 impl Inherit {
     tg! { inherit_token, inherit }
@@ -249,20 +249,20 @@ impl Inherit {
     ng! { idents, [Ident] }
 }
 
-ast! { #[from(NODE_INHERIT_FROM)] struct InheritFrom; }
+node! { #[from(NODE_INHERIT_FROM)] struct InheritFrom; }
 
-ast! { #[from(NODE_STRING)] struct Str; }
+node! { #[from(NODE_STRING)] struct Str; }
 
-ast! { #[from(NODE_STRING_INTERPOL)] struct StrInterpol; }
+node! { #[from(NODE_STRING_INTERPOL)] struct StrInterpol; }
 
-ast! { #[from(NODE_LAMBDA)] struct Lambda; }
+node! { #[from(NODE_LAMBDA)] struct Lambda; }
 
 impl Lambda {
     ng! { param, Param, 0 }
     ng! { body, Expr, 0 }
 }
 
-ast! { #[from(NODE_LEGACY_LET)] struct LegacyLet; }
+node! { #[from(NODE_LEGACY_LET)] struct LegacyLet; }
 
 impl EntryHolder for LegacyLet {}
 
@@ -272,7 +272,7 @@ impl LegacyLet {
     tg! { curly_close_token, "}" }
 }
 
-ast! { #[from(NODE_LET_IN)] struct LetIn; }
+node! { #[from(NODE_LET_IN)] struct LetIn; }
 
 impl LetIn {
     tg! { let_token, let }
@@ -280,7 +280,7 @@ impl LetIn {
     ng! { body, Expr, 0 }
 }
 
-ast! { #[from(NODE_LIST)] struct List; }
+node! { #[from(NODE_LIST)] struct List; }
 
 impl List {
     tg! { l_brack_token, "[" }
@@ -288,7 +288,7 @@ impl List {
     tg! { r_brack_token, "]" }
 }
 
-ast! { #[from(NODE_BIN_OP)] struct BinOp; }
+node! { #[from(NODE_BIN_OP)] struct BinOp; }
 
 impl BinOp {
     ng! { lhs, Expr, 0 }
@@ -300,14 +300,14 @@ impl BinOp {
     ng! { rhs, Expr, 1 }
 }
 
-ast! { #[from(NODE_OR_DEFAULT)] struct OrDefault; }
+node! { #[from(NODE_OR_DEFAULT)] struct OrDefault; }
 
 impl OrDefault {
     ng! { index, Select, 0 }
     ng! { default, Expr, 1 }
 }
 
-ast! { #[from(NODE_PAREN)] struct Paren; }
+node! { #[from(NODE_PAREN)] struct Paren; }
 
 impl Paren {
     tg! { l_paren_token, "(" }
@@ -315,13 +315,13 @@ impl Paren {
     tg! { r_paren_token, ")" }
 }
 
-ast! { #[from(NODE_PAT_BIND)] struct PatBind; }
+node! { #[from(NODE_PAT_BIND)] struct PatBind; }
 
 impl PatBind {
     ng! { ident, Ident, 0 }
 }
 
-ast! { #[from(NODE_PAT_ENTRY)] struct PatEntry; }
+node! { #[from(NODE_PAT_ENTRY)] struct PatEntry; }
 
 impl PatEntry {
     ng! { ident, Ident, 0 }
@@ -329,7 +329,7 @@ impl PatEntry {
     ng! { default, Expr, 1 }
 }
 
-ast! {
+node! {
     #[case(
         NODE_PATTERN => Pattern,
         NODE_IDENT => Ident,
@@ -337,7 +337,7 @@ ast! {
     enum Param;
 }
 
-ast! { #[from(NODE_PATTERN)] struct Pattern; }
+node! { #[from(NODE_PATTERN)] struct Pattern; }
 
 impl Pattern {
     tg! { at_token, @ }
@@ -346,13 +346,13 @@ impl Pattern {
     ng! { pat_bind, PatBind, 0 }
 }
 
-ast! { #[from(NODE_ROOT)] struct Root; }
+node! { #[from(NODE_ROOT)] struct Root; }
 
 impl Root {
     ng! { expr, Expr, 0 }
 }
 
-ast! { #[from(NODE_ATTR_SET)] struct AttrSet; }
+node! { #[from(NODE_ATTR_SET)] struct AttrSet; }
 
 impl EntryHolder for AttrSet {}
 
@@ -362,7 +362,7 @@ impl AttrSet {
     tg! { r_curly_token, "}" }
 }
 
-ast! {
+node! {
     #[case(
         NODE_INHERIT => Inherit,
         NODE_KEY_VALUE => KeyValue,
@@ -370,14 +370,14 @@ ast! {
     enum Entry;
 }
 
-ast! { #[from(NODE_KEY_VALUE)] struct KeyValue; }
+node! { #[from(NODE_KEY_VALUE)] struct KeyValue; }
 
 impl KeyValue {
     ng! { key, Key, 0 }
     ng! { value, Expr, 0 }
 }
 
-ast! { #[from(NODE_UNARY_OP)] struct UnaryOp; }
+node! { #[from(NODE_UNARY_OP)] struct UnaryOp; }
 
 impl UnaryOp {
     pub fn operator(&self) -> Option<UnaryOpKind> {
@@ -386,7 +386,7 @@ impl UnaryOp {
     ng! { expr, Expr, 0 }
 }
 
-ast! { #[from(NODE_WITH)] struct With; }
+node! { #[from(NODE_WITH)] struct With; }
 
 impl With {
     ng! { namespace, Expr, 0 }

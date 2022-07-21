@@ -6,11 +6,7 @@ mod nodes;
 mod operators;
 mod tokens;
 
-use crate::{
-    NixLanguage,
-    SyntaxKind,
-    SyntaxToken,
-};
+use crate::{NixLanguage, SyntaxKind, SyntaxToken};
 
 pub use nodes::*;
 pub use operators::{BinOpKind, UnaryOpKind};
@@ -64,4 +60,17 @@ pub trait AstToken {
         Self: Sized;
 
     fn syntax(&self) -> &SyntaxToken;
+}
+
+pub struct Another;
+pub struct My;
+
+impl From<Another> for Option<My> {
+    fn from(_: Another) -> Self {
+        None
+    }
+}
+
+fn test() {
+    let test = <Option<My>>::from(Another).unwrap();
 }
