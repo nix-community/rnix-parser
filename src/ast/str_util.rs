@@ -74,7 +74,7 @@ impl ast::Str {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StrPart {
     Literal(String),
-    Ast(ast::StrInterpol),
+    Interpolation(ast::StrInterpol),
 }
 
 /// Interpret escape sequences in the nix string and return the converted value
