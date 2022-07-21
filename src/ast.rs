@@ -26,10 +26,6 @@ mod support {
     use super::{AstNode, AstToken};
     use crate::{SyntaxElement, SyntaxKind, SyntaxToken};
 
-    pub(super) fn first<N: AstNode, NN: AstNode>(parent: &N) -> Option<NN> {
-        parent.syntax().children().find_map(|n| NN::cast(n))
-    }
-
     pub(super) fn nth<N: AstNode, NN: AstNode>(parent: &N, n: usize) -> Option<NN> {
         parent.syntax().children().flat_map(NN::cast).nth(n)
     }

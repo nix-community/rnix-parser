@@ -45,13 +45,17 @@ macro_rules! ast_tokens {
 
 ast_tokens! {
     TOKEN_WHITESPACE => Whitespace,
-    TOKEN_COMMENT => Comment,
+    TOKEN_COMMENT => Comment: {
+        pub fn text(&self) -> &str {
+            self.syntax().text().strip_prefix('#').unwrap()
+        }
+    },
     TOKEN_FLOAT => Float: {
         pub fn value(&self) -> Result<f64, num::ParseFloatError> {
             self.syntax().text().parse()
         }
     },
-    TOKEN_INTEGER => Integer: { 
+    TOKEN_INTEGER => Integer: {
         pub fn value(&self) -> Result<i64, num::ParseIntError> {
             self.syntax().text().parse()
         }
