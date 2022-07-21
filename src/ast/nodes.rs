@@ -165,7 +165,7 @@ ast_nodes! {
         NODE_WITH => With,
     } => Expr,
 
-    // This will most likely be removed along with NODE_LITERAL
+    // This will most likely be removed along with NODE_LITERAL later
     NODE_LITERAL => Literal,
 
     {
@@ -176,7 +176,7 @@ ast_nodes! {
 
     NODE_IDENT => Ident: {
         pub fn ident_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T![ident])
+            token_u(self, T![TOKEN_IDENT])
         }
     },
 
