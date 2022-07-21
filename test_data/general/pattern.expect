@@ -21,12 +21,10 @@ NODE_ROOT 0..51 {
               TOKEN_WHITESPACE(" ") 9..10
               TOKEN_QUESTION("?") 10..11
               TOKEN_WHITESPACE(" ") 11..12
-              NODE_LITERAL 12..18 {
-                NODE_STRING 12..18 {
-                  TOKEN_STRING_START("\"") 12..13
-                  TOKEN_STRING_CONTENT("test") 13..17
-                  TOKEN_STRING_END("\"") 17..18
-                }
+              NODE_STRING 12..18 {
+                TOKEN_STRING_START("\"") 12..13
+                TOKEN_STRING_CONTENT("test") 13..17
+                TOKEN_STRING_END("\"") 17..18
               }
             }
             TOKEN_WHITESPACE(" ") 18..19

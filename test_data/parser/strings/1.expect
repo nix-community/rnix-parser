@@ -11,12 +11,10 @@ NODE_ROOT 0..137 {
       TOKEN_WHITESPACE(" ") 10..11
       TOKEN_ASSIGN("=") 11..12
       TOKEN_WHITESPACE(" ") 12..13
-      NODE_LITERAL 13..20 {
-        NODE_STRING 13..20 {
-          TOKEN_STRING_START("\"") 13..14
-          TOKEN_STRING_CONTENT("hello") 14..19
-          TOKEN_STRING_END("\"") 19..20
-        }
+      NODE_STRING 13..20 {
+        TOKEN_STRING_START("\"") 13..14
+        TOKEN_STRING_CONTENT("hello") 14..19
+        TOKEN_STRING_END("\"") 19..20
       }
       TOKEN_SEMICOLON(";") 20..21
     }
@@ -30,12 +28,10 @@ NODE_ROOT 0..137 {
       TOKEN_WHITESPACE(" ") 32..33
       TOKEN_ASSIGN("=") 33..34
       TOKEN_WHITESPACE(" ") 34..35
-      NODE_LITERAL 35..62 {
-        NODE_STRING 35..62 {
-          TOKEN_STRING_START("\'\'") 35..37
-          TOKEN_STRING_CONTENT("\n    hello\n    world\n  ") 37..60
-          TOKEN_STRING_END("\'\'") 60..62
-        }
+      NODE_STRING 35..62 {
+        TOKEN_STRING_START("\'\'") 35..37
+        TOKEN_STRING_CONTENT("\n    hello\n    world\n  ") 37..60
+        TOKEN_STRING_END("\'\'") 60..62
       }
       TOKEN_SEMICOLON(";") 62..63
     }

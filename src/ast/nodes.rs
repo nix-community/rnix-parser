@@ -1,5 +1,6 @@
 use crate::{NixLanguage, SyntaxKind, SyntaxKind::*, SyntaxNode, SyntaxToken};
 
+use super::tokens::*;
 use super::{operators::BinOpKind, support::*, AstNode, UnaryOpKind};
 use rowan::ast::AstChildren;
 use rowan::ast::AstNode as OtherAstNode;
@@ -164,6 +165,7 @@ ast_nodes! {
         NODE_WITH => With,
     } => Expr,
 
+    // This will most likely be removed along with NODE_LITERAL
     NODE_LITERAL => Literal,
 
     {

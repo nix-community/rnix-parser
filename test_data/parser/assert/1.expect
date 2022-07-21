@@ -12,12 +12,10 @@ NODE_ROOT 0..18 {
       }
     }
     TOKEN_SEMICOLON(";") 11..12
-    NODE_LITERAL 12..18 {
-      NODE_STRING 12..18 {
-        TOKEN_STRING_START("\"") 12..13
-        TOKEN_STRING_CONTENT("a==b") 13..17
-        TOKEN_STRING_END("\"") 17..18
-      }
+    NODE_STRING 12..18 {
+      TOKEN_STRING_START("\"") 12..13
+      TOKEN_STRING_CONTENT("a==b") 13..17
+      TOKEN_STRING_END("\"") 17..18
     }
   }
 }

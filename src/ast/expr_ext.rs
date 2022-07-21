@@ -7,7 +7,6 @@ use super::support::first;
 // This means that we have to write it out manually instead of using the macro to create the type for us.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LiteralKind {
-    Str(ast::Str),
     Float(ast::Float),
     Integer(ast::Integer),
     Path(ast::Path),
@@ -16,12 +15,6 @@ pub enum LiteralKind {
 
 impl ast::Literal {
     pub fn kind(&self) -> LiteralKind {
-        // the following "chain" of `if let Some(it) = token(self)` might look like a weird repetition,
-        // but `token` is generic over its return value and what exactly it decodes depends on that.
-        if let Some(it) = first(self) {
-            return LiteralKind::Str(it);
-        }
-
         if let Some(it) = token(self) {
             return LiteralKind::Float(it);
         }

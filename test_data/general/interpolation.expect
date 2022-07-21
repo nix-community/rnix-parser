@@ -11,12 +11,10 @@ NODE_ROOT 0..270 {
       TOKEN_WHITESPACE(" ") 11..12
       TOKEN_ASSIGN("=") 12..13
       TOKEN_WHITESPACE(" ") 13..14
-      NODE_LITERAL 14..21 {
-        NODE_STRING 14..21 {
-          TOKEN_STRING_START("\"") 14..15
-          TOKEN_STRING_CONTENT("World") 15..20
-          TOKEN_STRING_END("\"") 20..21
-        }
+      NODE_STRING 14..21 {
+        TOKEN_STRING_START("\"") 14..15
+        TOKEN_STRING_CONTENT("World") 15..20
+        TOKEN_STRING_END("\"") 20..21
       }
       TOKEN_SEMICOLON(";") 21..22
     }
@@ -35,20 +33,18 @@ NODE_ROOT 0..270 {
         TOKEN_WHITESPACE(" ") 36..37
         TOKEN_ASSIGN("=") 37..38
         TOKEN_WHITESPACE(" ") 38..39
-        NODE_LITERAL 39..56 {
-          NODE_STRING 39..56 {
-            TOKEN_STRING_START("\"") 39..40
-            TOKEN_STRING_CONTENT("Hello ") 40..46
-            NODE_STRING_INTERPOL 46..54 {
-              TOKEN_INTERPOL_START("${") 46..48
-              NODE_IDENT 48..53 {
-                TOKEN_IDENT("world") 48..53
-              }
-              TOKEN_INTERPOL_END("}") 53..54
+        NODE_STRING 39..56 {
+          TOKEN_STRING_START("\"") 39..40
+          TOKEN_STRING_CONTENT("Hello ") 40..46
+          NODE_STRING_INTERPOL 46..54 {
+            TOKEN_INTERPOL_START("${") 46..48
+            NODE_IDENT 48..53 {
+              TOKEN_IDENT("world") 48..53
             }
-            TOKEN_STRING_CONTENT("!") 54..55
-            TOKEN_STRING_END("\"") 55..56
+            TOKEN_INTERPOL_END("}") 53..54
           }
+          TOKEN_STRING_CONTENT("!") 54..55
+          TOKEN_STRING_END("\"") 55..56
         }
         TOKEN_SEMICOLON(";") 56..57
       }
@@ -62,82 +58,74 @@ NODE_ROOT 0..270 {
         TOKEN_WHITESPACE(" ") 69..70
         TOKEN_ASSIGN("=") 70..71
         TOKEN_WHITESPACE(" ") 71..72
-        NODE_LITERAL 72..267 {
-          NODE_STRING 72..267 {
-            TOKEN_STRING_START("\'\'") 72..74
-            TOKEN_STRING_CONTENT("\n    The set\'s x value is: ") 74..101
-            NODE_STRING_INTERPOL 101..161 {
-              TOKEN_INTERPOL_START("${") 101..103
-              TOKEN_WHITESPACE("\n      ") 103..110
-              NODE_SELECT 110..155 {
-                NODE_ATTR_SET 110..153 {
-                  TOKEN_CURLY_B_OPEN("{") 110..111
-                  TOKEN_WHITESPACE("\n        ") 111..120
-                  NODE_KEY_VALUE 120..128 {
-                    NODE_KEY 120..121 {
-                      NODE_IDENT 120..121 {
-                        TOKEN_IDENT("x") 120..121
-                      }
+        NODE_STRING 72..267 {
+          TOKEN_STRING_START("\'\'") 72..74
+          TOKEN_STRING_CONTENT("\n    The set\'s x value is: ") 74..101
+          NODE_STRING_INTERPOL 101..161 {
+            TOKEN_INTERPOL_START("${") 101..103
+            TOKEN_WHITESPACE("\n      ") 103..110
+            NODE_SELECT 110..155 {
+              NODE_ATTR_SET 110..153 {
+                TOKEN_CURLY_B_OPEN("{") 110..111
+                TOKEN_WHITESPACE("\n        ") 111..120
+                NODE_KEY_VALUE 120..128 {
+                  NODE_KEY 120..121 {
+                    NODE_IDENT 120..121 {
+                      TOKEN_IDENT("x") 120..121
                     }
-                    TOKEN_WHITESPACE(" ") 121..122
-                    TOKEN_ASSIGN("=") 122..123
-                    TOKEN_WHITESPACE(" ") 123..124
-                    NODE_LITERAL 124..127 {
-                      NODE_STRING 124..127 {
-                        TOKEN_STRING_START("\"") 124..125
-                        TOKEN_STRING_CONTENT("1") 125..126
-                        TOKEN_STRING_END("\"") 126..127
-                      }
-                    }
-                    TOKEN_SEMICOLON(";") 127..128
                   }
-                  TOKEN_WHITESPACE("\n        ") 128..137
-                  NODE_KEY_VALUE 137..145 {
-                    NODE_KEY 137..138 {
-                      NODE_IDENT 137..138 {
-                        TOKEN_IDENT("y") 137..138
-                      }
-                    }
-                    TOKEN_WHITESPACE(" ") 138..139
-                    TOKEN_ASSIGN("=") 139..140
-                    TOKEN_WHITESPACE(" ") 140..141
-                    NODE_LITERAL 141..144 {
-                      NODE_STRING 141..144 {
-                        TOKEN_STRING_START("\"") 141..142
-                        TOKEN_STRING_CONTENT("2") 142..143
-                        TOKEN_STRING_END("\"") 143..144
-                      }
-                    }
-                    TOKEN_SEMICOLON(";") 144..145
+                  TOKEN_WHITESPACE(" ") 121..122
+                  TOKEN_ASSIGN("=") 122..123
+                  TOKEN_WHITESPACE(" ") 123..124
+                  NODE_STRING 124..127 {
+                    TOKEN_STRING_START("\"") 124..125
+                    TOKEN_STRING_CONTENT("1") 125..126
+                    TOKEN_STRING_END("\"") 126..127
                   }
-                  TOKEN_WHITESPACE("\n      ") 145..152
-                  TOKEN_CURLY_B_CLOSE("}") 152..153
+                  TOKEN_SEMICOLON(";") 127..128
                 }
-                TOKEN_DOT(".") 153..154
-                NODE_IDENT 154..155 {
-                  TOKEN_IDENT("x") 154..155
+                TOKEN_WHITESPACE("\n        ") 128..137
+                NODE_KEY_VALUE 137..145 {
+                  NODE_KEY 137..138 {
+                    NODE_IDENT 137..138 {
+                      TOKEN_IDENT("y") 137..138
+                    }
+                  }
+                  TOKEN_WHITESPACE(" ") 138..139
+                  TOKEN_ASSIGN("=") 139..140
+                  TOKEN_WHITESPACE(" ") 140..141
+                  NODE_STRING 141..144 {
+                    TOKEN_STRING_START("\"") 141..142
+                    TOKEN_STRING_CONTENT("2") 142..143
+                    TOKEN_STRING_END("\"") 143..144
+                  }
+                  TOKEN_SEMICOLON(";") 144..145
                 }
+                TOKEN_WHITESPACE("\n      ") 145..152
+                TOKEN_CURLY_B_CLOSE("}") 152..153
               }
-              TOKEN_WHITESPACE("\n    ") 155..160
-              TOKEN_INTERPOL_END("}") 160..161
-            }
-            TOKEN_STRING_CONTENT("\n\n    This line shall have no indention\n      This line shall be indented by 2\n    \'\'\\n\n    ") 161..253
-            NODE_STRING_INTERPOL 253..262 {
-              TOKEN_INTERPOL_START("${") 253..255
-              TOKEN_WHITESPACE(" ") 255..256
-              NODE_LITERAL 256..260 {
-                NODE_STRING 256..260 {
-                  TOKEN_STRING_START("\"") 256..257
-                  TOKEN_STRING_CONTENT("hi") 257..259
-                  TOKEN_STRING_END("\"") 259..260
-                }
+              TOKEN_DOT(".") 153..154
+              NODE_IDENT 154..155 {
+                TOKEN_IDENT("x") 154..155
               }
-              TOKEN_WHITESPACE(" ") 260..261
-              TOKEN_INTERPOL_END("}") 261..262
             }
-            TOKEN_STRING_CONTENT("\n  ") 262..265
-            TOKEN_STRING_END("\'\'") 265..267
+            TOKEN_WHITESPACE("\n    ") 155..160
+            TOKEN_INTERPOL_END("}") 160..161
           }
+          TOKEN_STRING_CONTENT("\n\n    This line shall have no indention\n      This line shall be indented by 2\n    \'\'\\n\n    ") 161..253
+          NODE_STRING_INTERPOL 253..262 {
+            TOKEN_INTERPOL_START("${") 253..255
+            TOKEN_WHITESPACE(" ") 255..256
+            NODE_STRING 256..260 {
+              TOKEN_STRING_START("\"") 256..257
+              TOKEN_STRING_CONTENT("hi") 257..259
+              TOKEN_STRING_END("\"") 259..260
+            }
+            TOKEN_WHITESPACE(" ") 260..261
+            TOKEN_INTERPOL_END("}") 261..262
+          }
+          TOKEN_STRING_CONTENT("\n  ") 262..265
+          TOKEN_STRING_END("\'\'") 265..267
         }
         TOKEN_SEMICOLON(";") 267..268
       }

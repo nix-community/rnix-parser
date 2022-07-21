@@ -54,12 +54,10 @@ NODE_ROOT 0..229 {
       TOKEN_WHITESPACE(" ") 78..79
       TOKEN_COMMENT("/* meaning of life */") 79..100
       TOKEN_WHITESPACE(" ") 100..101
-      NODE_LITERAL 101..105 {
-        NODE_STRING 101..105 {
-          TOKEN_STRING_START("\"") 101..102
-          TOKEN_STRING_CONTENT("42") 102..104
-          TOKEN_STRING_END("\"") 104..105
-        }
+      NODE_STRING 101..105 {
+        TOKEN_STRING_START("\"") 101..102
+        TOKEN_STRING_CONTENT("42") 102..104
+        TOKEN_STRING_END("\"") 104..105
       }
       TOKEN_SEMICOLON(";") 105..106
     }
@@ -90,12 +88,10 @@ NODE_ROOT 0..229 {
       TOKEN_WHITESPACE("  ") 176..178
       TOKEN_ASSIGN("=") 178..179
       TOKEN_WHITESPACE("      ") 179..185
-      NODE_LITERAL 185..194 {
-        NODE_STRING 185..194 {
-          TOKEN_STRING_START("\"") 185..186
-          TOKEN_STRING_CONTENT("hunter2") 186..193
-          TOKEN_STRING_END("\"") 193..194
-        }
+      NODE_STRING 185..194 {
+        TOKEN_STRING_START("\"") 185..186
+        TOKEN_STRING_CONTENT("hunter2") 186..193
+        TOKEN_STRING_END("\"") 193..194
       }
       TOKEN_SEMICOLON(";") 194..195
     }
