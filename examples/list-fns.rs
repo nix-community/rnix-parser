@@ -2,7 +2,7 @@ use std::{env, error::Error, fs};
 
 use rnix::ast::AstToken;
 use rnix::{
-    ast::{self, EntryHolder},
+    ast::{self, AstToken, EntryHolder},
     match_ast, NodeOrToken, SyntaxNode,
 };
 use rowan::ast::AstNode;
