@@ -1,6 +1,5 @@
 use crate::{NixLanguage, SyntaxKind, SyntaxKind::*, SyntaxNode, SyntaxToken};
 
-use super::tokens::*;
 use super::{operators::BinOpKind, support::*, AstNode, UnaryOpKind};
 use rowan::ast::AstChildren;
 use rowan::ast::AstNode as OtherAstNode;
@@ -28,19 +27,14 @@ pub trait EntryHolder: AstNode {
     }
 }
 
-macro_rules! nth {
-    ($self:expr; $index:expr) => {
-        $self.syntax().children()
-            .nth($index)
-    };
-    ($self:expr; ($kind:ident) $index:expr) => {
-        nth!($self; $index).and_then($kind::cast)
-    };
-}
-
-macro_rules! ast_nodes {
-    ($kind:ident => $name:ident $($tt:tt)*) => {
+macro_rules! ast {
+    (
+        #[from($kind:ident)]
+        $(#[$meta:meta])*
+        struct $name:ident;
+    ) => {
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        $(#[$meta])*
         pub struct $name(pub(super) SyntaxNode);
 
         impl std::fmt::Display for $name {
@@ -67,14 +61,17 @@ macro_rules! ast_nodes {
                 &self.0
             }
         }
-
-        ast_nodes!{ @impl $name $($tt)* }
     };
-
-    ({ $($kind:ident => $typed:ident),* $(,)? } => $name:ident $($tt:tt)*) => {
+    (
+        #[case($($kind:ident => $variant:ident),* $(,)?)]
+        $(#[$meta:meta])*
+        enum $name:ident;
+    ) => {
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        $(#[$meta])*
         pub enum $name {
             $(
-                $typed($typed),
+                $variant($variant),
             )*
         }
 
@@ -94,7 +91,7 @@ macro_rules! ast_nodes {
             fn cast(syntax: SyntaxNode) -> Option<Self> {
                 let res = match syntax.kind() {
                     $(
-                        $kind => $name::$typed($typed(syntax))
+                        $kind => $name::$variant($variant(syntax))
                     ),*,
                     _ => return None,
                 };
@@ -104,44 +101,61 @@ macro_rules! ast_nodes {
             fn syntax(&self) -> &SyntaxNode {
                 match self {
                     $(
-                        $name::$typed(it) => &it.0,
+                        $name::$variant(it) => &it.0,
                     )*
                 }
             }
         }
 
         $(
-            impl From<$typed> for $name {
-                fn from(node: $typed) -> $name { $name::$typed(node) }
+            impl From<$variant> for $name {
+                fn from(node: $variant) -> $name { $name::$variant(node) }
             }
         )*
-
-        ast_nodes! { @impl $name $($tt)* }
     };
-
-    (@impl $name:ident $(: $trait:ident)* $(: { $($item:item)* })?, $($tt:tt)*) => {
-        $(impl $name {
-            $($item)*
-        })?
-
-        $(impl $trait for $name {})*
-
-        ast_nodes! { $($tt)* }
-    };
-
-    () => { };
 }
 
-macro_rules! token_getter {
-    ($name:ident, $token:tt) => {
+macro_rules! tg {
+    (
+        $(#[doc=$doc:tt])?
+        $name:ident,
+        $token:tt
+    ) => {
+        $(#[doc=$doc])?
         pub fn $name(&self) -> Option<SyntaxToken> {
             token_u(self, T![$token])
         }
     };
 }
 
-ast_nodes! {
-     {
+macro_rules! ng {
+    (
+        $(#[$meta:meta])*
+        $name:ident,
+        $ty:ty,
+        $i:expr
+    ) => {
+        $(#[$meta])*
+        pub fn $name(&self) -> Option<$ty> {
+            nth(self, $i)
+        }
+    };
+    (
+        $(#[$meta:meta])*
+        $name:ident,
+        [$ty:ty]
+    ) => {
+        $(#[$meta])*
+        pub fn $name(&self) -> AstChildren<$ty> {
+            children(self)
+        }
+    };
+}
+
+ast! { #[from(NODE_LITERAL)] struct Literal; }
+
+ast! {
+    #[case(
         NODE_APPLY => Apply,
         NODE_ASSERT => Assert,
         NODE_DYNAMIC => Dynamic,
@@ -163,317 +177,218 @@ ast_nodes! {
         NODE_UNARY_OP => UnaryOp,
         NODE_IDENT => Ident,
         NODE_WITH => With,
-    } => Expr,
+    )]
+    /// An expression. The fundamental nix ast type.
+    enum Expr;
+}
 
-    // This will most likely be removed along with NODE_LITERAL later
-    NODE_LITERAL => Literal,
-
-    {
+ast! {
+    #[case(
         NODE_IDENT => Ident,
         NODE_DYNAMIC => Dynamic,
         NODE_STRING => Str,
-    } => Attr,
+    )]
+    enum Attr;
+}
 
-    NODE_IDENT => Ident: {
-        pub fn ident_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T![TOKEN_IDENT])
-        }
-    },
+ast! { #[from(NODE_IDENT)] struct Ident; }
 
-    NODE_APPLY => Apply: {
-        /// Return the lambda being applied
-        pub fn lambda(&self) -> Option<Expr> {
-            first(self)
-        }
-        /// Return the value which the lambda is being applied with
-        pub fn argument(&self) -> Option<Expr> {
-            nth(self, 1)
-        }
-    },
-    NODE_ASSERT => Assert: {
-        pub fn assert_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T![assert])
-        }
+impl Ident {
+    tg! { ident_token, TOKEN_IDENT }
+}
 
-        /// Return the assert condition
-        pub fn condition(&self) -> Option<Expr> {
-            first(self)
-        }
+ast! { #[from(NODE_APPLY)] struct Apply; }
 
-        /// Return the success body
-        pub fn body(&self) -> Option<Expr> {
-            nth(self, 1)
-        }
-    },
-    NODE_KEY => Key: {
-        /// Return the path as an iterator of identifiers
-        pub fn attrs(&self) -> AstChildren<Attr> {
-            children(self)
-        }
-    },
-    NODE_DYNAMIC => Dynamic,
-    NODE_ERROR => Error,
-    NODE_IF_ELSE => IfElse: {
-        pub fn if_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T![if])
-        }
+impl Apply {
+    ng! { lambda, Expr, 0 }
+    ng! { argument, Expr, 1 }
+}
 
-        /// Return the condition
-        pub fn condition(&self) -> Option<Expr> {
-            nth(self, 0)
-        }
+ast! { #[from(NODE_ASSERT)] struct Assert; }
 
-        pub fn then_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T![then])
-        }
+impl Assert {
+    tg! { assert_token, assert }
+    ng! { condition, Expr, 0 }
+    ng! { body, Expr, 1 }
+}
 
-        /// Return the success body
-        pub fn body(&self) -> Option<Expr> {
-            nth(self, 1)
-        }
+ast! { #[from(NODE_KEY)] struct Key; }
 
-        pub fn else_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T![else])
-        }
+impl Key {
+    ng! { attrs, [Attr] }
+}
 
-        /// Return the else body
-        pub fn else_body(&self) -> Option<Expr> {
-            nth(self, 2)
-        }
-    },
-    NODE_SELECT => Select: {
-        /// Return the set being indexed
-        pub fn expr(&self) -> Option<Expr> {
-            first(self)
-        }
+ast! { #[from(NODE_DYNAMIC)] struct Dynamic; }
 
-        pub fn dot_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T![.])
-        }
+ast! { #[from(NODE_ERROR)] struct Error; }
 
-        /// Return the index
-        pub fn attr(&self) -> Option<Attr> {
-            first(self)
-        }
-    },
-    NODE_INHERIT => Inherit: {
-        // /// Return the set where keys are being inherited from, if any
-        pub fn inherit_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T![inherit])
-        }
+ast! { #[from(NODE_IF_ELSE)] struct IfElse; }
 
-        pub fn inherit_from(&self) -> Option<InheritFrom> {
-            first(self)
-        }
+impl IfElse {
+    tg! { if_token, if }
+    ng! { condition, Expr, 0 }
+    tg! { then_token, then }
+    ng! { body, Expr, 1 }
+    tg! { else_token, else }
+    ng! { else_body, Expr, 2 }
+}
 
-        /// Return all the identifiers being inherited
-        pub fn idents(&self) -> impl Iterator<Item = Ident> {
-            children(self)
-        }
-    },
+ast! { #[from(NODE_SELECT)] struct Select; }
 
-    NODE_INHERIT_FROM => InheritFrom: { },
-    NODE_STRING => Str: {
-        // TODO: make string_parts take type from here
-        // /// Parse the interpolation into a series of parts
-        // pub fn parts(&self) -> Vec<StrPart> {
-        //     value::string_parts(self)
-        // }
-    },
-    NODE_STRING_INTERPOL => StrInterpol,
-    NODE_LAMBDA => Lambda: {
-        /// Return the argument of the lambda
-        pub fn param(&self) -> Option<Param> {
-            first(self)
-        }
+impl Select {
+    ng! { expr, Expr, 0 }
+    tg! { dot_token, . }
+    ng! { attr, Expr, 1 }
+}
 
-        /// Return the body of the lambda
-        pub fn body(&self) -> Option<Expr> {
-            first(self)
-        }
-    },
-    NODE_LEGACY_LET => LegacyLet: EntryHolder: {
-        token_getter! { let_token, let }
-        token_getter! { curly_open_token, "{" }
-        token_getter! { curly_close_token, "}" }
-    },
-    NODE_LET_IN => LetIn: EntryHolder: {
-        token_getter! { let_token, let }
-        token_getter! { in_token, in }
-        pub fn body(&self) -> Option<Expr> {
-            first(self)
-        }
-    },
-    NODE_LIST => List: {
-        pub fn l_brack_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T!["["])
-        }
+ast! { #[from(NODE_INHERIT)] struct Inherit; }
 
-        /// Return an iterator over items in the list
-        pub fn items(&self) -> AstChildren<Expr> {
-            children(self)
-        }
+impl Inherit {
+    tg! { inherit_token, inherit }
+    ng! { inherit_from, Expr, 0 }
+    ng! { idents, [Ident] }
+}
 
-        pub fn r_brack_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T!["]"])
-        }
-    },
-    NODE_BIN_OP => BinOp: {
-        /// Return the left hand side of the binary operation
-        pub fn lhs(&self) -> Option<Expr> {
-            first(self)
-        }
+ast! { #[from(NODE_INHERIT_FROM)] struct InheritFrom; }
 
-        // /// Return the operator
-        pub fn operator(&self) -> Option<BinOpKind> {
-            children_tokens_u(self)
-                .find_map(|t| BinOpKind::from_kind(t.kind()))
-        }
+ast! { #[from(NODE_STRING)] struct Str; }
 
-        /// Return the right hand side of the binary operation
-        pub fn rhs(&self) -> Option<Expr> {
-            nth(self, 1)
-        }
-    },
-    NODE_OR_DEFAULT => OrDefault: {
-        /// Return the indexing operation
-        pub fn index(&self) -> Option<Select> {
-            nth!(self; (Select) 0)
-        }
-        /// Return the default value
-        pub fn default(&self) -> Option<SyntaxNode> {
-            nth!(self; 1)
-        }
-    },
+ast! { #[from(NODE_STRING_INTERPOL)] struct StrInterpol; }
 
-    NODE_PAREN => Paren: {
-         pub fn l_paren_token(&self) -> Option<SyntaxToken> {
-             token_u(self, T!["("])
-         }
+ast! { #[from(NODE_LAMBDA)] struct Lambda; }
 
-         pub fn expr(&self) -> Option<Expr> {
-             first(self)
-         }
+impl Lambda {
+    ng! { param, Param, 0 }
+    ng! { body, Expr, 0 }
+}
 
-         pub fn r_paren_token(&self) -> Option<SyntaxToken> {
-             token_u(self, T![")"])
-         }
-     },
+ast! { #[from(NODE_LEGACY_LET)] struct LegacyLet; }
 
-    NODE_PAT_BIND => PatBind: {
-        /// Return the identifier the set is being bound as
-        pub fn ident(&self) -> Option<Ident> {
-            first(self)
-        }
-    },
+impl EntryHolder for LegacyLet {}
 
-    NODE_PAT_ENTRY => PatEntry: {
-        /// Return the identifier the argument is being bound as
-        pub fn ident(&self) -> Option<Ident> {
-            first(self)
-        }
+impl LegacyLet {
+    tg! { let_token, let }
+    tg! { curly_open_token, "{" }
+    tg! { curly_close_token, "}" }
+}
 
-        pub fn question_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T![?])
-        }
+ast! { #[from(NODE_LET_IN)] struct LetIn; }
 
-        /// Return the default value, if any
-        pub fn default(&self) -> Option<Expr> {
-            nth(self, 1)
-        }
-    },
+impl LetIn {
+    tg! { let_token, let }
+    tg! { in_token, in }
+    ng! { body, Expr, 0 }
+}
 
-    {
+ast! { #[from(NODE_LIST)] struct List; }
+
+impl List {
+    tg! { l_brack_token, "[" }
+    ng! { items, [Expr] }
+    tg! { r_brack_token, "]" }
+}
+
+ast! { #[from(NODE_BIN_OP)] struct BinOp; }
+
+impl BinOp {
+    ng! { lhs, Expr, 0 }
+
+    pub fn operator(&self) -> Option<BinOpKind> {
+        children_tokens_u(self).find_map(|t| BinOpKind::from_kind(t.kind()))
+    }
+
+    ng! { rhs, Expr, 1 }
+}
+
+ast! { #[from(NODE_OR_DEFAULT)] struct OrDefault; }
+
+impl OrDefault {
+    ng! { index, Select, 0 }
+    ng! { default, Expr, 1 }
+}
+
+ast! { #[from(NODE_PAREN)] struct Paren; }
+
+impl Paren {
+    tg! { l_paren_token, "(" }
+    ng! { expr, Expr, 0 }
+    tg! { r_paren_token, ")" }
+}
+
+ast! { #[from(NODE_PAT_BIND)] struct PatBind; }
+
+impl PatBind {
+    ng! { ident, Ident, 0 }
+}
+
+ast! { #[from(NODE_PAT_ENTRY)] struct PatEntry; }
+
+impl PatEntry {
+    ng! { ident, Ident, 0 }
+    tg! { question_token, ? }
+    ng! { default, Expr, 1 }
+}
+
+ast! {
+    #[case(
         NODE_PATTERN => Pattern,
         NODE_IDENT => Ident,
-    } => Param,
+    )]
+    enum Param;
+}
 
-    NODE_PATTERN => Pattern: {
-        pub fn at_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T![@])
-        }
+ast! { #[from(NODE_PATTERN)] struct Pattern; }
 
-        /// Return an iterator over all pattern entries
-        pub fn pat_entries(&self) -> impl Iterator<Item = PatEntry> {
-            children(self)
-        }
+impl Pattern {
+    tg! { at_token, @ }
+    ng! { pat_entries, [PatEntry] }
+    tg! { ellipsis_token, ... }
+    ng! { pat_bind, PatBind, 0 }
+}
 
-        pub fn ellipsis_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T![...])
-        }
+ast! { #[from(NODE_ROOT)] struct Root; }
 
-        pub fn has_ellipsis(&self) -> bool {
-            self.ellipsis_token().is_some()
-        }
+impl Root {
+    ng! { expr, Expr, 0 }
+}
 
-        /// Returns the identifier bound with {}@identifier if it exists
-        pub fn pat_bind(&self) -> Option<PatBind> {
-            first(self)
-        }
-    },
+ast! { #[from(NODE_ATTR_SET)] struct AttrSet; }
 
-    NODE_ROOT => Root: {
-        pub fn expr(&self) -> Option<Expr> {
-            first(self)
-        }
-    },
+impl EntryHolder for AttrSet {}
 
-    NODE_ATTR_SET => AttrSet: EntryHolder: {
-         pub fn rec_token(&self) -> Option<SyntaxToken> {
-             token_u(self, T![rec])
-         }
+impl AttrSet {
+    tg! { rec_token, rec }
+    tg! { l_curly_token, "{" }
+    tg! { r_curly_token, "}" }
+}
 
-        /// Returns true if this set is recursive
-        pub fn is_recursive(&self) -> bool {
-            self.rec_token().is_some()
-        }
-
-        pub fn l_curly_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T!["{"])
-        }
-
-        pub fn r_curly_token(&self) -> Option<SyntaxToken> {
-            token_u(self, T!["}"])
-        }
-    },
-
-    {
+ast! {
+    #[case(
         NODE_INHERIT => Inherit,
         NODE_KEY_VALUE => KeyValue,
-    } => Entry,
+    )]
+    enum Entry;
+}
 
-    NODE_KEY_VALUE => KeyValue: {
-        /// Return this entry's key
-        pub fn key(&self) -> Option<Key> {
-            first(self)
-        }
+ast! { #[from(NODE_KEY_VALUE)] struct KeyValue; }
 
-        /// Return this entry's value
-        pub fn value(&self) -> Option<Expr> {
-            first(self)
-        }
-    },
+impl KeyValue {
+    ng! { key, Key, 0 }
+    ng! { value, Expr, 0 }
+}
 
-    NODE_UNARY_OP => UnaryOp: {
-        /// Return the operator
-        pub fn operator(&self) -> Option<UnaryOpKind> {
-            children_tokens_u(self).find_map(|t| UnaryOpKind::from_kind(t.kind()))
-        }
+ast! { #[from(NODE_UNARY_OP)] struct UnaryOp; }
 
-        /// Return the value in the operation
-        pub fn expr(&self) -> Option<Expr> {
-            first(self)
-        }
-    },
-    NODE_WITH => With: {
-        /// Return the namespace
-        pub fn namespace(&self) -> Option<Expr> {
-            nth(self, 0)
-        }
+impl UnaryOp {
+    pub fn operator(&self) -> Option<UnaryOpKind> {
+        children_tokens_u(self).find_map(|t| UnaryOpKind::from_kind(t.kind()))
+    }
+    ng! { expr, Expr, 0 }
+}
 
-        /// Return the body
-        pub fn body(&self) -> Option<Expr> {
-            nth(self, 1)
-        }
-    },
+ast! { #[from(NODE_WITH)] struct With; }
+
+impl With {
+    ng! { namespace, Expr, 0 }
+    ng! { body, Expr, 1 }
 }
