@@ -272,6 +272,10 @@ node! { #[from(NODE_STRING)] struct Str; }
 
 node! { #[from(NODE_STRING_INTERPOL)] struct StrInterpol; }
 
+impl StrInterpol {
+    ng! { expr, Expr, 0 }
+}
+
 node! { #[from(NODE_LAMBDA)] struct Lambda; }
 
 impl Lambda {

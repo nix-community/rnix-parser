@@ -1,6 +1,5 @@
 use std::{env, error::Error, fs};
 
-use rnix::ast::AstToken;
 use rnix::{
     ast::{self, AstToken, EntryHolder},
     match_ast, NodeOrToken, SyntaxNode,

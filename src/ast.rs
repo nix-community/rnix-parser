@@ -4,19 +4,33 @@ mod expr_ext;
 mod node_ext;
 mod nodes;
 mod operators;
-mod tokens;
 mod str_util;
+mod tokens;
 
 use crate::{NixLanguage, SyntaxKind, SyntaxToken};
 
 pub use nodes::*;
 pub use operators::{BinOpKind, UnaryOpKind};
-pub use tokens::*;
 pub use str_util::StrPart;
+pub use tokens::*;
 
 pub trait AstNode: rowan::ast::AstNode<Language = NixLanguage> {}
 
 impl<T> AstNode for T where T: rowan::ast::AstNode<Language = NixLanguage> {}
+
+pub trait AstToken {
+    fn can_cast(from: SyntaxKind) -> bool
+    where
+        Self: Sized;
+
+    /// Cast an untyped token into this strongly-typed token. This will return
+    /// None if the type was not correct.
+    fn cast(from: SyntaxToken) -> Option<Self>
+    where
+        Self: Sized;
+
+    fn syntax(&self) -> &SyntaxToken;
+}
 
 mod support {
     use rowan::ast::AstChildren;
@@ -48,18 +62,4 @@ mod support {
     pub(super) fn children_tokens_u<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
         parent.syntax().children_with_tokens().filter_map(SyntaxElement::into_token)
     }
-}
-
-pub trait AstToken {
-    fn can_cast(from: SyntaxKind) -> bool
-    where
-        Self: Sized;
-
-    /// Cast an untyped token into this strongly-typed token. This will return
-    /// None if the type was not correct.
-    fn cast(from: SyntaxToken) -> Option<Self>
-    where
-        Self: Sized;
-
-    fn syntax(&self) -> &SyntaxToken;
 }
