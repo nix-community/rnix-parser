@@ -86,9 +86,9 @@ impl<T: AstNode> Parse<T> {
 /// ```ignore
 /// match_ast! {
 ///     match node {
-///         ast::CallExpr(it) => { ... },
-///         ast::MethodCallExpr(it) => { ... },
-///         ast::MacroCall(it) => { ... },
+///         ast::Apply(it) => { ... },
+///         ast::Assert(it) => { ... },
+///         ast::IfElse(it) => { ... },
 ///         _ => None,
 ///     }
 /// }
