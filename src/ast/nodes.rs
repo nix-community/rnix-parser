@@ -281,6 +281,7 @@ node! { #[from(NODE_LAMBDA)] struct Lambda; }
 
 impl Lambda {
     ng! { param, Param, 0 }
+    tg! { token_colon, : }
     ng! { body, Expr, 0 }
 }
 
@@ -295,6 +296,8 @@ impl LegacyLet {
 }
 
 node! { #[from(NODE_LET_IN)] struct LetIn; }
+
+impl EntryHolder for LetIn {}
 
 impl LetIn {
     tg! { let_token, let }
@@ -396,6 +399,7 @@ node! { #[from(NODE_KEY_VALUE)] struct KeyValue; }
 
 impl KeyValue {
     ng! { key, Key, 0 }
+    tg! { assign_token, = }
     ng! { value, Expr, 0 }
 }
 
@@ -411,6 +415,8 @@ impl UnaryOp {
 node! { #[from(NODE_WITH)] struct With; }
 
 impl With {
+    tg! { with_token, with }
     ng! { namespace, Expr, 0 }
+    tg! { semicolon_token, ; }
     ng! { body, Expr, 1 }
 }
