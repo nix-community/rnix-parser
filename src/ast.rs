@@ -5,12 +5,14 @@ mod node_ext;
 mod nodes;
 mod operators;
 mod tokens;
+mod str_util;
 
 use crate::{NixLanguage, SyntaxKind, SyntaxToken};
 
 pub use nodes::*;
 pub use operators::{BinOpKind, UnaryOpKind};
 pub use tokens::*;
+pub use str_util::StrPart;
 
 pub trait AstNode: rowan::ast::AstNode<Language = NixLanguage> {}
 
@@ -60,17 +62,4 @@ pub trait AstToken {
         Self: Sized;
 
     fn syntax(&self) -> &SyntaxToken;
-}
-
-pub struct Another;
-pub struct My;
-
-impl From<Another> for Option<My> {
-    fn from(_: Another) -> Self {
-        None
-    }
-}
-
-fn test() {
-    let test = <Option<My>>::from(Another).unwrap();
 }

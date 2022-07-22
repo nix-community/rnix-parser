@@ -7,7 +7,7 @@ use crate::{
 };
 
 impl ast::Str {
-    fn string_parts(&self) -> Vec<StrPart> {
+    pub fn parts(&self) -> Vec<StrPart> {
         // temporary for now
         fn children_tokens<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
             parent.syntax().children_with_tokens().filter_map(SyntaxElement::into_token)
@@ -46,7 +46,7 @@ impl ast::Str {
                 }
                 NodeOrToken::Node(node) => {
                     assert_eq!(node.kind(), NODE_STRING_INTERPOL);
-                    parts.push(StrPart::Ast(ast::StrInterpol::cast(node.clone()).unwrap()));
+                    parts.push(StrPart::Interpolation(ast::StrInterpol::cast(node.clone()).unwrap()));
                     last_was_ast = true;
                 }
             }
@@ -233,7 +233,7 @@ mod tests {
                 "#
         .replace("|trailing-whitespace", "");
 
-        if let [StrPart::Literal(lit)] = &ast::Str::string_parts(&string_node(txtin.as_str()))[..] {
+        if let [StrPart::Literal(lit)] = &ast::Str::parts(&string_node(txtin.as_str()))[..] {
             assert_eq!(lit,
                 // Get the below with nix repl
                 "    \n          \nThis is a multiline string :D\n  indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\ntwo single quotes: ''\nthree single quotes: '''\n"

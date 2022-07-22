@@ -111,6 +111,17 @@ macro_rules! node {
             impl From<$variant> for $name {
                 fn from(node: $variant) -> $name { $name::$variant(node) }
             }
+
+            impl TryFrom<$name> for $variant {
+                type Error = ();
+
+                fn try_from(node: $name) -> Result<$variant, ()> {
+                    match node {
+                        $name::$variant(it) => Ok(it),
+                        _ => Err(()),
+                    }
+                }
+            }
         )*
     };
 }
@@ -177,6 +188,7 @@ node! {
         NODE_UNARY_OP => UnaryOp,
         NODE_IDENT => Ident,
         NODE_WITH => With,
+        NODE_STRING => Str,
     )]
     /// An expression. The fundamental nix ast type.
     enum Expr;
@@ -245,11 +257,16 @@ node! { #[from(NODE_INHERIT)] struct Inherit; }
 
 impl Inherit {
     tg! { inherit_token, inherit }
-    ng! { inherit_from, Expr, 0 }
+    ng! { from, InheritFrom, 0 }
     ng! { idents, [Ident] }
 }
 
 node! { #[from(NODE_INHERIT_FROM)] struct InheritFrom; }
+
+// this should also be removed later
+impl InheritFrom {
+    ng! { expr, Expr, 0 }
+}
 
 node! { #[from(NODE_STRING)] struct Str; }
 

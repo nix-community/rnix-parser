@@ -108,62 +108,71 @@ macro_rules! match_ast {
 
 #[cfg(test)]
 mod tests {
-    // #[test]
-    // fn interpolation() {
-    //     let ast = parse(include_str!("../test_data/general/interpolation.nix"));
+    use rowan::ast::AstNode;
 
-    //     let let_in = ast.root().inner().and_then(LetIn::cast).unwrap();
-    //     let set = let_in.body().and_then(AttrSet::cast).unwrap();
-    //     let entry = set.entries().nth(1).unwrap();
-    //     let value = entry.value().and_then(Str::cast).unwrap();
+    use crate::{
+        ast::{self, EntryHolder},
+        SyntaxKind,
+    };
 
-    //     match &*value.parts() {
-    //         &[
-    //             StrPart::Literal(ref s1),
-    //             StrPart::Ast(_),
-    //             StrPart::Literal(ref s2),
-    //             StrPart::Ast(_),
-    //             StrPart::Literal(ref s3)
-    //         ]
-    //         if s1 == "The set\'s x value is: "
-    //             && s2 == "\n\nThis line shall have no indention\n  This line shall be indented by 2\n\n\n"
-    //             && s3 == "\n" => (),
-    //         parts => panic!("did not match: {:#?}", parts)
-    //     }
-    // }
-    // #[test]
-    // fn inherit() {
-    //     let ast = parse(include_str!("../test_data/general/inherit.nix"));
+    #[test]
+    fn interpolation() {
+        let root =
+            ast::Root::parse(include_str!("../test_data/general/interpolation.nix")).ok().unwrap();
+        let let_in = ast::LetIn::try_from(root.expr().unwrap()).unwrap();
+        let set = ast::AttrSet::try_from(let_in.body().unwrap()).unwrap();
+        let entry = set.entries().nth(1).unwrap();
+        let key_value = ast::KeyValue::try_from(entry).unwrap();
+        let value = ast::Str::try_from(key_value.value().unwrap()).unwrap();
 
-    //     let let_in = ast.root().inner().and_then(LetIn::cast).unwrap();
-    //     let set = let_in.body().and_then(AttrSet::cast).unwrap();
-    //     let inherit = set.inherits().nth(1).unwrap();
+        match &*value.parts() {
+            &[
+                ast::StrPart::Literal(ref s1),
+                ast::StrPart::Interpolation(_),
+                ast::StrPart::Literal(ref s2),
+                ast::StrPart::Interpolation(_),
+                ast::StrPart::Literal(ref s3)
+            ]
+            if s1 == "The set's x value is: "
+                && s2 == "\n\nThis line shall have no indention\n  This line shall be indented by 2\n\n\n"
+                && s3 == "\n" => (),
+            parts => panic!("did not match: {:#?}", parts)
+        }
+    }
 
-    //     let from = inherit.from().unwrap().inner().and_then(Ident::cast).unwrap();
-    //     assert_eq!(from.to_inner_token().text(), "set");
-    //     let mut children = inherit.idents();
-    //     assert_eq!(children.next().unwrap().to_inner_token().text(), "z");
-    //     assert_eq!(children.next().unwrap().to_inner_token().text(), "a");
-    //     assert!(children.next().is_none());
-    // }
-    // #[test]
-    // fn math() {
-    //     let ast = parse(include_str!("../test_data/general/math.nix"));
-    //     let root = ast.root().inner().and_then(BinOp::cast).unwrap();
-    //     let operation = root.lhs().and_then(BinOp::cast).unwrap();
+    #[test]
+    fn inherit() {
+        let root = ast::Root::parse(include_str!("../test_data/general/inherit.nix")).ok().unwrap();
+        let let_in = ast::LetIn::try_from(root.expr().unwrap()).unwrap();
+        let set = ast::AttrSet::try_from(let_in.body().unwrap()).unwrap();
+        let inherit = set.inherits().nth(1).unwrap();
 
-    //     assert_eq!(root.operator().unwrap(), BinOpKind::Add);
-    //     assert_eq!(operation.operator().unwrap(), BinOpKind::Add);
+        let from = inherit.from().unwrap().expr().unwrap();
+        let ident: ast::Ident = ast::Ident::try_from(from).unwrap();
+        assert_eq!(ident.syntax().text(), "set");
+        let mut children = inherit.idents();
+        assert_eq!(children.next().unwrap().syntax().text(), "z");
+        assert_eq!(children.next().unwrap().syntax().text(), "a");
+        assert!(children.next().is_none());
+    }
 
-    //     let lhs = operation.lhs().and_then(Value::cast).unwrap();
-    //     assert_eq!(lhs.to_value(), Ok(NixValue::Integer(1)));
+    #[test]
+    fn math() {
+        let root = ast::Root::parse(include_str!("../test_data/general/math.nix")).ok().unwrap();
+        let op1 = ast::BinOp::try_from(root.expr().unwrap()).unwrap();
+        let op2 = ast::BinOp::try_from(op1.lhs().unwrap()).unwrap();
+        assert_eq!(op1.operator().unwrap(), ast::BinOpKind::Add);
 
-    //     let rhs = operation.rhs().and_then(BinOp::cast).unwrap();
-    //     assert_eq!(rhs.operator().unwrap(), BinOpKind::Mul);
-    // }
-    // #[test]
-    // fn t_macro() {
-    //     assert_eq!(T![@], SyntaxKind::TOKEN_AT);
-    //     assert!(matches!(SyntaxKind::TOKEN_PAREN_OPEN, T!["("]));
-    // }
+        let lhs = ast::Literal::try_from(op2.lhs().unwrap()).unwrap();
+        assert_eq!(lhs.syntax().text(), "1");
+
+        let rhs = ast::BinOp::try_from(op2.rhs().unwrap()).unwrap();
+        assert_eq!(rhs.operator().unwrap(), ast::BinOpKind::Mul);
+    }
+
+    #[test]
+    fn t_macro() {
+        assert_eq!(T![@], SyntaxKind::TOKEN_AT);
+        assert!(matches!(SyntaxKind::TOKEN_PAREN_OPEN, T!["("]));
+    }
 }
