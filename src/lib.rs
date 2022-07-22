@@ -111,7 +111,7 @@ mod tests {
     use rowan::ast::AstNode;
 
     use crate::{
-        ast::{self, EntryHolder},
+        ast::{self, HasEntry},
         SyntaxKind,
     };
 

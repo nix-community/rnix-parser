@@ -1,7 +1,7 @@
 use std::{env, error::Error, fs};
 
 use rnix::{
-    ast::{self, AstToken, EntryHolder},
+    ast::{self, AstToken, HasEntry},
     match_ast, NodeOrToken, SyntaxNode,
 };
 use rowan::ast::AstNode;

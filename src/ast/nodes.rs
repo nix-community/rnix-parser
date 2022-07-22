@@ -4,7 +4,7 @@ use super::{operators::BinOpKind, support::*, AstNode, UnaryOpKind};
 use rowan::ast::AstChildren;
 use rowan::ast::AstNode as OtherAstNode;
 
-pub trait EntryHolder: AstNode {
+pub trait HasEntry: AstNode {
     fn entries(&self) -> AstChildren<Entry>
     where
         Self: Sized,
@@ -287,7 +287,7 @@ impl Lambda {
 
 node! { #[from(NODE_LEGACY_LET)] struct LegacyLet; }
 
-impl EntryHolder for LegacyLet {}
+impl HasEntry for LegacyLet {}
 
 impl LegacyLet {
     tg! { let_token, let }
@@ -297,7 +297,7 @@ impl LegacyLet {
 
 node! { #[from(NODE_LET_IN)] struct LetIn; }
 
-impl EntryHolder for LetIn {}
+impl HasEntry for LetIn {}
 
 impl LetIn {
     tg! { let_token, let }
@@ -379,7 +379,7 @@ impl Root {
 
 node! { #[from(NODE_ATTR_SET)] struct AttrSet; }
 
-impl EntryHolder for AttrSet {}
+impl HasEntry for AttrSet {}
 
 impl AttrSet {
     tg! { rec_token, rec }
