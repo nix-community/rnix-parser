@@ -46,16 +46,20 @@ mod support {
     }
 
     pub(super) fn token<N: AstNode, T: AstToken>(parent: &N) -> Option<T> {
-        children_tokens(parent).find_map(T::cast)
+        children_tokens(parent).nth(0)
     }
 
     /// Token untyped
     pub(super) fn token_u<N: AstNode>(parent: &N, kind: SyntaxKind) -> Option<SyntaxToken> {
-        children_tokens(parent).find(|it| it.kind() == kind)
+        children_tokens_u(parent).find(|it| it.kind() == kind)
     }
 
-    pub(super) fn children_tokens<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
-        parent.syntax().children_with_tokens().filter_map(SyntaxElement::into_token)
+    pub(super) fn children_tokens<N: AstNode, T: AstToken>(parent: &N) -> impl Iterator<Item = T> {
+        parent
+            .syntax()
+            .children_with_tokens()
+            .filter_map(SyntaxElement::into_token)
+            .filter_map(T::cast)
     }
 
     pub(super) fn children_tokens_u<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
