@@ -91,5 +91,5 @@ fn comments_before(node: &SyntaxNode) -> String {
         .flatten()
         .map(|s| s.text().trim().to_string())
         .collect::<Vec<_>>()
-        .join(" ")
+        .join("\n         ")
 }
