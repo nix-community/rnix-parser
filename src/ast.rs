@@ -1,7 +1,6 @@
 //! Provides a type system for the AST, in some sense
 
 mod expr_ext;
-mod node_ext;
 mod nodes;
 mod operators;
 mod str_util;
