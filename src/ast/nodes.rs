@@ -263,9 +263,10 @@ impl Inherit {
 
 node! { #[from(NODE_INHERIT_FROM)] struct InheritFrom; }
 
-// this should also be removed later
 impl InheritFrom {
+    tg! { l_paren_token, "(" }
     ng! { expr, Expr, 0 }
+    tg! { r_paren_token, ")" }
 }
 
 node! { #[from(NODE_STRING)] struct Str; }
