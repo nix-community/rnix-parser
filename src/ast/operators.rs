@@ -3,7 +3,6 @@ use crate::SyntaxKind::{self, *};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BinOpKind {
     Concat,
-    IsSet,
     Update,
 
     Add,
@@ -27,7 +26,6 @@ impl BinOpKind {
     pub fn from_kind(token: SyntaxKind) -> Option<Self> {
         match token {
             TOKEN_CONCAT => Some(BinOpKind::Concat),
-            TOKEN_QUESTION => Some(BinOpKind::IsSet),
             TOKEN_UPDATE => Some(BinOpKind::Update),
 
             TOKEN_ADD => Some(BinOpKind::Add),
