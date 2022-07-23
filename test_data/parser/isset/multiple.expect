@@ -1,0 +1,32 @@
+NODE_ROOT 0..15 {
+  NODE_HAS_ATTR 0..15 {
+    NODE_HAS_ATTR 0..6 {
+      NODE_ATTR_SET 0..2 {
+        TOKEN_CURLY_B_OPEN("{") 0..1
+        TOKEN_CURLY_B_CLOSE("}") 1..2
+      }
+      TOKEN_WHITESPACE(" ") 2..3
+      TOKEN_QUESTION("?") 3..4
+      TOKEN_WHITESPACE(" ") 4..5
+      NODE_ATTRPATH 5..6 {
+        NODE_IDENT 5..6 {
+          TOKEN_IDENT("a") 5..6
+        }
+      }
+    }
+    TOKEN_WHITESPACE(" ") 6..7
+    TOKEN_QUESTION("?") 7..8
+    TOKEN_WHITESPACE(" ") 8..9
+    NODE_ATTRPATH 9..15 {
+      NODE_DYNAMIC 9..15 {
+        TOKEN_DYNAMIC_START("${") 9..11
+        NODE_STRING 11..14 {
+          TOKEN_STRING_START("\"") 11..12
+          TOKEN_STRING_CONTENT("a") 12..13
+          TOKEN_STRING_END("\"") 13..14
+        }
+        TOKEN_DYNAMIC_END("}") 14..15
+      }
+    }
+  }
+}
