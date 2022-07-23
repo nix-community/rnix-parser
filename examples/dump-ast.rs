@@ -1,4 +1,3 @@
-use rnix::types::*;
 use std::{env, fs};
 
 fn main() {
@@ -15,12 +14,11 @@ fn main() {
                 return;
             }
         };
-        let ast = rnix::parse(&content);
+        let parse = rnix::Root::parse(&content);
 
-        for error in ast.errors() {
+        for error in parse.errors() {
             println!("error: {}", error);
         }
-
-        println!("{}", ast.root().dump());
+        println!("{:#?}", parse.tree());
     }
 }

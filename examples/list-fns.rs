@@ -1,6 +1,19 @@
 use std::{env, error::Error, fs};
 
-use rnix::{types::*, NodeOrToken, SyntaxKind::*, SyntaxNode};
+use rnix::{
+    ast::{self, AstToken, HasEntry},
+    match_ast, NodeOrToken, SyntaxNode,
+};
+use rowan::ast::AstNode;
+
+macro_rules! single_match {
+    ($expression:expr, $(|)? $( $pattern:pat_param )|+ $( if $guard: expr )? => $captured:expr) => {
+        match $expression {
+            $( $pattern )|+ $( if $guard )? => Some($captured),
+            _ => None
+        }
+    };
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let file = match env::args().nth(1) {
@@ -11,28 +24,47 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
     let content = fs::read_to_string(&file)?;
-    let ast = rnix::parse(&content).as_result()?;
-    let set = ast.root().inner().and_then(AttrSet::cast).ok_or("root isn't a set")?;
-
+    let ast = rnix::Root::parse(&content).ok()?;
+    let expr = ast.expr().unwrap();
+    let set = match expr {
+        ast::Expr::AttrSet(set) => set,
+        _ => return Err("root isn't a set".into()),
+    };
     for entry in set.entries() {
-        if let Some(lambda) = entry.value().and_then(Lambda::cast) {
-            if let Some(attr) = entry.key() {
-                let ident = attr.path().last().and_then(Ident::cast);
-                let s = ident.as_ref().map_or_else(|| "error".to_string(), Ident::to_inner_string);
+        if let ast::Entry::KeyValue(key_value) = entry {
+            if let Some(ast::Expr::Lambda(lambda)) = key_value.value() {
+                let key = key_value.key().unwrap();
+                let ident = key.attrs().last().and_then(|attr| match attr {
+                    ast::Attr::Ident(ident) => Some(ident),
+                    _ => None,
+                });
+                let s = ident.as_ref().map_or_else(
+                    || "error".to_string(),
+                    |ident| ident.ident_token().unwrap().text().to_string(),
+                );
                 println!("Function name: {}", s);
-                if let Some(comment) = find_comment(attr.node().clone()) {
-                    println!("-> Doc: {}", comment);
+                {
+                    let comments = comments_before(key_value.syntax());
+                    if !comments.is_empty() {
+                        println!("--> Doc: {comments}");
+                    }
                 }
 
                 let mut value = Some(lambda);
                 while let Some(lambda) = value {
-                    let ident = lambda.arg().and_then(Ident::cast);
-                    let s = ident.as_ref().map_or_else(|| "error".to_string(), Ident::to_inner_string);
-                    println!("-> Arg: {}", s);
-                    if let Some(comment) = lambda.arg().and_then(find_comment) {
-                        println!("--> Doc: {}", comment);
+                    let s = lambda
+                        .param()
+                        .as_ref()
+                        .map_or_else(|| "error".to_string(), |param| param.to_string());
+                    println!("-> Param: {}", s);
+                    {
+                        let comments = comments_before(lambda.syntax());
+                        if !comments.is_empty() {
+                            println!("--> Doc: {comments}");
+                        }
                     }
-                    value = lambda.body().and_then(Lambda::cast);
+                    value =
+                        single_match!(lambda.body().unwrap(), ast::Expr::Lambda(lambda) => lambda);
                 }
                 println!();
             }
@@ -41,32 +73,23 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-fn find_comment(node: SyntaxNode) -> Option<String> {
-    let mut node = NodeOrToken::Node(node);
-    let mut comments = Vec::new();
-    loop {
-        loop {
-            if let Some(new) = node.prev_sibling_or_token() {
-                node = new;
-                break;
-            } else {
-                node = NodeOrToken::Node(node.parent()?);
-            }
-        }
 
-        match node.kind() {
-            TOKEN_COMMENT => match &node {
-                NodeOrToken::Token(token) => comments.push(token.text().to_string()),
-                NodeOrToken::Node(_) => unreachable!(),
+fn comments_before(node: &SyntaxNode) -> String {
+    node.siblings_with_tokens(rowan::Direction::Prev)
+        // rowan always returns the first node for some reason
+        .skip(1)
+        .map_while(|element| match element {
+            NodeOrToken::Token(token) => match_ast! {
+                match token {
+                    ast::Comment(it) => Some(Some(it)),
+                    ast::Whitespace(_) => Some(None),
+                    _ => None,
+                }
             },
-            t if t.is_trivia() => (),
-            _ => break,
-        }
-    }
-    let doc = comments
-        .iter()
-        .map(|it| it.trim_start_matches('#').trim())
+            _ => None,
+        })
+        .flatten()
+        .map(|s| s.text().trim().to_string())
         .collect::<Vec<_>>()
-        .join("\n        ");
-    Some(doc).filter(|it| !it.is_empty())
+        .join("\n         ")
 }

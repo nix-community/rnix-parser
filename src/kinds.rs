@@ -109,6 +109,7 @@ impl SyntaxKind {
     pub fn is_literal(self) -> bool {
         matches!(self, TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI)
     }
+
     /// Returns true if this token should be used as a function argument.
     /// ```ignore
     /// Example:
