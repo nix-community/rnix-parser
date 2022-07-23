@@ -31,10 +31,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         _ => return Err("root isn't a set".into()),
     };
     for entry in set.entries() {
-        if let ast::Entry::KeyValue(key_value) = entry {
-            if let Some(ast::Expr::Lambda(lambda)) = key_value.value() {
-                let key = key_value.key().unwrap();
-                let ident = key.attrs().last().and_then(|attr| match attr {
+        if let ast::Entry::AttrpathValue(attrpath_value) = entry {
+            if let Some(ast::Expr::Lambda(lambda)) = attrpath_value.value() {
+                let attrpath = attrpath_value.attrpath().unwrap();
+                let ident = attrpath.attrs().last().and_then(|attr| match attr {
                     ast::Attr::Ident(ident) => Some(ident),
                     _ => None,
                 });
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 );
                 println!("Function name: {}", s);
                 {
-                    let comments = comments_before(key_value.syntax());
+                    let comments = comments_before(attrpath_value.syntax());
                     if !comments.is_empty() {
                         println!("--> Doc: {comments}");
                     }

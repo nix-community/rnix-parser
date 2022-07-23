@@ -12,7 +12,7 @@ pub trait HasEntry: AstNode {
         children(self)
     }
 
-    fn key_values(&self) -> AstChildren<KeyValue>
+    fn attrpath_values(&self) -> AstChildren<AttrpathValue>
     where
         Self: Sized,
     {
@@ -169,7 +169,6 @@ node! {
     #[case(
         NODE_APPLY => Apply,
         NODE_ASSERT => Assert,
-        NODE_DYNAMIC => Dynamic,
         NODE_ERROR => Error,
         NODE_IF_ELSE => IfElse,
         NODE_SELECT => Select,
@@ -181,7 +180,6 @@ node! {
         NODE_LET_IN => LetIn,
         NODE_LIST => List,
         NODE_BIN_OP => BinOp,
-        NODE_OR_DEFAULT => OrDefault,
         NODE_PAREN => Paren,
         NODE_ROOT => Root,
         NODE_ATTR_SET => AttrSet,
@@ -189,6 +187,7 @@ node! {
         NODE_IDENT => Ident,
         NODE_WITH => With,
         NODE_STRING => Str,
+        NODE_HAS_ATTR => HasAttr,
     )]
     /// An expression. The fundamental nix ast type.
     enum Expr;
@@ -224,9 +223,9 @@ impl Assert {
     ng! { body, Expr, 1 }
 }
 
-node! { #[from(NODE_KEY)] struct Key; }
+node! { #[from(NODE_ATTRPATH)] struct Attrpath; }
 
-impl Key {
+impl Attrpath {
     ng! { attrs, [Attr] }
 }
 
@@ -250,7 +249,9 @@ node! { #[from(NODE_SELECT)] struct Select; }
 impl Select {
     ng! { expr, Expr, 0 }
     tg! { dot_token, . }
-    ng! { attr, Expr, 1 }
+    ng! { attrpath, Attrpath, 0 }
+    tg! { or_token, or }
+    ng! { default_expr, Expr, 1 }
 }
 
 node! { #[from(NODE_INHERIT)] struct Inherit; }
@@ -325,13 +326,6 @@ impl BinOp {
     ng! { rhs, Expr, 1 }
 }
 
-node! { #[from(NODE_OR_DEFAULT)] struct OrDefault; }
-
-impl OrDefault {
-    ng! { index, Select, 0 }
-    ng! { default, Expr, 1 }
-}
-
 node! { #[from(NODE_PAREN)] struct Paren; }
 
 impl Paren {
@@ -390,15 +384,15 @@ impl AttrSet {
 node! {
     #[case(
         NODE_INHERIT => Inherit,
-        NODE_KEY_VALUE => KeyValue,
+        NODE_ATTRPATH_VALUE => AttrpathValue,
     )]
     enum Entry;
 }
 
-node! { #[from(NODE_KEY_VALUE)] struct KeyValue; }
+node! { #[from(NODE_ATTRPATH_VALUE)] struct AttrpathValue; }
 
-impl KeyValue {
-    ng! { key, Key, 0 }
+impl AttrpathValue {
+    ng! { attrpath, Attrpath, 0 }
     tg! { assign_token, = }
     ng! { value, Expr, 0 }
 }
@@ -419,4 +413,12 @@ impl With {
     ng! { namespace, Expr, 0 }
     tg! { semicolon_token, ; }
     ng! { body, Expr, 1 }
+}
+
+node! { #[from(NODE_HAS_ATTR)] struct HasAttr; }
+
+impl HasAttr {
+    ng! { expr, Expr, 0 }
+    tg! { question_token, ? }
+    ng! { attrpath, Attrpath, 0 }
 }

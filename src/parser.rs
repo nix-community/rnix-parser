@@ -276,8 +276,8 @@ where
             _ => self.expect_ident(),
         }
     }
-    fn parse_key(&mut self) {
-        self.start_node(NODE_KEY);
+    fn parse_attrpath(&mut self) {
+        self.start_node(NODE_ATTRPATH);
         loop {
             self.parse_attr();
 
@@ -397,8 +397,8 @@ where
                     self.finish_node();
                 }
                 Some(_) => {
-                    self.start_node(NODE_KEY_VALUE);
-                    self.parse_key();
+                    self.start_node(NODE_ATTRPATH_VALUE);
+                    self.parse_attrpath();
                     self.expect(TOKEN_ASSIGN);
                     self.parse_expr();
                     self.expect(TOKEN_SEMICOLON);
@@ -492,7 +492,6 @@ where
                 self.bump();
                 self.finish_node();
             }
-            TOKEN_DYNAMIC_START => self.parse_dynamic(),
             TOKEN_STRING_START => self.parse_string(),
             TOKEN_PATH => {
                 let next = self.try_next();
@@ -569,7 +568,6 @@ where
                         TOKEN_REC,
                         TOKEN_CURLY_B_OPEN,
                         TOKEN_SQUARE_B_OPEN,
-                        TOKEN_DYNAMIC_START,
                         TOKEN_STRING_START,
                         TOKEN_IDENT,
                     ]
@@ -579,18 +577,17 @@ where
             }
         };
 
-        while self.peek() == Some(TOKEN_DOT) {
+        if self.peek() == Some(TOKEN_DOT) {
             self.start_node_at(checkpoint, NODE_SELECT);
             self.bump();
-            self.parse_attr();
+            self.parse_attrpath();
+            if self.peek_data().map(|&(t, s)| t == TOKEN_IDENT && s == OR).unwrap_or(false) {
+                self.bump();
+                self.parse_val();
+            }
             self.finish_node();
         }
-        if self.peek_data().map(|&(t, s)| t == TOKEN_IDENT && s == OR).unwrap_or(false) {
-            self.start_node_at(checkpoint, NODE_OR_DEFAULT);
-            self.bump();
-            self.parse_val();
-            self.finish_node();
-        }
+
         checkpoint
     }
     fn parse_fn(&mut self) -> Checkpoint {
@@ -647,11 +644,18 @@ where
         }
         checkpoint
     }
-    fn parse_isset(&mut self) -> Checkpoint {
-        self.handle_operation_left(false, Self::parse_negate, &[TOKEN_QUESTION])
+    fn parse_hasattr(&mut self) -> Checkpoint {
+        let checkpoint = self.parse_negate();
+        while self.peek().map(|t| t == TOKEN_QUESTION).unwrap_or(false) {
+            self.start_node_at(checkpoint, NODE_HAS_ATTR);
+            self.bump();
+            self.parse_attrpath();
+            self.finish_node();
+        }
+        checkpoint
     }
     fn parse_concat(&mut self) -> Checkpoint {
-        self.handle_operation_right(Self::parse_isset, &[TOKEN_CONCAT])
+        self.handle_operation_right(Self::parse_hasattr, &[TOKEN_CONCAT])
     }
     fn parse_mul(&mut self) -> Checkpoint {
         self.handle_operation_left(false, Self::parse_concat, &[TOKEN_MUL, TOKEN_DIV])

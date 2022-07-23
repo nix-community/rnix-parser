@@ -2,8 +2,8 @@ NODE_ROOT 0..91 {
   NODE_LET_IN 0..91 {
     TOKEN_LET("let") 0..3
     TOKEN_WHITESPACE("\n  ") 3..6
-    NODE_KEY_VALUE 6..29 {
-      NODE_KEY 6..7 {
+    NODE_ATTRPATH_VALUE 6..29 {
+      NODE_ATTRPATH 6..7 {
         NODE_IDENT 6..7 {
           TOKEN_IDENT("a") 6..7
         }
@@ -32,8 +32,8 @@ NODE_ROOT 0..91 {
       TOKEN_SEMICOLON(";") 28..29
     }
     TOKEN_WHITESPACE("\n  ") 29..32
-    NODE_KEY_VALUE 32..86 {
-      NODE_KEY 32..33 {
+    NODE_ATTRPATH_VALUE 32..86 {
+      NODE_ATTRPATH 32..33 {
         NODE_IDENT 32..33 {
           TOKEN_IDENT("b") 32..33
         }

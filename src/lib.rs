@@ -124,8 +124,8 @@ mod tests {
         let let_in = ast::LetIn::try_from(root.expr().unwrap()).unwrap();
         let set = ast::AttrSet::try_from(let_in.body().unwrap()).unwrap();
         let entry = set.entries().nth(1).unwrap();
-        let key_value = ast::KeyValue::try_from(entry).unwrap();
-        let value = ast::Str::try_from(key_value.value().unwrap()).unwrap();
+        let attrpath_value = ast::AttrpathValue::try_from(entry).unwrap();
+        let value = ast::Str::try_from(attrpath_value.value().unwrap()).unwrap();
 
         match &*value.parts() {
             &[

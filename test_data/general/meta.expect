@@ -2,8 +2,8 @@ NODE_ROOT 0..229 {
   NODE_ATTR_SET 0..197 {
     TOKEN_CURLY_B_OPEN("{") 0..1
     TOKEN_WHITESPACE("\n  ") 1..4
-    NODE_KEY_VALUE 4..67 {
-      NODE_KEY 4..7 {
+    NODE_ATTRPATH_VALUE 4..67 {
+      NODE_ATTRPATH 4..7 {
         NODE_IDENT 4..7 {
           TOKEN_IDENT("add") 4..7
         }
@@ -43,8 +43,8 @@ NODE_ROOT 0..229 {
       TOKEN_SEMICOLON(";") 66..67
     }
     TOKEN_WHITESPACE("\n  ") 67..70
-    NODE_KEY_VALUE 70..106 {
-      NODE_KEY 70..76 {
+    NODE_ATTRPATH_VALUE 70..106 {
+      NODE_ATTRPATH 70..76 {
         NODE_IDENT 70..76 {
           TOKEN_IDENT("string") 70..76
         }
@@ -62,8 +62,8 @@ NODE_ROOT 0..229 {
       TOKEN_SEMICOLON(";") 105..106
     }
     TOKEN_WHITESPACE("\n    ") 106..111
-    NODE_KEY_VALUE 111..126 {
-      NODE_KEY 111..113 {
+    NODE_ATTRPATH_VALUE 111..126 {
+      NODE_ATTRPATH 111..113 {
         NODE_IDENT 111..113 {
           TOKEN_IDENT("hi") 111..113
         }
@@ -79,8 +79,8 @@ NODE_ROOT 0..229 {
     TOKEN_WHITESPACE("\n ") 126..128
     TOKEN_COMMENT("# Store my password in plain text") 128..161
     TOKEN_WHITESPACE("\n      ") 161..168
-    NODE_KEY_VALUE 168..195 {
-      NODE_KEY 168..176 {
+    NODE_ATTRPATH_VALUE 168..195 {
+      NODE_ATTRPATH 168..176 {
         NODE_IDENT 168..176 {
           TOKEN_IDENT("password") 168..176
         }

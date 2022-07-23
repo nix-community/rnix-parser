@@ -70,7 +70,7 @@ pub enum SyntaxKind {
 
     NODE_APPLY,
     NODE_ASSERT,
-    NODE_KEY,
+    NODE_ATTRPATH,
     NODE_DYNAMIC,
     NODE_ERROR,
     NODE_IDENT,
@@ -86,18 +86,19 @@ pub enum SyntaxKind {
     NODE_LET_IN,
     NODE_LIST,
     NODE_BIN_OP,
-    NODE_OR_DEFAULT,
     NODE_PAREN,
     NODE_PATTERN,
     NODE_PAT_BIND,
     NODE_PAT_ENTRY,
     NODE_ROOT,
     NODE_ATTR_SET,
-    NODE_KEY_VALUE,
+    NODE_ATTRPATH_VALUE,
     NODE_UNARY_OP,
     NODE_LITERAL,
     NODE_WITH,
     NODE_PATH_WITH_INTERPOL,
+    // Attrpath existence check: foo ? bar.${baz}."bux"
+    NODE_HAS_ATTR,
 
     #[doc(hidden)]
     __LAST,

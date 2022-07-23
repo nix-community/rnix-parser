@@ -11,8 +11,8 @@ NODE_ROOT 0..166 {
   NODE_ATTR_SET 0..166 {
     TOKEN_CURLY_B_OPEN("{") 0..1
     TOKEN_WHITESPACE("\n  ") 1..4
-    NODE_KEY_VALUE 4..33 {
-      NODE_KEY 4..9 {
+    NODE_ATTRPATH_VALUE 4..33 {
+      NODE_ATTRPATH 4..9 {
         NODE_IDENT 4..9 {
           TOKEN_IDENT("hello") 4..9
         }
@@ -32,8 +32,8 @@ NODE_ROOT 0..166 {
       TOKEN_SEMICOLON(";") 32..33
     }
     TOKEN_WHITESPACE("\n  ") 33..36
-    NODE_KEY_VALUE 36..120 {
-      NODE_KEY 36..40 {
+    NODE_ATTRPATH_VALUE 36..120 {
+      NODE_ATTRPATH 36..40 {
         NODE_IDENT 36..40 {
           TOKEN_IDENT("test") 36..40
         }
@@ -44,8 +44,8 @@ NODE_ROOT 0..166 {
       NODE_ATTR_SET 43..119 {
         TOKEN_CURLY_B_OPEN("{") 43..44
         TOKEN_WHITESPACE("\n    ") 44..49
-        NODE_KEY_VALUE 49..65 {
-          NODE_KEY 49..54 {
+        NODE_ATTRPATH_VALUE 49..65 {
+          NODE_ATTRPATH 49..54 {
             NODE_IDENT 49..54 {
               TOKEN_IDENT("valid") 49..54
             }
@@ -61,8 +61,8 @@ NODE_ROOT 0..166 {
           TOKEN_SEMICOLON(";") 64..65
         }
         TOKEN_WHITESPACE("\n    ") 65..70
-        NODE_KEY_VALUE 70..115 {
-          NODE_KEY 70..77 {
+        NODE_ATTRPATH_VALUE 70..115 {
+          NODE_ATTRPATH 70..77 {
             NODE_IDENT 70..77 {
               TOKEN_IDENT("invalid") 70..77
             }
@@ -92,8 +92,8 @@ NODE_ROOT 0..166 {
       TOKEN_SEMICOLON(";") 119..120
     }
     TOKEN_WHITESPACE("\n  ") 120..123
-    NODE_KEY_VALUE 123..166 {
-      NODE_KEY 123..128 {
+    NODE_ATTRPATH_VALUE 123..166 {
+      NODE_ATTRPATH 123..128 {
         NODE_IDENT 123..128 {
           TOKEN_IDENT("test2") 123..128
         }
@@ -104,8 +104,8 @@ NODE_ROOT 0..166 {
       NODE_ATTR_SET 131..166 {
         TOKEN_CURLY_B_OPEN("{") 131..132
         TOKEN_WHITESPACE("\n    ") 132..137
-        NODE_KEY_VALUE 137..150 {
-          NODE_KEY 137..142 {
+        NODE_ATTRPATH_VALUE 137..150 {
+          NODE_ATTRPATH 137..142 {
             NODE_IDENT 137..142 {
               TOKEN_IDENT("hello") 137..142
             }
@@ -121,8 +121,8 @@ NODE_ROOT 0..166 {
           TOKEN_SEMICOLON(";") 149..150
         }
         TOKEN_WHITESPACE("\n    ") 150..155
-        NODE_KEY_VALUE 155..166 {
-          NODE_KEY 155..159 {
+        NODE_ATTRPATH_VALUE 155..166 {
+          NODE_ATTRPATH 155..159 {
             NODE_IDENT 155..159 {
               TOKEN_IDENT("aaaa") 155..159
             }
