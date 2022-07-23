@@ -3,8 +3,8 @@ mod macros;
 pub mod ast;
 mod kinds;
 pub mod parser;
-pub mod tokenizer;
 mod token_set;
+pub mod tokenizer;
 
 use std::marker::PhantomData;
 
