@@ -2,8 +2,8 @@ NODE_ROOT 0..62 {
   NODE_ATTR_SET 0..62 {
     TOKEN_CURLY_B_OPEN("{") 0..1
     TOKEN_WHITESPACE("\n  ") 1..4
-    NODE_KEY_VALUE 4..28 {
-      NODE_KEY 4..9 {
+    NODE_ATTRPATH_VALUE 4..28 {
+      NODE_ATTRPATH 4..9 {
         NODE_IDENT 4..9 {
           TOKEN_IDENT("thing") 4..9
         }
@@ -45,8 +45,8 @@ NODE_ROOT 0..62 {
       TOKEN_SEMICOLON(";") 27..28
     }
     TOKEN_WHITESPACE("\n  ") 28..31
-    NODE_KEY_VALUE 31..60 {
-      NODE_KEY 31..37 {
+    NODE_ATTRPATH_VALUE 31..60 {
+      NODE_ATTRPATH 31..37 {
         NODE_IDENT 31..37 {
           TOKEN_IDENT("concat") 31..37
         }

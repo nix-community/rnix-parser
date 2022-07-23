@@ -1,0 +1,19 @@
+NODE_ROOT 0..132 {
+  TOKEN_COMMENT("# https://github.com/NixOS/nixpkgs/blob/38860c9e91cb00f4d8cd19c7b4e36c45680c89b5/nixos/modules/security/pam.nix#L1180") 0..117
+  TOKEN_WHITESPACE("\n") 117..118
+  NODE_APPLY 118..132 {
+    NODE_APPLY 118..126 {
+      NODE_IDENT 118..123 {
+        TOKEN_IDENT("foldl") 118..123
+      }
+      TOKEN_WHITESPACE(" ") 123..124
+      NODE_IDENT 124..126 {
+        TOKEN_IDENT("or") 124..126
+      }
+    }
+    TOKEN_WHITESPACE(" ") 126..127
+    NODE_IDENT 127..132 {
+      TOKEN_IDENT("false") 127..132
+    }
+  }
+}
