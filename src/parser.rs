@@ -5,13 +5,13 @@ use std::{
     fmt,
 };
 
-use cbitset::BitSet256;
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, TextRange, TextSize};
 
 use crate::{
     tokenizer::Token,
     NixLanguage,
     SyntaxKind::{self, *},
+    TokenSet,
 };
 
 const OR: &str = "or";
@@ -192,16 +192,16 @@ where
         self.peek_data().map(|&(t, _)| t)
     }
     fn expect_peek_any(&mut self, allowed_slice: &[SyntaxKind]) -> Option<SyntaxKind> {
-        let allowed: BitSet256 = allowed_slice.iter().map(|&k| k as u16).collect();
+        let allowed: TokenSet = TokenSet::new(allowed_slice);
 
         let next = match self.peek() {
             None => None,
-            Some(kind) if allowed.contains(kind as usize) => Some(kind),
+            Some(kind) if allowed.contains(kind) => Some(kind),
             Some(kind) => {
                 let start = self.start_error_node();
                 loop {
                     self.bump();
-                    if self.peek().map(|kind| allowed.contains(kind as usize)).unwrap_or(true) {
+                    if self.peek().map(|kind| allowed.contains(kind)).unwrap_or(true) {
                         break;
                     }
                 }
