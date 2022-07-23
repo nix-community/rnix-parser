@@ -4,6 +4,7 @@ pub mod ast;
 mod kinds;
 pub mod parser;
 pub mod tokenizer;
+mod token_set;
 
 use std::marker::PhantomData;
 
@@ -13,6 +14,7 @@ use ast::AstNode;
 use parser::ParseError;
 use rowan::GreenNode;
 pub use rowan::{NodeOrToken, TextRange, TextSize, TokenAtOffset, WalkEvent};
+pub(crate) use token_set::TokenSet;
 
 use self::tokenizer::Tokenizer;
 
