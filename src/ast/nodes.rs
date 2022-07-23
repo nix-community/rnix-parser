@@ -250,7 +250,9 @@ impl Select {
     ng! { expr, Expr, 0 }
     tg! { dot_token, . }
     ng! { attrpath, Attrpath, 0 }
-    tg! { or_token, or }
+    // we should either add or as a token in the lexer
+    // or just find a token with text "or"
+    // tg! { or_token, or }
     ng! { default_expr, Expr, 1 }
 }
 

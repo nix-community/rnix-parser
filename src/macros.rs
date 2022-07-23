@@ -7,7 +7,6 @@ macro_rules! T {
     (in)      => ($crate::SyntaxKind::TOKEN_IN);
     (inherit) => ($crate::SyntaxKind::TOKEN_INHERIT);
     (let)     => ($crate::SyntaxKind::TOKEN_LET);
-    (or)      => ($crate::SyntaxKind::TOKEN_OR);
     (rec)     => ($crate::SyntaxKind::TOKEN_REC);
     (then)    => ($crate::SyntaxKind::TOKEN_THEN);
     (with)    => ($crate::SyntaxKind::TOKEN_WITH);
