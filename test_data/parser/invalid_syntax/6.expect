@@ -5,8 +5,8 @@ NODE_ROOT 0..57 {
     TOKEN_WHITESPACE(" ") 3..4
     TOKEN_CURLY_B_OPEN("{") 4..5
     TOKEN_WHITESPACE("\n    ") 5..10
-    NODE_KEY_VALUE 10..22 {
-      NODE_KEY 10..17 {
+    NODE_ATTRPATH_VALUE 10..22 {
+      NODE_ATTRPATH 10..17 {
         NODE_IDENT 10..13 {
           TOKEN_IDENT("bar") 10..13
         }
@@ -24,8 +24,8 @@ NODE_ROOT 0..57 {
       TOKEN_SEMICOLON(";") 21..22
     }
     TOKEN_WHITESPACE("\n    ") 22..27
-    NODE_KEY_VALUE 27..38 {
-      NODE_KEY 27..30 {
+    NODE_ATTRPATH_VALUE 27..38 {
+      NODE_ATTRPATH 27..30 {
         NODE_IDENT 27..30 {
           TOKEN_IDENT("foo") 27..30
         }
@@ -38,14 +38,16 @@ NODE_ROOT 0..57 {
           TOKEN_IDENT("bar") 33..36
         }
         TOKEN_DOT(".") 36..37
-        NODE_ERROR 37..37 {
+        NODE_ATTRPATH 37..37 {
+          NODE_ERROR 37..37 {
+          }
         }
       }
       TOKEN_SEMICOLON(";") 37..38
     }
     TOKEN_WHITESPACE("\n    ") 38..43
-    NODE_KEY_VALUE 43..55 {
-      NODE_KEY 43..46 {
+    NODE_ATTRPATH_VALUE 43..55 {
+      NODE_ATTRPATH 43..46 {
         NODE_IDENT 43..46 {
           TOKEN_IDENT("abc") 43..46
         }

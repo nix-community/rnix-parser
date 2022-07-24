@@ -3,7 +3,9 @@ error: unexpected TOKEN_STRING_START at 78..98, wanted any of [TOKEN_ASSIGN]
 error: unexpected TOKEN_CURLY_B_CLOSE at 162..166, wanted any of [TOKEN_ASSIGN]
 error: unexpected end of file, wanted any of [TOKEN_ASSIGN]
 error: unexpected end of file
+error: expected semicolon at 166..166
 error: unexpected end of file
+error: expected semicolon at 166..166
 error: unexpected end of file
 NODE_ROOT 0..166 {
   NODE_ATTR_SET 0..166 {
@@ -132,7 +134,11 @@ NODE_ROOT 0..166 {
             TOKEN_WHITESPACE("\n") 164..165
             TOKEN_CURLY_B_CLOSE("}") 165..166
           }
+          NODE_ERROR 166..166 {
+          }
         }
+      }
+      NODE_ERROR 166..166 {
       }
     }
   }

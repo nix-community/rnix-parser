@@ -284,6 +284,14 @@ where
         match self.peek() {
             Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
             Some(TOKEN_STRING_START) => self.parse_string(),
+            _ => self.expect_ident(),
+        }
+    }
+    // Parse an attribute, but if we don't see one, emit an *empty* error node.
+    fn parse_attr_no_bump(&mut self) {
+        match self.peek() {
+            Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
+            Some(TOKEN_STRING_START) => self.parse_string(),
             Some(TOKEN_IDENT) => self.expect_ident(),
             _ => {
                 let start = self.start_error_node();
@@ -298,7 +306,7 @@ where
     fn parse_attrpath(&mut self) {
         self.start_node(NODE_ATTRPATH);
         loop {
-            self.parse_attr();
+            self.parse_attr_no_bump();
 
             if self.peek() == Some(TOKEN_DOT) {
                 self.bump();
@@ -422,6 +430,13 @@ where
                     self.parse_expr();
                     if let Some(TOKEN_SEMICOLON) = self.peek() {
                         self.bump();
+                    } else {
+                        let start = self.start_error_node();
+                        let end = self.finish_error_node();
+                        self.errors.push(ParseError::Expected(
+                            TextRange::new(start, end),
+                            "semicolon".to_string(),
+                        ));
                     }
                     self.finish_node();
                 }
