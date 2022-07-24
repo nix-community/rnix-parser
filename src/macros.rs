@@ -35,7 +35,7 @@ macro_rules! T {
     (*)       => ($crate::SyntaxKind::TOKEN_MUL);
     (/)       => ($crate::SyntaxKind::TOKEN_DIV);
 
-    (&&)      => ($crate::SyntaxKind::TOKEN_AND);
+    (&&)      => ($crate::SyntaxKind::TOKEN_AND_AND);
     (==)      => ($crate::SyntaxKind::TOKEN_EQUAL);
     (=>)      => ($crate::SyntaxKind::TOKEN_IMPLICATION);
     (<)       => ($crate::SyntaxKind::TOKEN_LESS);
@@ -43,6 +43,6 @@ macro_rules! T {
     (>)       => ($crate::SyntaxKind::TOKEN_MORE);
     (>=)      => ($crate::SyntaxKind::TOKEN_MORE_OR_EQ);
     (!=)      => ($crate::SyntaxKind::TOKEN_NOT_EQUAL);
-    (||)      => ($crate::SyntaxKind::TOKEN_OR);
+    (||)      => ($crate::SyntaxKind::TOKEN_OR_OR);
     ($kind:ident) => ($crate::SyntaxKind::$kind);
 }

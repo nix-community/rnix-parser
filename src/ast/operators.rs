@@ -33,7 +33,7 @@ impl BinOpKind {
             TOKEN_MUL => Some(BinOpKind::Mul),
             TOKEN_DIV => Some(BinOpKind::Div),
 
-            TOKEN_AND => Some(BinOpKind::And),
+            TOKEN_AND_AND => Some(BinOpKind::And),
             TOKEN_EQUAL => Some(BinOpKind::Equal),
             TOKEN_IMPLICATION => Some(BinOpKind::Implication),
             TOKEN_LESS => Some(BinOpKind::Less),
@@ -41,7 +41,7 @@ impl BinOpKind {
             TOKEN_MORE => Some(BinOpKind::More),
             TOKEN_MORE_OR_EQ => Some(BinOpKind::MoreOrEq),
             TOKEN_NOT_EQUAL => Some(BinOpKind::NotEqual),
-            TOKEN_OR => Some(BinOpKind::Or),
+            TOKEN_OR_OR => Some(BinOpKind::Or),
 
             _ => None,
         }

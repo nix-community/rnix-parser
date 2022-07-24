@@ -689,10 +689,10 @@ where
         self.handle_operation_left(true, Self::parse_compare, &[TOKEN_EQUAL, TOKEN_NOT_EQUAL])
     }
     fn parse_and(&mut self) -> Checkpoint {
-        self.handle_operation_left(false, Self::parse_equal, &[TOKEN_AND])
+        self.handle_operation_left(false, Self::parse_equal, &[TOKEN_AND_AND])
     }
     fn parse_or(&mut self) -> Checkpoint {
-        self.handle_operation_left(false, Self::parse_and, &[TOKEN_OR])
+        self.handle_operation_left(false, Self::parse_and, &[TOKEN_OR_OR])
     }
     fn parse_implication(&mut self) -> Checkpoint {
         self.handle_operation_right(Self::parse_or, &[TOKEN_IMPLICATION])
