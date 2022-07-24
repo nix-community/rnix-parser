@@ -108,7 +108,10 @@ impl<'a> Tokenizer<'a> {
         loop {
             let start = self.state;
             match self.next() {
-                None => return TOKEN_ERROR,
+                None => {
+                    self.pop_ctx(Context::StringBody { multiline });
+                    return TOKEN_ERROR;
+                }
                 Some('"') if !multiline => {
                     self.state = start;
                     self.pop_ctx(Context::StringBody { multiline: false });
@@ -131,7 +134,9 @@ impl<'a> Tokenizer<'a> {
                         }
                         Some('\\') => {
                             self.next().unwrap();
-                            self.next().unwrap();
+                            if let None = self.next() {
+                                return TOKEN_ERROR;
+                            }
                         }
                         _ => {
                             self.state = start;
@@ -306,15 +311,15 @@ impl<'a> Tokenizer<'a> {
             }
             '!' => TOKEN_INVERT,
             '{' => {
-                if let Some(Context::Interpol { brackets: extra_brackets }) = self.ctx.last_mut() {
-                    *extra_brackets += 1;
+                if let Some(Context::Interpol { brackets }) = self.ctx.last_mut() {
+                    *brackets += 1;
                 }
                 TOKEN_CURLY_B_OPEN
             }
             '}' => {
-                if let Some(Context::Interpol { brackets: extra_brackets }) = self.ctx.last_mut() {
-                    match extra_brackets.checked_sub(1) {
-                        Some(new) => *extra_brackets = new,
+                if let Some(Context::Interpol { brackets }) = self.ctx.last_mut() {
+                    match brackets.checked_sub(1) {
+                        Some(new) => *brackets = new,
                         None => {
                             self.pop_ctx(Context::Interpol { brackets: 0 });
                             return Some(TOKEN_INTERPOL_END);
@@ -464,6 +469,8 @@ impl<'a> Iterator for Tokenizer<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::str;
+
     use super::{tokenize, SyntaxKind::*, Token};
 
     macro_rules! tokens {
@@ -480,6 +487,19 @@ mod tests {
     }
     fn error(token: &str) -> Vec<Token<'_>> {
         tokens![(TOKEN_ERROR, token)]
+    }
+
+    fn fuzz<B: AsRef<[u8]>>(b: B) {
+        let s = str::from_utf8(b.as_ref()).unwrap();
+        println!("`{s}`");
+        tokenize(s);
+    }
+
+    #[test]
+    fn test_fuzz() {
+        fuzz("\"");
+        fuzz([39, 39, 34]);
+        fuzz([39, 39, 39, 39, 92]);
     }
 
     #[test]
