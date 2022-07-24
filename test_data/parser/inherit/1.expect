@@ -50,13 +50,13 @@ NODE_ROOT 0..95 {
       TOKEN_INHERIT("inherit") 36..43
       TOKEN_WHITESPACE(" ") 43..44
       NODE_DYNAMIC 44..50 {
-        TOKEN_DYNAMIC_START("${") 44..46
+        TOKEN_INTERPOL_START("${") 44..46
         NODE_STRING 46..49 {
           TOKEN_STRING_START("\"") 46..47
           TOKEN_STRING_CONTENT("f") 47..48
           TOKEN_STRING_END("\"") 48..49
         }
-        TOKEN_DYNAMIC_END("}") 49..50
+        TOKEN_INTERPOL_END("}") 49..50
       }
       TOKEN_SEMICOLON(";") 50..51
     }

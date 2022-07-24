@@ -56,8 +56,6 @@ pub enum SyntaxKind {
     TOKEN_OR_OR,
 
     // Identifiers and values
-    TOKEN_DYNAMIC_END,
-    TOKEN_DYNAMIC_START,
     TOKEN_FLOAT,
     TOKEN_IDENT,
     TOKEN_INTEGER,
