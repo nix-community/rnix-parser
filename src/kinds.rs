@@ -70,7 +70,7 @@ pub enum SyntaxKind {
 
     NODE_APPLY,
     NODE_ASSERT,
-    NODE_KEY,
+    NODE_ATTRPATH,
     NODE_DYNAMIC,
     NODE_ERROR,
     NODE_IDENT,
@@ -86,17 +86,19 @@ pub enum SyntaxKind {
     NODE_LET_IN,
     NODE_LIST,
     NODE_BIN_OP,
-    NODE_OR_DEFAULT,
     NODE_PAREN,
     NODE_PATTERN,
     NODE_PAT_BIND,
     NODE_PAT_ENTRY,
     NODE_ROOT,
     NODE_ATTR_SET,
-    NODE_KEY_VALUE,
+    NODE_ATTRPATH_VALUE,
     NODE_UNARY_OP,
     NODE_LITERAL,
     NODE_WITH,
+    NODE_PATH_WITH_INTERPOL,
+    // Attrpath existence check: foo ? bar.${baz}."bux"
+    NODE_HAS_ATTR,
 
     #[doc(hidden)]
     __LAST,
@@ -106,11 +108,9 @@ use SyntaxKind::*;
 impl SyntaxKind {
     /// Returns true if this token is a literal, such as an integer or a string
     pub fn is_literal(self) -> bool {
-        match self {
-            TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI => true,
-            _ => false,
-        }
+        matches!(self, TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI)
     }
+
     /// Returns true if this token should be used as a function argument.
     /// ```ignore
     /// Example:
@@ -131,9 +131,6 @@ impl SyntaxKind {
     /// Returns true if this token is a comment, whitespace, or similar, and
     /// should be skipped over by the parser.
     pub fn is_trivia(self) -> bool {
-        match self {
-            TOKEN_COMMENT | TOKEN_ERROR | TOKEN_WHITESPACE => true,
-            _ => false,
-        }
+        matches!(self, TOKEN_COMMENT | TOKEN_ERROR | TOKEN_WHITESPACE)
     }
 }

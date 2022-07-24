@@ -2,7 +2,7 @@ use rnix::parser::ParseError;
 use std::{env, fs};
 
 fn main() {
-    let file = match env::args().skip(1).next() {
+    let file = match env::args().nth(1) {
         Some(file) => file,
         None => {
             eprintln!("Usage: error-report <file>");
@@ -16,13 +16,14 @@ fn main() {
             return;
         }
     };
-    let ast = rnix::parse(&content);
+    let ast = rnix::Root::parse(&content);
     for error in ast.errors() {
         let range = match error {
             ParseError::Unexpected(range) => range,
             ParseError::UnexpectedExtra(range) => range,
             ParseError::UnexpectedWanted(_, range, _) => range,
             ParseError::UnexpectedDoubleBind(range) => range,
+            ParseError::DuplicatedArgs(range, _) => range,
             err => {
                 eprintln!("error: {}", err);
                 continue;

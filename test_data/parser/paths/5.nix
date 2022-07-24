@@ -1,0 +1,1 @@
+<nixpkgs/${foo}/bar>
