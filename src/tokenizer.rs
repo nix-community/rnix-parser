@@ -384,11 +384,11 @@ impl<'a> Tokenizer<'a> {
             }
             '&' if self.peek() == Some('&') => {
                 self.next().unwrap();
-                TOKEN_AND
+                TOKEN_AND_AND
             }
             '|' if self.peek() == Some('|') => {
                 self.next().unwrap();
-                TOKEN_OR
+                TOKEN_OR_OR
             }
             '<' if self.peek() == Some('=') => {
                 self.next().unwrap();
@@ -432,6 +432,8 @@ impl<'a> Tokenizer<'a> {
                         "in" => TOKEN_IN,
                         "inherit" => TOKEN_INHERIT,
                         "let" => TOKEN_LET,
+                        // "or" is a contextual keyword and will be handled in the parser.
+                        "or" => TOKEN_OR,
                         "rec" => TOKEN_REC,
                         "then" => TOKEN_THEN,
                         "with" => TOKEN_WITH,
@@ -1135,7 +1137,7 @@ mod tests {
                 (TOKEN_INVERT, "!"),
                 (TOKEN_IDENT, "false"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_AND, "&&"),
+                (TOKEN_AND_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "false"),
                 (TOKEN_WHITESPACE, " "),
@@ -1143,7 +1145,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "true"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_OR, "||"),
+                (TOKEN_OR_OR, "||"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "true"),
             ]
@@ -1157,7 +1159,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_AND, "&&"),
+                (TOKEN_AND_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
@@ -1165,7 +1167,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_AND, "&&"),
+                (TOKEN_AND_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
@@ -1173,7 +1175,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "1"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_AND, "&&"),
+                (TOKEN_AND_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
@@ -1191,7 +1193,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "1"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_AND, "&&"),
+                (TOKEN_AND_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),

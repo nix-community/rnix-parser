@@ -14,6 +14,7 @@ pub enum SyntaxKind {
     TOKEN_IN,
     TOKEN_INHERIT,
     TOKEN_LET,
+    TOKEN_OR,
     TOKEN_REC,
     TOKEN_THEN,
     TOKEN_WITH,
@@ -44,7 +45,7 @@ pub enum SyntaxKind {
     TOKEN_MUL,
     TOKEN_DIV,
 
-    TOKEN_AND,
+    TOKEN_AND_AND,
     TOKEN_EQUAL,
     TOKEN_IMPLICATION,
     TOKEN_LESS,
@@ -52,7 +53,7 @@ pub enum SyntaxKind {
     TOKEN_MORE,
     TOKEN_MORE_OR_EQ,
     TOKEN_NOT_EQUAL,
-    TOKEN_OR,
+    TOKEN_OR_OR,
 
     // Identifiers and values
     TOKEN_DYNAMIC_END,
