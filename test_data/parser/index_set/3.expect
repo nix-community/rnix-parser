@@ -24,11 +24,11 @@ NODE_ROOT 0..33 {
       }
       TOKEN_DOT(".") 28..29
       NODE_DYNAMIC 29..33 {
-        TOKEN_DYNAMIC_START("${") 29..31
+        TOKEN_INTERPOL_START("${") 29..31
         NODE_IDENT 31..32 {
           TOKEN_IDENT("a") 31..32
         }
-        TOKEN_DYNAMIC_END("}") 32..33
+        TOKEN_INTERPOL_END("}") 32..33
       }
     }
   }

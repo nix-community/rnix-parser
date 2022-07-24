@@ -29,11 +29,11 @@ NODE_ROOT 0..216 {
             NODE_ATTRPATH_VALUE 28..42 {
               NODE_ATTRPATH 28..35 {
                 NODE_DYNAMIC 28..35 {
-                  TOKEN_DYNAMIC_START("${") 28..30
+                  TOKEN_INTERPOL_START("${") 28..30
                   NODE_IDENT 30..34 {
                     TOKEN_IDENT("name") 30..34
                   }
-                  TOKEN_DYNAMIC_END("}") 34..35
+                  TOKEN_INTERPOL_END("}") 34..35
                 }
               }
               TOKEN_WHITESPACE(" ") 35..36
@@ -208,11 +208,11 @@ NODE_ROOT 0..216 {
             TOKEN_WHITESPACE(" ") 196..197
             NODE_ATTRPATH 197..211 {
               NODE_DYNAMIC 197..211 {
-                TOKEN_DYNAMIC_START("${") 197..199
+                TOKEN_INTERPOL_START("${") 197..199
                 NODE_IDENT 199..210 {
                   TOKEN_IDENT("dynamic_key") 199..210
                 }
-                TOKEN_DYNAMIC_END("}") 210..211
+                TOKEN_INTERPOL_END("}") 210..211
               }
             }
           }

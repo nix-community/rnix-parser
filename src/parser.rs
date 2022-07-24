@@ -235,7 +235,7 @@ where
     fn parse_dynamic(&mut self) {
         self.start_node(NODE_DYNAMIC);
         self.bump();
-        while self.peek().map(|t| t != TOKEN_DYNAMIC_END).unwrap_or(false) {
+        while self.peek().map(|t| t != TOKEN_INTERPOL_END).unwrap_or(false) {
             self.parse_expr();
         }
         self.bump();
@@ -269,7 +269,7 @@ where
     }
     fn parse_attr(&mut self) {
         match self.peek() {
-            Some(TOKEN_DYNAMIC_START) => self.parse_dynamic(),
+            Some(TOKEN_INTERPOL_START) => self.parse_dynamic(),
             Some(TOKEN_STRING_START) => self.parse_string(),
             _ => self.expect_ident(),
         }

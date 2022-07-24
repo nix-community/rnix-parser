@@ -317,13 +317,7 @@ impl<'a> Tokenizer<'a> {
                         Some(new) => *extra_brackets = new,
                         None => {
                             self.pop_ctx(Context::Interpol { brackets: 0 });
-                            return {
-                                Some(match self.ctx.last().copied() {
-                                    Some(Context::StringBody { .. }) => TOKEN_INTERPOL_END,
-                                    Some(Context::Path) => TOKEN_INTERPOL_END,
-                                    _ => TOKEN_DYNAMIC_END,
-                                })
-                            };
+                            return Some(TOKEN_INTERPOL_END);
                         }
                     }
                 }
@@ -392,7 +386,7 @@ impl<'a> Tokenizer<'a> {
             '$' if self.peek() == Some('{') => {
                 self.next().unwrap();
                 self.push_ctx(Context::Interpol { brackets: 0 });
-                TOKEN_DYNAMIC_START
+                TOKEN_INTERPOL_START
             }
             'a'..='z' | 'A'..='Z' | '_' => {
                 let kind = match kind {
@@ -1245,9 +1239,9 @@ mod tests {
             tokens![
                 (TOKEN_IDENT, "a"),
                 (TOKEN_DOT, "."),
-                (TOKEN_DYNAMIC_START, "${"),
+                (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "b"),
-                (TOKEN_DYNAMIC_END, "}"),
+                (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_DOT, "."),
                 (TOKEN_IDENT, "c"),
             ]
@@ -1257,7 +1251,7 @@ mod tests {
             tokens![
                 (TOKEN_IDENT, "a"),
                 (TOKEN_DOT, "."),
-                (TOKEN_DYNAMIC_START, "${"),
+                (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_CURLY_B_OPEN, "{"),
                 (TOKEN_WHITESPACE, " "),
@@ -1276,7 +1270,7 @@ mod tests {
                 (TOKEN_DOT, "."),
                 (TOKEN_IDENT, "b"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_DYNAMIC_END, "}"),
+                (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_DOT, "."),
                 (TOKEN_IDENT, "c"),
             ]

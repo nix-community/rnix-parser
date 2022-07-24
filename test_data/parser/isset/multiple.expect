@@ -19,13 +19,13 @@ NODE_ROOT 0..15 {
     TOKEN_WHITESPACE(" ") 8..9
     NODE_ATTRPATH 9..15 {
       NODE_DYNAMIC 9..15 {
-        TOKEN_DYNAMIC_START("${") 9..11
+        TOKEN_INTERPOL_START("${") 9..11
         NODE_STRING 11..14 {
           TOKEN_STRING_START("\"") 11..12
           TOKEN_STRING_CONTENT("a") 12..13
           TOKEN_STRING_END("\"") 13..14
         }
-        TOKEN_DYNAMIC_END("}") 14..15
+        TOKEN_INTERPOL_END("}") 14..15
       }
     }
   }
