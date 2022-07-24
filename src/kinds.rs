@@ -14,6 +14,7 @@ pub enum SyntaxKind {
     TOKEN_IN,
     TOKEN_INHERIT,
     TOKEN_LET,
+    TOKEN_OR,
     TOKEN_REC,
     TOKEN_THEN,
     TOKEN_WITH,

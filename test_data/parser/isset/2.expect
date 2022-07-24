@@ -15,7 +15,7 @@ NODE_ROOT 0..14 {
         }
       }
       TOKEN_WHITESPACE(" ") 5..6
-      TOKEN_IDENT("or") 6..8
+      TOKEN_OR("or") 6..8
       TOKEN_WHITESPACE(" ") 8..9
       NODE_LITERAL 9..10 {
         TOKEN_INTEGER("1") 9..10

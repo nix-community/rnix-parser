@@ -14,8 +14,6 @@ use crate::{
     TokenSet,
 };
 
-const OR: &str = "or";
-
 /// An error that occurred during parsing
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
@@ -581,10 +579,25 @@ where
             self.start_node_at(checkpoint, NODE_SELECT);
             self.bump();
             self.parse_attrpath();
-            if self.peek_data().map(|&(t, s)| t == TOKEN_IDENT && s == OR).unwrap_or(false) {
+            if self.peek() == Some(TOKEN_OR) {
                 self.bump();
                 self.parse_val();
             }
+            self.finish_node();
+
+        // This seems weird, but it matches Nix's behavior.
+        // If there is no "." but a "or" immediately followed a primary expression,
+        // we construct a application node, with "or" parsed as an identifier,
+        // ignoring the associativity of ancestor applications.
+        // Eg.
+        // "a b or c" => "((a (b or)) c)"
+        // "or a" => fail
+        } else if self.peek() == Some(TOKEN_OR) {
+            self.start_node_at(checkpoint, NODE_APPLY);
+            self.start_node(NODE_IDENT);
+            let (_, s) = self.try_next().unwrap();
+            self.manual_bump(s, TOKEN_IDENT);
+            self.finish_node();
             self.finish_node();
         }
 

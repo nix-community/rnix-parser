@@ -432,6 +432,8 @@ impl<'a> Tokenizer<'a> {
                         "in" => TOKEN_IN,
                         "inherit" => TOKEN_INHERIT,
                         "let" => TOKEN_LET,
+                        // "or" is a contextual keyword and will be handled in the parser.
+                        "or" => TOKEN_OR,
                         "rec" => TOKEN_REC,
                         "then" => TOKEN_THEN,
                         "with" => TOKEN_WITH,
