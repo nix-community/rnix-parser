@@ -21,24 +21,13 @@ fn is_valid_uri_char(c: char) -> bool {
     }
 }
 
-#[derive(Clone, Copy)]
-struct Interpol {
-    brackets: u32,
-    string: bool,
-    multiline: bool,
-    path_interpol: bool,
-}
-#[derive(Clone, Copy)]
-enum Todo {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Context {
     StringBody { multiline: bool },
     StringEnd,
+    Interpol { brackets: u32 },
     InterpolStart,
     Path,
-}
-#[derive(Clone, Copy, Default)]
-struct Context {
-    interpol: Option<Interpol>,
-    todo: Option<Todo>,
 }
 
 #[derive(Clone, Copy)]
@@ -46,11 +35,13 @@ struct State<'a> {
     input: &'a str,
     offset: usize,
 }
+
 impl PartialEq for State<'_> {
     fn eq(&self, other: &Self) -> bool {
         std::ptr::eq(self.input, other.input) && self.offset == other.offset
     }
 }
+
 impl Eq for State<'_> {}
 
 pub type Token<'a> = (SyntaxKind, &'a str);
@@ -68,7 +59,7 @@ pub struct Tokenizer<'a> {
 impl<'a> Tokenizer<'a> {
     /// Create a new instance
     pub fn new(input: &'a str) -> Self {
-        Self { ctx: vec![Context::default()], state: State { input, offset: 0 } }
+        Self { ctx: Vec::new(), state: State { input, offset: 0 } }
     }
 
     fn remaining(&self) -> &str {
@@ -95,6 +86,15 @@ impl<'a> Tokenizer<'a> {
         &past.input[past.offset..self.state.offset]
     }
 
+    fn push_ctx(&mut self, ctx: Context) {
+        self.ctx.push(ctx)
+    }
+
+    fn pop_ctx(&mut self, ctx: Context) {
+        debug_assert_eq!(self.ctx.last(), Some(&ctx));
+        self.ctx.pop();
+    }
+
     fn consume<F>(&mut self, mut f: F) -> usize
     where
         F: FnMut(char) -> bool,
@@ -111,6 +111,8 @@ impl<'a> Tokenizer<'a> {
                 None => return TOKEN_ERROR,
                 Some('"') if !multiline => {
                     self.state = start;
+                    self.pop_ctx(Context::StringBody { multiline: false });
+                    self.push_ctx(Context::StringEnd);
                     return TOKEN_STRING_CONTENT;
                 }
                 Some('\\') if !multiline => match self.next() {
@@ -133,6 +135,8 @@ impl<'a> Tokenizer<'a> {
                         }
                         _ => {
                             self.state = start;
+                            self.pop_ctx(Context::StringBody { multiline: true });
+                            self.push_ctx(Context::StringEnd);
                             return TOKEN_STRING_CONTENT;
                         }
                     },
@@ -145,15 +149,7 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('{') => {
                         self.state = start;
-                        self.ctx.push(Context {
-                            interpol: Some(Interpol {
-                                brackets: 0,
-                                string: true,
-                                multiline,
-                                path_interpol: false,
-                            }),
-                            todo: Some(Todo::InterpolStart),
-                        });
+                        self.push_ctx(Context::InterpolStart);
                         return TOKEN_STRING_CONTENT;
                     }
                     _ => (),
@@ -166,9 +162,11 @@ impl<'a> Tokenizer<'a> {
     fn check_path_since(&mut self, past: State) -> SyntaxKind {
         self.consume(is_valid_path_char);
         if self.remaining().starts_with("${") {
-            self.ctx.last_mut().unwrap().todo = Some(Todo::Path);
+            self.ctx.push(Context::InterpolStart);
         } else if self.str_since(past).ends_with('/') {
             return TOKEN_ERROR;
+        } else {
+            self.pop_ctx(Context::Path);
         }
         TOKEN_PATH
     }
@@ -178,38 +176,36 @@ impl<'a> Tokenizer<'a> {
 
         // Handle already started multi-token
         loop {
-            let todo = &mut self.ctx.last_mut().unwrap().todo;
-            match todo.take() {
-                Some(Todo::InterpolStart) => {
+            match self.ctx.last() {
+                Some(Context::InterpolStart) => {
+                    self.pop_ctx(Context::InterpolStart);
+                    self.ctx.push(Context::Interpol { brackets: 0 });
                     if self.starts_with_bump("${") {
                         return Some(TOKEN_INTERPOL_START);
+                    } else {
+                        unreachable!()
                     }
                 }
-                Some(Todo::Path) => {
+                Some(Context::Path) => {
                     if self.starts_with_bump("${") {
-                        self.ctx.push(Context {
-                            interpol: Some(Interpol {
-                                brackets: 0,
-                                string: false,
-                                multiline: false,
-                                path_interpol: true,
-                            }),
-                            todo: None,
-                        });
+                        self.ctx.push(Context::Interpol { brackets: 0 });
                         return Some(TOKEN_INTERPOL_START);
                     } else if self.peek().map_or(false, is_valid_path_char) {
                         return Some(self.check_path_since(start));
+                    } else {
+                        self.pop_ctx(Context::Path);
                     }
                 }
-                Some(Todo::StringBody { multiline }) => {
-                    *todo = Some(Todo::StringEnd);
-                    let token = self.next_string(multiline);
+                Some(Context::StringBody { multiline }) => {
+                    let token = self.next_string(*multiline);
+                    // skip empty stuff
                     if self.state == start {
                         continue;
                     }
                     return Some(token);
                 }
-                Some(Todo::StringEnd) => {
+                Some(Context::StringEnd) => {
+                    self.pop_ctx(Context::StringEnd);
                     let status = match self.peek() {
                         Some('"') => {
                             self.next().unwrap();
@@ -294,6 +290,7 @@ impl<'a> Tokenizer<'a> {
             return Some(if c == '~' && self.next() != Some('/') {
                 TOKEN_ERROR
             } else {
+                self.push_ctx(Context::Path);
                 self.check_path_since(start)
             });
         }
@@ -309,32 +306,24 @@ impl<'a> Tokenizer<'a> {
             }
             '!' => TOKEN_INVERT,
             '{' => {
-                if let Some(Interpol { ref mut brackets, .. }) =
-                    self.ctx.last_mut().unwrap().interpol
-                {
-                    *brackets += 1;
+                if let Some(Context::Interpol { brackets: extra_brackets }) = self.ctx.last_mut() {
+                    *extra_brackets += 1;
                 }
                 TOKEN_CURLY_B_OPEN
             }
             '}' => {
-                if let Some(Interpol { ref mut brackets, string, multiline, path_interpol }) =
-                    self.ctx.last_mut().unwrap().interpol
-                {
-                    match brackets.checked_sub(1) {
-                        Some(new) => *brackets = new,
+                if let Some(Context::Interpol { brackets: extra_brackets }) = self.ctx.last_mut() {
+                    match extra_brackets.checked_sub(1) {
+                        Some(new) => *extra_brackets = new,
                         None => {
-                            self.ctx.pop().unwrap();
-
-                            return Some(if string {
-                                self.ctx.last_mut().unwrap().todo =
-                                    Some(Todo::StringBody { multiline });
-                                TOKEN_INTERPOL_END
-                            } else if path_interpol {
-                                self.ctx.last_mut().unwrap().todo = Some(Todo::Path);
-                                TOKEN_INTERPOL_END
-                            } else {
-                                TOKEN_DYNAMIC_END
-                            });
+                            self.pop_ctx(Context::Interpol { brackets: 0 });
+                            return {
+                                Some(match self.ctx.last().copied() {
+                                    Some(Context::StringBody { .. }) => TOKEN_INTERPOL_END,
+                                    Some(Context::Path) => TOKEN_INTERPOL_END,
+                                    _ => TOKEN_DYNAMIC_END,
+                                })
+                            };
                         }
                     }
                 }
@@ -402,15 +391,7 @@ impl<'a> Tokenizer<'a> {
             '>' => TOKEN_MORE,
             '$' if self.peek() == Some('{') => {
                 self.next().unwrap();
-                self.ctx.push(Context {
-                    interpol: Some(Interpol {
-                        brackets: 0,
-                        string: false,
-                        multiline: false,
-                        path_interpol: false,
-                    }),
-                    ..Default::default()
-                });
+                self.push_ctx(Context::Interpol { brackets: 0 });
                 TOKEN_DYNAMIC_START
             }
             'a'..='z' | 'A'..='Z' | '_' => {
@@ -445,12 +426,12 @@ impl<'a> Tokenizer<'a> {
                 }
             }
             '"' => {
-                self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: false });
+                self.push_ctx(Context::StringBody { multiline: false });
                 TOKEN_STRING_START
             }
             '\'' if self.peek() == Some('\'') => {
                 self.next().unwrap();
-                self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: true });
+                self.push_ctx(Context::StringBody { multiline: true });
                 TOKEN_STRING_START
             }
             '0'..='9' => {
