@@ -18,6 +18,9 @@ use crate::{
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum ParseError {
+    /// Expected is used when a token was expected but not found. Unlike UnexpectedWanted,
+    /// we continue to parse as if this token was found.
+    Expected(TextSize, Box<[SyntaxKind]>),
     /// Unexpected is used when the cause cannot be specified further
     Unexpected(TextRange),
     /// UnexpectedExtra is used when there are additional tokens to the root in the tree
@@ -37,6 +40,12 @@ pub enum ParseError {
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ParseError::Expected(location, kinds) => write!(
+                f,
+                "wanted any of {:?} at {}",
+                kinds,
+                usize::from(*location),
+            ),
             ParseError::Unexpected(range) => {
                 write!(
                     f,
@@ -189,6 +198,41 @@ where
     fn peek(&mut self) -> Option<SyntaxKind> {
         self.peek_data().map(|&(t, _)| t)
     }
+
+    /// If the next token is in `allowed_slice`, expect_peek_any returns it.
+    /// Otherwise, it appends `self.errors` without consuming any tokens.
+    ///
+    /// This is generally preferred over expect_peek_any, but the callee must
+    /// ensure that an infinite loop won't be caused by this method not bumping.
+    fn peek_any_or_missing(&mut self, allowed_slice: &[SyntaxKind]) -> Option<SyntaxKind> {
+        let allowed = TokenSet::from_slice(allowed_slice);
+
+        match self.peek() {
+            Some(kind) if allowed.contains(kind) => Some(kind),
+            Some(_) => {
+                self.errors.push(ParseError::Expected(
+                    self.get_text_position(),
+                    allowed_slice.to_vec().into_boxed_slice(),
+                ));
+
+                None
+            }
+            None => {
+                self.errors
+                .push(ParseError::UnexpectedEOFWanted(allowed_slice.to_vec().into_boxed_slice()));
+
+                None
+            },
+        }
+    }
+
+    /// If the next token is in `allowed_slice`, expect_peek_any returns it.
+    /// Otherwise, it appends self.errors and creates a NODE_ERROR containing all tokens
+    /// until a token in `allowed_slice` is found.
+    ///
+    /// This is not always wanted. For example, in `{ foo = 1 } // { bar = 2; }`, it would
+    /// be better to recognize the semicolon as missing then move on, rather than bumping
+    /// all the way to the semicolon after `bar`. 
     fn expect_peek_any(&mut self, allowed_slice: &[SyntaxKind]) -> Option<SyntaxKind> {
         let allowed = TokenSet::from_slice(allowed_slice);
 
@@ -224,6 +268,17 @@ where
             self.bump();
         }
     }
+
+    // Expect a token or silently ignore if missing. This only bumps if the token is found,
+    // so watch out for infinite loops. This returns whether the token was found.
+    fn expect_or_missing(&mut self, expected: SyntaxKind) -> bool {
+        let found = self.peek_any_or_missing(&[expected]).is_some();
+        if found {
+            self.bump();
+        }
+        found
+    }
+
     fn expect_ident(&mut self) {
         if self.expect_peek_any(&[TOKEN_IDENT]).is_some() {
             self.start_node(NODE_IDENT);
@@ -277,7 +332,14 @@ where
     fn parse_attrpath(&mut self) {
         self.start_node(NODE_ATTRPATH);
         loop {
-            self.parse_attr();
+            match self.peek_any_or_missing(&[TOKEN_INTERPOL_START, TOKEN_STRING_START, TOKEN_IDENT]) {
+                Some(TOKEN_INTERPOL_START) => self.parse_dynamic(),
+                Some(TOKEN_STRING_START) => self.parse_string(),
+                Some(TOKEN_IDENT) => self.expect_ident(),
+                _ => {
+                    break
+                }
+            }
 
             if self.peek() == Some(TOKEN_DOT) {
                 self.bump();
@@ -399,7 +461,7 @@ where
                     self.parse_attrpath();
                     self.expect(TOKEN_ASSIGN);
                     self.parse_expr();
-                    self.expect(TOKEN_SEMICOLON);
+                    self.expect_or_missing(TOKEN_SEMICOLON);
                     self.finish_node();
                 }
             }

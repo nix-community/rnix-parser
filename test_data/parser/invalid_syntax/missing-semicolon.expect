@@ -1,0 +1,64 @@
+error: wanted any of [TOKEN_SEMICOLON] at 13
+error: wanted any of [TOKEN_INTERPOL_START, TOKEN_STRING_START, TOKEN_IDENT] at 14
+error: wanted any of [TOKEN_SEMICOLON] at 17
+NODE_ROOT 0..34 {
+  NODE_BIN_OP 0..34 {
+    NODE_ATTR_SET 0..18 {
+      TOKEN_CURLY_B_OPEN("{") 0..1
+      TOKEN_WHITESPACE(" ") 1..2
+      NODE_ATTRPATH_VALUE 2..13 {
+        NODE_ATTRPATH 2..5 {
+          NODE_IDENT 2..5 {
+            TOKEN_IDENT("foo") 2..5
+          }
+        }
+        TOKEN_WHITESPACE(" ") 5..6
+        TOKEN_ASSIGN("=") 6..7
+        TOKEN_WHITESPACE(" ") 7..8
+        NODE_APPLY 8..13 {
+          NODE_LITERAL 8..9 {
+            TOKEN_INTEGER("1") 8..9
+          }
+          TOKEN_WHITESPACE(" ") 9..10
+          NODE_IDENT 10..13 {
+            TOKEN_IDENT("bar") 10..13
+          }
+        }
+      }
+      TOKEN_WHITESPACE(" ") 13..14
+      NODE_ATTRPATH_VALUE 14..17 {
+        NODE_ATTRPATH 14..14 {
+        }
+        TOKEN_ASSIGN("=") 14..15
+        TOKEN_WHITESPACE(" ") 15..16
+        NODE_LITERAL 16..17 {
+          TOKEN_INTEGER("2") 16..17
+        }
+      }
+      TOKEN_CURLY_B_CLOSE("}") 17..18
+    }
+    TOKEN_WHITESPACE(" ") 18..19
+    TOKEN_UPDATE("//") 19..21
+    TOKEN_WHITESPACE(" ") 21..22
+    NODE_ATTR_SET 22..34 {
+      TOKEN_CURLY_B_OPEN("{") 22..23
+      TOKEN_WHITESPACE(" ") 23..24
+      NODE_ATTRPATH_VALUE 24..32 {
+        NODE_ATTRPATH 24..27 {
+          NODE_IDENT 24..27 {
+            TOKEN_IDENT("xyz") 24..27
+          }
+        }
+        TOKEN_WHITESPACE(" ") 27..28
+        TOKEN_ASSIGN("=") 28..29
+        TOKEN_WHITESPACE(" ") 29..30
+        NODE_LITERAL 30..31 {
+          TOKEN_INTEGER("3") 30..31
+        }
+        TOKEN_SEMICOLON(";") 31..32
+      }
+      TOKEN_WHITESPACE(" ") 32..33
+      TOKEN_CURLY_B_CLOSE("}") 33..34
+    }
+  }
+}
