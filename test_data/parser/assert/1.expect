@@ -1,21 +1,16 @@
-NODE_ROOT 0..18 {
-  NODE_ASSERT 0..18 {
-    TOKEN_ASSERT("assert") 0..6
-    TOKEN_WHITESPACE(" ") 6..7
-    NODE_BIN_OP 7..11 {
-      NODE_IDENT 7..8 {
-        TOKEN_IDENT("a") 7..8
-      }
-      TOKEN_EQUAL("==") 8..10
-      NODE_IDENT 10..11 {
-        TOKEN_IDENT("b") 10..11
-      }
-    }
-    TOKEN_SEMICOLON(";") 11..12
-    NODE_STRING 12..18 {
-      TOKEN_STRING_START("\"") 12..13
-      TOKEN_STRING_CONTENT("a==b") 13..17
-      TOKEN_STRING_END("\"") 17..18
-    }
-  }
-}
+NODE_ROOT@0..18
+  NODE_ASSERT@0..18
+    TOKEN_ASSERT@0..6 "assert"
+    TOKEN_WHITESPACE@6..7 " "
+    NODE_BIN_OP@7..11
+      NODE_IDENT@7..8
+        TOKEN_IDENT@7..8 "a"
+      TOKEN_EQUAL@8..10 "=="
+      NODE_IDENT@10..11
+        TOKEN_IDENT@10..11 "b"
+    TOKEN_SEMICOLON@11..12 ";"
+    NODE_STRING@12..18
+      TOKEN_STRING_START@12..13 "\""
+      TOKEN_STRING_CONTENT@13..17 "a==b"
+      TOKEN_STRING_END@17..18 "\""
+

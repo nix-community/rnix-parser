@@ -1,33 +1,23 @@
-NODE_ROOT 0..33 {
-  NODE_BIN_OP 0..33 {
-    NODE_IDENT 0..5 {
-      TOKEN_IDENT("false") 0..5
-    }
-    TOKEN_WHITESPACE(" ") 5..6
-    TOKEN_IMPLICATION("->") 6..8
-    NODE_BIN_OP 8..33 {
-      NODE_BIN_OP 8..27 {
-        NODE_UNARY_OP 8..14 {
-          TOKEN_INVERT("!") 8..9
-          NODE_IDENT 9..14 {
-            TOKEN_IDENT("false") 9..14
-          }
-        }
-        TOKEN_AND_AND("&&") 14..16
-        NODE_BIN_OP 16..27 {
-          NODE_IDENT 16..21 {
-            TOKEN_IDENT("false") 16..21
-          }
-          TOKEN_EQUAL("==") 21..23
-          NODE_IDENT 23..27 {
-            TOKEN_IDENT("true") 23..27
-          }
-        }
-      }
-      TOKEN_OR_OR("||") 27..29
-      NODE_IDENT 29..33 {
-        TOKEN_IDENT("true") 29..33
-      }
-    }
-  }
-}
+NODE_ROOT@0..33
+  NODE_BIN_OP@0..33
+    NODE_IDENT@0..5
+      TOKEN_IDENT@0..5 "false"
+    TOKEN_WHITESPACE@5..6 " "
+    TOKEN_IMPLICATION@6..8 "->"
+    NODE_BIN_OP@8..33
+      NODE_BIN_OP@8..27
+        NODE_UNARY_OP@8..14
+          TOKEN_INVERT@8..9 "!"
+          NODE_IDENT@9..14
+            TOKEN_IDENT@9..14 "false"
+        TOKEN_AND_AND@14..16 "&&"
+        NODE_BIN_OP@16..27
+          NODE_IDENT@16..21
+            TOKEN_IDENT@16..21 "false"
+          TOKEN_EQUAL@21..23 "=="
+          NODE_IDENT@23..27
+            TOKEN_IDENT@23..27 "true"
+      TOKEN_OR_OR@27..29 "||"
+      NODE_IDENT@29..33
+        TOKEN_IDENT@29..33 "true"
+

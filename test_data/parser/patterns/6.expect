@@ -1,22 +1,16 @@
-NODE_ROOT 0..8 {
-  NODE_LAMBDA 0..8 {
-    NODE_PATTERN 0..6 {
-      TOKEN_CURLY_B_OPEN("{") 0..1
-      NODE_PAT_ENTRY 1..5 {
-        NODE_IDENT 1..2 {
-          TOKEN_IDENT("a") 1..2
-        }
-        TOKEN_QUESTION("?") 2..3
-        NODE_ATTR_SET 3..5 {
-          TOKEN_CURLY_B_OPEN("{") 3..4
-          TOKEN_CURLY_B_CLOSE("}") 4..5
-        }
-      }
-      TOKEN_CURLY_B_CLOSE("}") 5..6
-    }
-    TOKEN_COLON(":") 6..7
-    NODE_IDENT 7..8 {
-      TOKEN_IDENT("a") 7..8
-    }
-  }
-}
+NODE_ROOT@0..8
+  NODE_LAMBDA@0..8
+    NODE_PATTERN@0..6
+      TOKEN_CURLY_B_OPEN@0..1 "{"
+      NODE_PAT_ENTRY@1..5
+        NODE_IDENT@1..2
+          TOKEN_IDENT@1..2 "a"
+        TOKEN_QUESTION@2..3 "?"
+        NODE_ATTR_SET@3..5
+          TOKEN_CURLY_B_OPEN@3..4 "{"
+          TOKEN_CURLY_B_CLOSE@4..5 "}"
+      TOKEN_CURLY_B_CLOSE@5..6 "}"
+    TOKEN_COLON@6..7 ":"
+    NODE_IDENT@7..8
+      TOKEN_IDENT@7..8 "a"
+
