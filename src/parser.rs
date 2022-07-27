@@ -796,58 +796,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use rowan::{NodeOrToken, WalkEvent};
-
-    use crate::{Root, SyntaxNode};
+    use crate::Root;
 
     use super::*;
 
     use std::{env, ffi::OsStr, fmt::Write, fs, io::Write as IoWrite, path::PathBuf};
 
-    /// A struct that prints out the textual representation of a node in a
-    /// stable format. See TypedNode::dump.
-    pub struct TextDump(SyntaxNode);
-
-    impl fmt::Display for TextDump {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            let mut indent = 0;
-            let mut skip_newline = true;
-            for event in self.0.preorder_with_tokens() {
-                if skip_newline {
-                    skip_newline = false;
-                } else {
-                    writeln!(f)?;
-                }
-                match &event {
-                    WalkEvent::Enter(enter) => {
-                        write!(f, "{:i$}{:?}", "", enter.kind(), i = indent)?;
-                        if let NodeOrToken::Token(token) = enter {
-                            write!(f, "(\"{}\")", token.text().escape_default())?
-                        }
-                        write!(
-                            f,
-                            " {}..{}",
-                            usize::from(enter.text_range().start()),
-                            usize::from(enter.text_range().end())
-                        )?;
-                        if let NodeOrToken::Node(_) = enter {
-                            write!(f, " {{")?;
-                        }
-                        indent += 2;
-                    }
-                    WalkEvent::Leave(leave) => {
-                        indent -= 2;
-                        if let NodeOrToken::Node(_) = leave {
-                            write!(f, "{:i$}}}", "", i = indent)?;
-                        } else {
-                            skip_newline = true;
-                        }
-                    }
-                }
-            }
-            Ok(())
-        }
-    }
     //     #[test]
     //     fn whitespace_attachment_for_incomplete_code1() {
     //         let code = "{
@@ -941,7 +895,7 @@ mod tests {
             for error in parse.errors() {
                 writeln!(actual, "error: {}", error).unwrap();
             }
-            writeln!(actual, "{}", TextDump(parse.syntax())).unwrap();
+            writeln!(actual, "{:#?}", parse.syntax()).unwrap();
             if should_update {
                 let mut file =
                     fs::OpenOptions::new().write(true).truncate(true).open(&path).unwrap();
@@ -965,6 +919,7 @@ mod tests {
     #[rustfmt::skip]
     mod dir_tests {
         use super::test_dir;
+
         #[test]
         fn general() {
             test_dir("general");
