@@ -13,7 +13,7 @@ NODE_ROOT 0..33 {
             TOKEN_IDENT("false") 9..14
           }
         }
-        TOKEN_AND("&&") 14..16
+        TOKEN_AND_AND("&&") 14..16
         NODE_BIN_OP 16..27 {
           NODE_IDENT 16..21 {
             TOKEN_IDENT("false") 16..21
@@ -24,7 +24,7 @@ NODE_ROOT 0..33 {
           }
         }
       }
-      TOKEN_OR("||") 27..29
+      TOKEN_OR_OR("||") 27..29
       NODE_IDENT 29..33 {
         TOKEN_IDENT("true") 29..33
       }

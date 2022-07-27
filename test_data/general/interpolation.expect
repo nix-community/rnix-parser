@@ -2,8 +2,8 @@ NODE_ROOT 0..270 {
   NODE_LET_IN 0..270 {
     TOKEN_LET("let") 0..3
     TOKEN_WHITESPACE("\n  ") 3..6
-    NODE_KEY_VALUE 6..22 {
-      NODE_KEY 6..11 {
+    NODE_ATTRPATH_VALUE 6..22 {
+      NODE_ATTRPATH 6..11 {
         NODE_IDENT 6..11 {
           TOKEN_IDENT("world") 6..11
         }
@@ -24,8 +24,8 @@ NODE_ROOT 0..270 {
     NODE_ATTR_SET 26..270 {
       TOKEN_CURLY_B_OPEN("{") 26..27
       TOKEN_WHITESPACE("\n  ") 27..30
-      NODE_KEY_VALUE 30..57 {
-        NODE_KEY 30..36 {
+      NODE_ATTRPATH_VALUE 30..57 {
+        NODE_ATTRPATH 30..36 {
           NODE_IDENT 30..36 {
             TOKEN_IDENT("string") 30..36
           }
@@ -49,8 +49,8 @@ NODE_ROOT 0..270 {
         TOKEN_SEMICOLON(";") 56..57
       }
       TOKEN_WHITESPACE("\n  ") 57..60
-      NODE_KEY_VALUE 60..268 {
-        NODE_KEY 60..69 {
+      NODE_ATTRPATH_VALUE 60..268 {
+        NODE_ATTRPATH 60..69 {
           NODE_IDENT 60..69 {
             TOKEN_IDENT("multiline") 60..69
           }
@@ -68,8 +68,8 @@ NODE_ROOT 0..270 {
               NODE_ATTR_SET 110..153 {
                 TOKEN_CURLY_B_OPEN("{") 110..111
                 TOKEN_WHITESPACE("\n        ") 111..120
-                NODE_KEY_VALUE 120..128 {
-                  NODE_KEY 120..121 {
+                NODE_ATTRPATH_VALUE 120..128 {
+                  NODE_ATTRPATH 120..121 {
                     NODE_IDENT 120..121 {
                       TOKEN_IDENT("x") 120..121
                     }
@@ -85,8 +85,8 @@ NODE_ROOT 0..270 {
                   TOKEN_SEMICOLON(";") 127..128
                 }
                 TOKEN_WHITESPACE("\n        ") 128..137
-                NODE_KEY_VALUE 137..145 {
-                  NODE_KEY 137..138 {
+                NODE_ATTRPATH_VALUE 137..145 {
+                  NODE_ATTRPATH 137..138 {
                     NODE_IDENT 137..138 {
                       TOKEN_IDENT("y") 137..138
                     }
@@ -105,8 +105,10 @@ NODE_ROOT 0..270 {
                 TOKEN_CURLY_B_CLOSE("}") 152..153
               }
               TOKEN_DOT(".") 153..154
-              NODE_IDENT 154..155 {
-                TOKEN_IDENT("x") 154..155
+              NODE_ATTRPATH 154..155 {
+                NODE_IDENT 154..155 {
+                  TOKEN_IDENT("x") 154..155
+                }
               }
             }
             TOKEN_WHITESPACE("\n    ") 155..160
