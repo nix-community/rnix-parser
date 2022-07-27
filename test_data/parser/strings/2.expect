@@ -1,22 +1,17 @@
-NODE_ROOT 0..99 {
-  NODE_ATTR_SET 0..99 {
-    TOKEN_CURLY_B_OPEN("{") 0..1
-    TOKEN_WHITESPACE("\n  ") 1..4
-    NODE_ATTRPATH_VALUE 4..97 {
-      NODE_ATTRPATH 4..24 {
-        NODE_IDENT 4..24 {
-          TOKEN_IDENT("more_complicated_url") 4..24
-        }
-      }
-      TOKEN_WHITESPACE(" ") 24..25
-      TOKEN_ASSIGN("=") 25..26
-      TOKEN_WHITESPACE("\n    ") 26..31
-      NODE_LITERAL 31..96 {
-        TOKEN_URI("http://c758482.r82.cf2.rackcdn.com/Sublime%20Text%202.0.2.tar.bz2") 31..96
-      }
-      TOKEN_SEMICOLON(";") 96..97
-    }
-    TOKEN_WHITESPACE("\n") 97..98
-    TOKEN_CURLY_B_CLOSE("}") 98..99
-  }
-}
+NODE_ROOT@0..99
+  NODE_ATTR_SET@0..99
+    TOKEN_CURLY_B_OPEN@0..1 "{"
+    TOKEN_WHITESPACE@1..4 "\n  "
+    NODE_ATTRPATH_VALUE@4..97
+      NODE_ATTRPATH@4..24
+        NODE_IDENT@4..24
+          TOKEN_IDENT@4..24 "more_complicated_url"
+      TOKEN_WHITESPACE@24..25 " "
+      TOKEN_ASSIGN@25..26 "="
+      TOKEN_WHITESPACE@26..31 "\n    "
+      NODE_LITERAL@31..96
+        TOKEN_URI@31..96 "http://c758482.r82.cf ..."
+      TOKEN_SEMICOLON@96..97 ";"
+    TOKEN_WHITESPACE@97..98 "\n"
+    TOKEN_CURLY_B_CLOSE@98..99 "}"
+
