@@ -737,7 +737,7 @@ where
                 self.bump()
             }
             self.finish_error_node();
-            return self.checkpoint()
+            return self.checkpoint();
         }
         self.depth += 1;
         let out = match self.peek() {
