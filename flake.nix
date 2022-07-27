@@ -7,6 +7,8 @@
     import-cargo.url = "github:edolstra/import-cargo";
   };
 
+  # first comment
+  # second comment
   outputs = { self, nixpkgs, utils, import-cargo }:
     {
       overlay = final: prev: let

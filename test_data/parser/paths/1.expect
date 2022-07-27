@@ -2,8 +2,8 @@ NODE_ROOT 0..107 {
   NODE_ATTR_SET 0..107 {
     TOKEN_CURLY_B_OPEN("{") 0..1
     TOKEN_WHITESPACE("\n  ") 1..4
-    NODE_KEY_VALUE 4..21 {
-      NODE_KEY 4..7 {
+    NODE_ATTRPATH_VALUE 4..21 {
+      NODE_ATTRPATH 4..7 {
         NODE_IDENT 4..7 {
           TOKEN_IDENT("abs") 4..7
         }
@@ -17,8 +17,8 @@ NODE_ROOT 0..107 {
       TOKEN_SEMICOLON(";") 20..21
     }
     TOKEN_WHITESPACE("\n  ") 21..24
-    NODE_KEY_VALUE 24..50 {
-      NODE_KEY 24..28 {
+    NODE_ATTRPATH_VALUE 24..50 {
+      NODE_ATTRPATH 24..28 {
         NODE_IDENT 24..28 {
           TOKEN_IDENT("home") 24..28
         }
@@ -32,8 +32,8 @@ NODE_ROOT 0..107 {
       TOKEN_SEMICOLON(";") 49..50
     }
     TOKEN_WHITESPACE("\n  ") 50..53
-    NODE_KEY_VALUE 53..79 {
-      NODE_KEY 53..56 {
+    NODE_ATTRPATH_VALUE 53..79 {
+      NODE_ATTRPATH 53..56 {
         NODE_IDENT 53..56 {
           TOKEN_IDENT("rel") 53..56
         }
@@ -47,8 +47,8 @@ NODE_ROOT 0..107 {
       TOKEN_SEMICOLON(";") 78..79
     }
     TOKEN_WHITESPACE("\n  ") 79..82
-    NODE_KEY_VALUE 82..105 {
-      NODE_KEY 82..87 {
+    NODE_ATTRPATH_VALUE 82..105 {
+      NODE_ATTRPATH 82..87 {
         NODE_IDENT 82..87 {
           TOKEN_IDENT("store") 82..87
         }

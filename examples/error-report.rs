@@ -16,7 +16,7 @@ fn main() {
             return;
         }
     };
-    let ast = rnix::parse(&content);
+    let ast = rnix::Root::parse(&content);
     for error in ast.errors() {
         let range = match error {
             ParseError::Unexpected(range) => range,

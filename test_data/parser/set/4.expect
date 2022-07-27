@@ -2,8 +2,8 @@ NODE_ROOT 0..33 {
   NODE_ATTR_SET 0..33 {
     TOKEN_CURLY_B_OPEN("{") 0..1
     TOKEN_WHITESPACE("\n  ") 1..4
-    NODE_KEY_VALUE 4..12 {
-      NODE_KEY 4..7 {
+    NODE_ATTRPATH_VALUE 4..12 {
+      NODE_ATTRPATH 4..7 {
         NODE_IDENT 4..5 {
           TOKEN_IDENT("a") 4..5
         }
@@ -21,8 +21,8 @@ NODE_ROOT 0..33 {
       TOKEN_SEMICOLON(";") 11..12
     }
     TOKEN_WHITESPACE("\n  ") 12..15
-    NODE_KEY_VALUE 15..31 {
-      NODE_KEY 15..26 {
+    NODE_ATTRPATH_VALUE 15..31 {
+      NODE_ATTRPATH 15..26 {
         NODE_STRING 15..21 {
           TOKEN_STRING_START("\"") 15..16
           NODE_STRING_INTERPOL 16..20 {
@@ -36,11 +36,11 @@ NODE_ROOT 0..33 {
         }
         TOKEN_DOT(".") 21..22
         NODE_DYNAMIC 22..26 {
-          TOKEN_DYNAMIC_START("${") 22..24
+          TOKEN_INTERPOL_START("${") 22..24
           NODE_IDENT 24..25 {
             TOKEN_IDENT("d") 24..25
           }
-          TOKEN_DYNAMIC_END("}") 25..26
+          TOKEN_INTERPOL_END("}") 25..26
         }
       }
       TOKEN_WHITESPACE(" ") 26..27
