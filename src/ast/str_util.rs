@@ -85,7 +85,7 @@ pub fn unescape(input: &str, multiline: bool) -> String {
     loop {
         match input.next() {
             None => break,
-            Some('"') if multiline => break,
+            Some('"') if !multiline => break,
             Some('\\') if !multiline => match input.next() {
                 None => break,
                 Some('n') => output.push('\n'),
@@ -201,7 +201,10 @@ mod tests {
     #[test]
     fn string_unescapes() {
         assert_eq!(unescape(r#"Hello\n\"World\" :D"#, false), "Hello\n\"World\" :D");
+        assert_eq!(unescape(r#"\"Hello\""#, false), "\"Hello\"");
+
         assert_eq!(unescape(r#"Hello''\n'''World''' :D"#, true), "Hello\n''World'' :D");
+        assert_eq!(unescape(r#""Hello""#, true), "\"Hello\"");
     }
     #[test]
     fn string_remove_common_indent() {
