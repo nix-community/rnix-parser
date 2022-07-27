@@ -12,59 +12,137 @@ impl ast::Str {
             parent.syntax().children_with_tokens().filter_map(SyntaxElement::into_token)
         }
 
-        let mut parts = Vec::new();
-        let mut literals = 0;
-        let mut common = std::usize::MAX;
         let multiline = children_tokens(self).next().map_or(false, |t| t.text() == "''");
-        let mut last_was_ast = false;
+        let mut is_first_literal = true;
+        let mut at_start_of_line = true;
+        let mut min_indent = 1000000;
+        let mut cur_indent = 0;
+        let mut n = 0;
+        let mut first_is_literal = false;
 
-        for child in self.syntax().children_with_tokens() {
-            match &child {
-                NodeOrToken::Token(token) if token.kind() == TOKEN_STRING_CONTENT => {
-                    let text: &str = token.text();
-
-                    let line_count = text.lines().count();
-                    let next_is_ast = child
-                        .next_sibling_or_token()
-                        .map_or(false, |child| child.kind() == NODE_STRING_INTERPOL);
-                    for (i, line) in text.lines().enumerate().skip(if last_was_ast { 1 } else { 0 })
-                    {
-                        let indent: usize = indention(line).count();
-                        if (i != line_count - 1 || !next_is_ast) && indent == line.chars().count() {
-                            // line is empty and not the start of an
-                            // interpolation, ignore indention
-                            continue;
+        if multiline {
+            for child in self.syntax().children_with_tokens() {
+                match child {
+                    NodeOrToken::Node(_) => {
+                        if at_start_of_line {
+                            at_start_of_line = false;
+                            min_indent = min_indent.min(cur_indent);
                         }
-                        common = common.min(indent);
+                        n += 1;
                     }
-                    parts.push(StrPart::Literal(text.to_string()));
-                    literals += 1;
-                }
-                NodeOrToken::Token(token) => {
-                    assert!(token.kind() == TOKEN_STRING_START || token.kind() == TOKEN_STRING_END)
-                }
-                NodeOrToken::Node(node) => {
-                    assert_eq!(node.kind(), NODE_STRING_INTERPOL);
-                    parts.push(StrPart::Interpolation(
-                        ast::StrInterpol::cast(node.clone()).unwrap(),
-                    ));
-                    last_was_ast = true;
+                    NodeOrToken::Token(token) => {
+                        if token.kind() == TOKEN_STRING_CONTENT {
+                            let mut token_text = token.text();
+
+                            if n == 0 {
+                                first_is_literal = true;
+                            }
+
+                            if is_first_literal && first_is_literal {
+                                is_first_literal = false;
+                                if let Some(p) = token_text.find('\n') {
+                                    if token_text[0..p].chars().all(|c| c == ' ') {
+                                        token_text = &token_text[p + 1..]
+                                    }
+                                }
+                            }
+
+                            for c in token_text.chars() {
+                                if at_start_of_line {
+                                    if c == ' ' {
+                                        cur_indent += 1;
+                                    } else if c == '\n' {
+                                        cur_indent = 0;
+                                    } else {
+                                        at_start_of_line = false;
+                                        min_indent = min_indent.min(cur_indent);
+                                    }
+                                } else if c == '\n' {
+                                    at_start_of_line = true;
+                                    cur_indent = 0;
+                                }
+                            }
+
+                            n += 1;
+                        }
+                    }
                 }
             }
         }
 
+        let mut parts = Vec::new();
+        let mut cur_dropped = 0;
         let mut i = 0;
-        for part in parts.iter_mut() {
-            if let StrPart::Literal(ref mut text) = part {
-                if multiline {
-                    *text = remove_indent(text, i == 0, common);
-                    if i == literals - 1 {
-                        // Last index
-                        remove_trailing(text);
+        is_first_literal = true;
+        at_start_of_line = true;
+
+        for child in self.syntax().children_with_tokens() {
+            match child {
+                NodeOrToken::Node(node) => {
+                    at_start_of_line = false;
+                    cur_dropped = 0;
+                    parts.push(StrPart::Interpolation(
+                        ast::StrInterpol::cast(node.clone()).unwrap(),
+                    ));
+                    i += 1;
+                }
+                NodeOrToken::Token(token) => {
+                    if token.kind() == TOKEN_STRING_CONTENT {
+                        let mut token_text = token.text();
+
+                        if multiline {
+                            if is_first_literal && first_is_literal {
+                                is_first_literal = false;
+                                if let Some(p) = token_text.find('\n') {
+                                    if token_text[0..p].chars().all(|c| c == ' ') {
+                                        token_text = &token_text[p + 1..];
+                                        if token_text.is_empty() {
+                                            i += 1;
+                                            continue;
+                                        }
+                                    }
+                                }
+                            }
+
+                            let mut str = String::new();
+                            for c in token_text.chars() {
+                                if at_start_of_line {
+                                    if c == ' ' {
+                                        if cur_dropped >= min_indent {
+                                            str.push(c);
+                                        }
+                                        cur_dropped += 1;
+                                    } else if c == '\n' {
+                                        cur_dropped = 0;
+                                        str.push(c);
+                                    } else {
+                                        at_start_of_line = false;
+                                        cur_dropped = 0;
+                                        str.push(c);
+                                    }
+                                } else {
+                                    str.push(c);
+                                    if c == '\n' {
+                                        at_start_of_line = true;
+                                    }
+                                }
+                            }
+
+                            if i == n - 1 {
+                                if let Some(p) = str.rfind('\n') {
+                                    if str[p + 1..].chars().all(|c| c == ' ') {
+                                        str.truncate(p + 1);
+                                    }
+                                }
+                            }
+
+                            parts.push(StrPart::Literal(unescape(&str, multiline)));
+                            i += 1;
+                        } else {
+                            parts.push(StrPart::Literal(unescape(token_text, multiline)));
+                        }
                     }
                 }
-                *text = unescape(text, multiline);
-                i += 1;
             }
         }
 
@@ -85,7 +163,7 @@ pub fn unescape(input: &str, multiline: bool) -> String {
     loop {
         match input.next() {
             None => break,
-            Some('"') if multiline => break,
+            Some('"') if !multiline => break,
             Some('\\') if !multiline => match input.next() {
                 None => break,
                 Some('n') => output.push('\n'),
@@ -94,7 +172,9 @@ pub fn unescape(input: &str, multiline: bool) -> String {
                 Some(c) => output.push(c),
             },
             Some('\'') if multiline => match input.next() {
-                None => break,
+                None => {
+                    output.push('\'');
+                }
                 Some('\'') => match input.peek() {
                     Some('\'') => {
                         input.next().unwrap();
@@ -127,71 +207,6 @@ pub fn unescape(input: &str, multiline: bool) -> String {
     output
 }
 
-pub(crate) fn indention(s: &str) -> impl Iterator<Item = char> + '_ {
-    s.chars().take_while(|&c| c != '\n' && c.is_whitespace())
-}
-
-/// Remove common indention in string
-pub fn remove_common_indent(input: &str) -> String {
-    let mut common = std::usize::MAX;
-    for line in input.lines() {
-        let indent = indention(line).count();
-        if line.chars().count() == indent {
-            // line is empty, ignore indention
-            continue;
-        }
-        common = common.min(indent);
-    }
-
-    remove_indent(input, true, common)
-}
-
-/// Remove a specified max value of indention from each line in a string after
-/// a specified starting point
-pub fn remove_indent(input: &str, initial: bool, indent: usize) -> String {
-    let mut output = String::new();
-    let mut start = 0;
-    if initial {
-        // If the first line is whitespace, ignore it completely
-        let iter = input.chars().take_while(|&c| c != '\n');
-        if iter.clone().all(char::is_whitespace) {
-            start += iter.map(char::len_utf8).sum::<usize>() + /* newline */ 1;
-            if start >= input.len() {
-                // There's nothing after this whitespace line
-                return output;
-            }
-        } else {
-            // Otherwise, skip like normal
-            start += indention(input).take(indent).map(char::len_utf8).sum::<usize>();
-        }
-    }
-    loop {
-        start += indention(&input[start..]).take(indent).map(char::len_utf8).sum::<usize>();
-        let end = input[start..].find('\n').map(|i| start + i + 1);
-        {
-            let end = end.unwrap_or(input.len());
-            output.push_str(&input[start..end]);
-        }
-        start = match end {
-            Some(end) => end,
-            None => break,
-        };
-    }
-    output
-}
-
-/// Remove any trailing whitespace from a string
-pub fn remove_trailing(string: &mut String) {
-    let trailing: usize = string
-        .chars()
-        .rev()
-        .take_while(|&c| c != '\n' && c.is_whitespace())
-        .map(char::len_utf8)
-        .sum();
-    let len = string.len();
-    string.truncate(len - trailing);
-}
-
 #[cfg(test)]
 mod tests {
     use crate::Root;
@@ -204,10 +219,15 @@ mod tests {
         assert_eq!(unescape(r#"Hello''\n'''World''' :D"#, true), "Hello\n''World'' :D");
     }
     #[test]
-    fn string_remove_common_indent() {
-        assert_eq!(remove_common_indent("\n  \n    \n \n "), "\n\n\n");
-        assert_eq!(remove_common_indent("\n  \n    \n a\n"), " \n   \na\n");
-        assert_eq!(remove_common_indent("  \n    \n a\n"), "   \na\n");
+    fn parts_leading_ws() {
+        let inp = "''\n  hello\n  world''";
+        let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
+        match expr {
+            ast::Expr::Str(str) => {
+                assert_eq!(str.parts(), vec![StrPart::Literal("hello\nworld".to_string())])
+            }
+            _ => unreachable!(),
+        }
     }
     #[test]
     fn parts() {
