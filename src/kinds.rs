@@ -80,6 +80,7 @@ pub enum SyntaxKind {
     NODE_STRING,
     NODE_STRING_INTERPOL,
     NODE_LAMBDA,
+    NODE_IDENT_PARAM,
     // An old let { x = 92; body = x; } syntax
     NODE_LEGACY_LET,
     NODE_LET_IN,

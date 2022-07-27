@@ -10,13 +10,15 @@ NODE_ROOT@0..216
       TOKEN_ASSIGN@13..14 "="
       TOKEN_WHITESPACE@14..15 " "
       NODE_LAMBDA@15..44
-        NODE_IDENT@15..19
-          TOKEN_IDENT@15..19 "name"
+        NODE_IDENT_PARAM@15..19
+          NODE_IDENT@15..19
+            TOKEN_IDENT@15..19 "name"
         TOKEN_COLON@19..20 ":"
         TOKEN_WHITESPACE@20..21 " "
         NODE_LAMBDA@21..44
-          NODE_IDENT@21..24
-            TOKEN_IDENT@21..24 "val"
+          NODE_IDENT_PARAM@21..24
+            NODE_IDENT@21..24
+              TOKEN_IDENT@21..24 "val"
           TOKEN_COLON@24..25 ":"
           TOKEN_WHITESPACE@25..26 " "
           NODE_ATTR_SET@26..44

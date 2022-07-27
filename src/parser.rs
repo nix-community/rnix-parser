@@ -532,6 +532,8 @@ where
                 match self.peek() {
                     Some(TOKEN_COLON) => {
                         self.start_node_at(checkpoint, NODE_LAMBDA);
+                        self.start_node_at(checkpoint, NODE_IDENT_PARAM);
+                        self.finish_node();
                         self.bump();
                         self.parse_expr();
                         self.finish_node();

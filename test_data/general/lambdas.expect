@@ -10,13 +10,15 @@ NODE_ROOT@0..51
       TOKEN_ASSIGN@10..11 "="
       TOKEN_WHITESPACE@11..12 " "
       NODE_LAMBDA@12..23
-        NODE_IDENT@12..13
-          TOKEN_IDENT@12..13 "x"
+        NODE_IDENT_PARAM@12..13
+          NODE_IDENT@12..13
+            TOKEN_IDENT@12..13 "x"
         TOKEN_COLON@13..14 ":"
         TOKEN_WHITESPACE@14..15 " "
         NODE_LAMBDA@15..23
-          NODE_IDENT@15..16
-            TOKEN_IDENT@15..16 "y"
+          NODE_IDENT_PARAM@15..16
+            NODE_IDENT@15..16
+              TOKEN_IDENT@15..16 "y"
           TOKEN_COLON@16..17 ":"
           TOKEN_WHITESPACE@17..18 " "
           NODE_BIN_OP@18..23

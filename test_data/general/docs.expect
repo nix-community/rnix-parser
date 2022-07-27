@@ -20,15 +20,17 @@ NODE_ROOT@0..306
       TOKEN_COMMENT@135..150 "# First integer"
       TOKEN_WHITESPACE@150..155 "\n    "
       NODE_LAMBDA@155..195
-        NODE_IDENT@155..156
-          TOKEN_IDENT@155..156 "x"
+        NODE_IDENT_PARAM@155..156
+          NODE_IDENT@155..156
+            TOKEN_IDENT@155..156 "x"
         TOKEN_COLON@156..157 ":"
         TOKEN_WHITESPACE@157..162 "\n    "
         TOKEN_COMMENT@162..178 "# Second integer"
         TOKEN_WHITESPACE@178..183 "\n    "
         NODE_LAMBDA@183..195
-          NODE_IDENT@183..184
-            TOKEN_IDENT@183..184 "y"
+          NODE_IDENT_PARAM@183..184
+            NODE_IDENT@183..184
+              TOKEN_IDENT@183..184 "y"
           TOKEN_COLON@184..185 ":"
           TOKEN_WHITESPACE@185..190 "\n    "
           NODE_BIN_OP@190..195
@@ -53,8 +55,9 @@ NODE_ROOT@0..306
       TOKEN_ASSIGN@269..270 "="
       TOKEN_WHITESPACE@270..271 " "
       NODE_LAMBDA@271..303
-        NODE_IDENT@271..275
-          TOKEN_IDENT@271..275 "nums"
+        NODE_IDENT_PARAM@271..275
+          NODE_IDENT@271..275
+            TOKEN_IDENT@271..275 "nums"
         TOKEN_COLON@275..276 ":"
         TOKEN_WHITESPACE@276..277 " "
         NODE_APPLY@277..303

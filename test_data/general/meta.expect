@@ -12,15 +12,17 @@ NODE_ROOT@0..229
       TOKEN_COMMENT@10..31 "/* the first value */"
       TOKEN_WHITESPACE@31..32 " "
       NODE_LAMBDA@32..66
-        NODE_IDENT@32..33
-          TOKEN_IDENT@32..33 "x"
+        NODE_IDENT_PARAM@32..33
+          NODE_IDENT@32..33
+            TOKEN_IDENT@32..33 "x"
         TOKEN_COLON@33..34 ":"
         TOKEN_WHITESPACE@34..35 " "
         TOKEN_COMMENT@35..57 "/* the second value */"
         TOKEN_WHITESPACE@57..58 " "
         NODE_LAMBDA@58..66
-          NODE_IDENT@58..59
-            TOKEN_IDENT@58..59 "y"
+          NODE_IDENT_PARAM@58..59
+            NODE_IDENT@58..59
+              TOKEN_IDENT@58..59 "y"
           TOKEN_COLON@59..60 ":"
           TOKEN_WHITESPACE@60..61 " "
           NODE_BIN_OP@61..66
