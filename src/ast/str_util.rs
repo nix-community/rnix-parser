@@ -58,9 +58,14 @@ impl ast::Str {
             if let StrPart::Literal(ref mut text) = part {
                 if multiline {
                     *text = remove_indent(text, i == 0, common);
+                    // If the last literal is of the form `X\nY`, exclude Y if it consists solely of spaces
                     if i == literals - 1 {
-                        // Last index
-                        remove_trailing(text);
+                        match text.rfind('\n') {
+                            Some(p) if text[p + 1..].chars().all(|c| c == ' ') => {
+                                text.truncate(p + 1);
+                            }
+                            _ => {}
+                        }
                     }
                 }
                 *text = unescape(text, multiline);
@@ -180,18 +185,6 @@ pub fn remove_indent(input: &str, initial: bool, indent: usize) -> String {
     output
 }
 
-/// Remove any trailing whitespace from a string
-pub fn remove_trailing(string: &mut String) {
-    let trailing: usize = string
-        .chars()
-        .rev()
-        .take_while(|&c| c != '\n' && c.is_whitespace())
-        .map(char::len_utf8)
-        .sum();
-    let len = string.len();
-    string.truncate(len - trailing);
-}
-
 #[cfg(test)]
 mod tests {
     use crate::Root;
@@ -211,6 +204,28 @@ mod tests {
         assert_eq!(remove_common_indent("\n  \n    \n \n "), "\n\n\n");
         assert_eq!(remove_common_indent("\n  \n    \n a\n"), " \n   \na\n");
         assert_eq!(remove_common_indent("  \n    \n a\n"), "   \na\n");
+    }
+    #[test]
+    fn parts_trailing_ws_single_line() {
+        let inp = "''hello ''";
+        let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
+        match expr {
+            ast::Expr::Str(str) => {
+                assert_eq!(str.parts(), vec![StrPart::Literal("hello ".to_string())])
+            }
+            _ => unreachable!(),
+        }
+    }
+    #[test]
+    fn parts_trailing_ws_multiline() {
+        let inp = "''hello\n ''";
+        let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
+        match expr {
+            ast::Expr::Str(str) => {
+                assert_eq!(str.parts(), vec![StrPart::Literal("hello\n".to_string())])
+            }
+            _ => unreachable!(),
+        }
     }
     #[test]
     fn parts() {
