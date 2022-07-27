@@ -21,24 +21,13 @@ fn is_valid_uri_char(c: char) -> bool {
     }
 }
 
-#[derive(Clone, Copy)]
-struct Interpol {
-    brackets: u32,
-    string: bool,
-    multiline: bool,
-    path_interpol: bool,
-}
-#[derive(Clone, Copy)]
-enum Todo {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Context {
     StringBody { multiline: bool },
     StringEnd,
+    Interpol { brackets: u32 },
     InterpolStart,
     Path,
-}
-#[derive(Clone, Copy, Default)]
-struct Context {
-    interpol: Option<Interpol>,
-    todo: Option<Todo>,
 }
 
 #[derive(Clone, Copy)]
@@ -46,11 +35,13 @@ struct State<'a> {
     input: &'a str,
     offset: usize,
 }
+
 impl PartialEq for State<'_> {
     fn eq(&self, other: &Self) -> bool {
         std::ptr::eq(self.input, other.input) && self.offset == other.offset
     }
 }
+
 impl Eq for State<'_> {}
 
 pub type Token<'a> = (SyntaxKind, &'a str);
@@ -68,7 +59,7 @@ pub struct Tokenizer<'a> {
 impl<'a> Tokenizer<'a> {
     /// Create a new instance
     pub fn new(input: &'a str) -> Self {
-        Self { ctx: vec![Context::default()], state: State { input, offset: 0 } }
+        Self { ctx: Vec::new(), state: State { input, offset: 0 } }
     }
 
     fn remaining(&self) -> &str {
@@ -95,6 +86,15 @@ impl<'a> Tokenizer<'a> {
         &past.input[past.offset..self.state.offset]
     }
 
+    fn push_ctx(&mut self, ctx: Context) {
+        self.ctx.push(ctx)
+    }
+
+    fn pop_ctx(&mut self, ctx: Context) {
+        debug_assert_eq!(self.ctx.last(), Some(&ctx));
+        self.ctx.pop();
+    }
+
     fn consume<F>(&mut self, mut f: F) -> usize
     where
         F: FnMut(char) -> bool,
@@ -108,9 +108,14 @@ impl<'a> Tokenizer<'a> {
         loop {
             let start = self.state;
             match self.next() {
-                None => return TOKEN_ERROR,
+                None => {
+                    self.pop_ctx(Context::StringBody { multiline });
+                    return TOKEN_ERROR;
+                }
                 Some('"') if !multiline => {
                     self.state = start;
+                    self.pop_ctx(Context::StringBody { multiline: false });
+                    self.push_ctx(Context::StringEnd);
                     return TOKEN_STRING_CONTENT;
                 }
                 Some('\\') if !multiline => match self.next() {
@@ -124,11 +129,19 @@ impl<'a> Tokenizer<'a> {
                         self.next();
                         self.peek()
                     } {
-                        Some('\'') | Some('\\') | Some('$') => {
+                        Some('\'') | Some('$') => {
                             self.next().unwrap();
+                        }
+                        Some('\\') => {
+                            self.next().unwrap();
+                            if let None = self.next() {
+                                return TOKEN_ERROR;
+                            }
                         }
                         _ => {
                             self.state = start;
+                            self.pop_ctx(Context::StringBody { multiline: true });
+                            self.push_ctx(Context::StringEnd);
                             return TOKEN_STRING_CONTENT;
                         }
                     },
@@ -141,15 +154,7 @@ impl<'a> Tokenizer<'a> {
                     }
                     Some('{') => {
                         self.state = start;
-                        self.ctx.push(Context {
-                            interpol: Some(Interpol {
-                                brackets: 0,
-                                string: true,
-                                multiline,
-                                path_interpol: false,
-                            }),
-                            todo: Some(Todo::InterpolStart),
-                        });
+                        self.push_ctx(Context::InterpolStart);
                         return TOKEN_STRING_CONTENT;
                     }
                     _ => (),
@@ -162,9 +167,11 @@ impl<'a> Tokenizer<'a> {
     fn check_path_since(&mut self, past: State) -> SyntaxKind {
         self.consume(is_valid_path_char);
         if self.remaining().starts_with("${") {
-            self.ctx.last_mut().unwrap().todo = Some(Todo::Path);
+            self.ctx.push(Context::InterpolStart);
         } else if self.str_since(past).ends_with('/') {
             return TOKEN_ERROR;
+        } else {
+            self.pop_ctx(Context::Path);
         }
         TOKEN_PATH
     }
@@ -174,38 +181,36 @@ impl<'a> Tokenizer<'a> {
 
         // Handle already started multi-token
         loop {
-            let todo = &mut self.ctx.last_mut().unwrap().todo;
-            match todo.take() {
-                Some(Todo::InterpolStart) => {
+            match self.ctx.last() {
+                Some(Context::InterpolStart) => {
+                    self.pop_ctx(Context::InterpolStart);
+                    self.ctx.push(Context::Interpol { brackets: 0 });
                     if self.starts_with_bump("${") {
                         return Some(TOKEN_INTERPOL_START);
+                    } else {
+                        unreachable!()
                     }
                 }
-                Some(Todo::Path) => {
+                Some(Context::Path) => {
                     if self.starts_with_bump("${") {
-                        self.ctx.push(Context {
-                            interpol: Some(Interpol {
-                                brackets: 0,
-                                string: false,
-                                multiline: false,
-                                path_interpol: true,
-                            }),
-                            todo: None,
-                        });
+                        self.ctx.push(Context::Interpol { brackets: 0 });
                         return Some(TOKEN_INTERPOL_START);
                     } else if self.peek().map_or(false, is_valid_path_char) {
                         return Some(self.check_path_since(start));
+                    } else {
+                        self.pop_ctx(Context::Path);
                     }
                 }
-                Some(Todo::StringBody { multiline }) => {
-                    *todo = Some(Todo::StringEnd);
-                    let token = self.next_string(multiline);
+                Some(Context::StringBody { multiline }) => {
+                    let token = self.next_string(*multiline);
+                    // skip empty stuff
                     if self.state == start {
                         continue;
                     }
                     return Some(token);
                 }
-                Some(Todo::StringEnd) => {
+                Some(Context::StringEnd) => {
+                    self.pop_ctx(Context::StringEnd);
                     let status = match self.peek() {
                         Some('"') => {
                             self.next().unwrap();
@@ -290,6 +295,7 @@ impl<'a> Tokenizer<'a> {
             return Some(if c == '~' && self.next() != Some('/') {
                 TOKEN_ERROR
             } else {
+                self.push_ctx(Context::Path);
                 self.check_path_since(start)
             });
         }
@@ -305,32 +311,18 @@ impl<'a> Tokenizer<'a> {
             }
             '!' => TOKEN_INVERT,
             '{' => {
-                if let Some(Interpol { ref mut brackets, .. }) =
-                    self.ctx.last_mut().unwrap().interpol
-                {
+                if let Some(Context::Interpol { brackets }) = self.ctx.last_mut() {
                     *brackets += 1;
                 }
                 TOKEN_CURLY_B_OPEN
             }
             '}' => {
-                if let Some(Interpol { ref mut brackets, string, multiline, path_interpol }) =
-                    self.ctx.last_mut().unwrap().interpol
-                {
+                if let Some(Context::Interpol { brackets }) = self.ctx.last_mut() {
                     match brackets.checked_sub(1) {
                         Some(new) => *brackets = new,
                         None => {
-                            self.ctx.pop().unwrap();
-
-                            return Some(if string {
-                                self.ctx.last_mut().unwrap().todo =
-                                    Some(Todo::StringBody { multiline });
-                                TOKEN_INTERPOL_END
-                            } else if path_interpol {
-                                self.ctx.last_mut().unwrap().todo = Some(Todo::Path);
-                                TOKEN_INTERPOL_END
-                            } else {
-                                TOKEN_DYNAMIC_END
-                            });
+                            self.pop_ctx(Context::Interpol { brackets: 0 });
+                            return Some(TOKEN_INTERPOL_END);
                         }
                     }
                 }
@@ -380,11 +372,11 @@ impl<'a> Tokenizer<'a> {
             }
             '&' if self.peek() == Some('&') => {
                 self.next().unwrap();
-                TOKEN_AND
+                TOKEN_AND_AND
             }
             '|' if self.peek() == Some('|') => {
                 self.next().unwrap();
-                TOKEN_OR
+                TOKEN_OR_OR
             }
             '<' if self.peek() == Some('=') => {
                 self.next().unwrap();
@@ -398,16 +390,8 @@ impl<'a> Tokenizer<'a> {
             '>' => TOKEN_MORE,
             '$' if self.peek() == Some('{') => {
                 self.next().unwrap();
-                self.ctx.push(Context {
-                    interpol: Some(Interpol {
-                        brackets: 0,
-                        string: false,
-                        multiline: false,
-                        path_interpol: false,
-                    }),
-                    ..Default::default()
-                });
-                TOKEN_DYNAMIC_START
+                self.push_ctx(Context::Interpol { brackets: 0 });
+                TOKEN_INTERPOL_START
             }
             'a'..='z' | 'A'..='Z' | '_' => {
                 let kind = match kind {
@@ -428,6 +412,8 @@ impl<'a> Tokenizer<'a> {
                         "in" => TOKEN_IN,
                         "inherit" => TOKEN_INHERIT,
                         "let" => TOKEN_LET,
+                        // "or" is a contextual keyword and will be handled in the parser.
+                        "or" => TOKEN_OR,
                         "rec" => TOKEN_REC,
                         "then" => TOKEN_THEN,
                         "with" => TOKEN_WITH,
@@ -439,12 +425,12 @@ impl<'a> Tokenizer<'a> {
                 }
             }
             '"' => {
-                self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: false });
+                self.push_ctx(Context::StringBody { multiline: false });
                 TOKEN_STRING_START
             }
             '\'' if self.peek() == Some('\'') => {
                 self.next().unwrap();
-                self.ctx.last_mut().unwrap().todo = Some(Todo::StringBody { multiline: true });
+                self.push_ctx(Context::StringBody { multiline: true });
                 TOKEN_STRING_START
             }
             '0'..='9' => {
@@ -483,29 +469,49 @@ impl<'a> Iterator for Tokenizer<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::str;
+
     use super::{tokenize, SyntaxKind::*, Token};
 
-    macro_rules! tokens {
-        ($(($token:expr, $str:expr),)*) => {
-            vec![$(($token, $str),)*]
-        };
-        ($(($token:expr, $str:expr)),*) => {
-            vec![$(($token, $str)),*]
-        };
+    fn check<'a, I: IntoIterator<Item = Token<'a>>>(s: &'a str, ts: I) {
+        let actual = tokenize(s);
+        let expected = ts.into_iter().collect::<Vec<_>>();
+        assert_eq!(
+            actual, expected,
+            "string
+{s}
+was tokenized into
+{actual:#?}
+but expected
+{expected:#?}",
+        )
     }
 
-    fn path(path: &str) -> Vec<Token<'_>> {
-        tokens![(TOKEN_PATH, path)]
+    fn path(path: &str) -> [Token<'_>; 1] {
+        [(TOKEN_PATH, path)]
     }
-    fn error(token: &str) -> Vec<Token<'_>> {
-        tokens![(TOKEN_ERROR, token)]
+    fn error(token: &str) -> [Token<'_>; 1] {
+        [(TOKEN_ERROR, token)]
+    }
+
+    fn fuzz<B: AsRef<[u8]>>(b: B) {
+        let s = str::from_utf8(b.as_ref()).unwrap();
+        println!("`{s}`");
+        tokenize(s);
+    }
+
+    #[test]
+    fn test_fuzz() {
+        fuzz("\"");
+        fuzz([39, 39, 34]);
+        fuzz([39, 39, 39, 39, 92]);
     }
 
     #[test]
     fn basic_int_set() {
-        assert_eq!(
-            tokenize("{ int = 42; }"),
-            tokens![
+        check(
+            "{ int = 42; }",
+            [
                 (TOKEN_CURLY_B_OPEN, "{"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "int"),
@@ -521,9 +527,9 @@ mod tests {
     }
     #[test]
     fn basic_float_set() {
-        assert_eq!(
-            tokenize("{ float = 1.234; }"),
-            tokens![
+        check(
+            "{ float = 1.234; }",
+            [
                 (TOKEN_CURLY_B_OPEN, "{"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "float"),
@@ -536,9 +542,9 @@ mod tests {
                 (TOKEN_CURLY_B_CLOSE, "}"),
             ],
         );
-        assert_eq!(
-            tokenize(".5 + 0.5"),
-            tokens![
+        check(
+            ".5 + 0.5",
+            [
                 (TOKEN_FLOAT, ".5"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_ADD, "+"),
@@ -546,9 +552,9 @@ mod tests {
                 (TOKEN_FLOAT, "0.5"),
             ],
         );
-        assert_eq!(
-            tokenize("{ scientific = 1.1e4; uppercase = 123.4E-2; }"),
-            tokens![
+        check(
+            "{ scientific = 1.1e4; uppercase = 123.4E-2; }",
+            [
                 (TOKEN_CURLY_B_OPEN, "{"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "scientific"),
@@ -571,9 +577,9 @@ mod tests {
     }
     #[test]
     fn basic_string_set() {
-        assert_eq!(
-            tokenize(r#"{ string = "Hello \"World\""; }"#),
-            tokens![
+        check(
+            r#"{ string = "Hello \"World\""; }"#,
+            [
                 (TOKEN_CURLY_B_OPEN, "{"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "string"),
@@ -591,20 +597,19 @@ mod tests {
     }
     #[test]
     fn multiline() {
-        assert_eq!(
-            tokenize(
-                r#"{
+        check(
+            r#"{
     multiline = ''
         This is a multiline string :D
           indented by two
         \'\'\'\'\
         ''${ interpolation was escaped }
+        ''\${ interpolation was escaped }
         two single quotes: '''
         three single quotes: ''''
     '';
-}"#
-            ),
-            tokens![
+}"#,
+            [
                 (TOKEN_CURLY_B_OPEN, "{"),
                 (TOKEN_WHITESPACE, "\n    "),
                 (TOKEN_IDENT, "multiline"),
@@ -619,9 +624,10 @@ mod tests {
           indented by two
         \'\'\'\'\
         ''${ interpolation was escaped }
+        ''\${ interpolation was escaped }
         two single quotes: '''
         three single quotes: ''''
-    "#
+    "#,
                 ),
                 (TOKEN_STRING_END, "''"),
                 (TOKEN_SEMICOLON, ";"),
@@ -632,32 +638,32 @@ mod tests {
     }
     #[test]
     fn special_escape() {
-        assert_eq!(
-            tokenize(r#" "$${test}" "#),
-            tokens![
+        check(
+            r#" "$${test}" "#,
+            [
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "\""),
                 (TOKEN_STRING_CONTENT, r#"$${test}"#),
                 (TOKEN_STRING_END, "\""),
                 (TOKEN_WHITESPACE, " "),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize(r#" ''$${test}'' "#),
-            tokens![
+        check(
+            r#" ''$${test}'' "#,
+            [
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "''"),
                 (TOKEN_STRING_CONTENT, r#"$${test}"#),
                 (TOKEN_STRING_END, "''"),
                 (TOKEN_WHITESPACE, " "),
-            ]
+            ],
         );
     }
     #[test]
     fn interpolation() {
-        assert_eq!(
-            tokenize(r#" "Hello, ${ { world = "World"; }.world }!" "#),
-            tokens![
+        check(
+            r#" "Hello, ${ { world = "World"; }.world }!" "#,
+            [
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "\""),
                 (TOKEN_STRING_CONTENT, "Hello, "),
@@ -682,11 +688,11 @@ mod tests {
                 (TOKEN_STRING_CONTENT, "!"),
                 (TOKEN_STRING_END, "\""),
                 (TOKEN_WHITESPACE, " "),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize(r#" "\$${test}" "#),
-            tokens![
+        check(
+            r#" "\$${test}" "#,
+            [
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "\""),
                 (TOKEN_STRING_CONTENT, "\\$"),
@@ -695,11 +701,11 @@ mod tests {
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "\""),
                 (TOKEN_WHITESPACE, " "),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize(r#" ''''$${test}'' "#),
-            tokens![
+        check(
+            r#" ''''$${test}'' "#,
+            [
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "''"),
                 (TOKEN_STRING_CONTENT, "''$"),
@@ -708,11 +714,11 @@ mod tests {
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "''"),
                 (TOKEN_WHITESPACE, " "),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize(r#" "${test}#123" "#),
-            tokens![
+        check(
+            r#" "${test}#123" "#,
+            [
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "\""),
                 (TOKEN_INTERPOL_START, "${"),
@@ -721,11 +727,11 @@ mod tests {
                 (TOKEN_STRING_CONTENT, "#123"),
                 (TOKEN_STRING_END, "\""),
                 (TOKEN_WHITESPACE, " "),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize(" ''\n${test}'' "),
-            tokens![
+        check(
+            " ''\n${test}'' ",
+            [
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "''"),
                 (TOKEN_STRING_CONTENT, "\n"),
@@ -734,11 +740,11 @@ mod tests {
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "''"),
                 (TOKEN_WHITESPACE, " "),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize(r#" "${hello} ${world}" "#),
-            tokens![
+        check(
+            r#" "${hello} ${world}" "#,
+            [
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "\""),
                 (TOKEN_INTERPOL_START, "${"),
@@ -750,11 +756,11 @@ mod tests {
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "\""),
                 (TOKEN_WHITESPACE, " "),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize(r#" ''${"${var}"}'' "#),
-            tokens![
+        check(
+            r#" ''${"${var}"}'' "#,
+            [
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "''"),
                 (TOKEN_INTERPOL_START, "${"),
@@ -766,11 +772,11 @@ mod tests {
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "''"),
                 (TOKEN_WHITESPACE, " "),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize(r#" ''dont '${escape} me'' "#),
-            tokens![
+        check(
+            r#" ''dont '${escape} me'' "#,
+            [
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_STRING_START, "''"),
                 (TOKEN_STRING_CONTENT, "dont '"),
@@ -785,13 +791,11 @@ mod tests {
     }
     #[test]
     fn comments() {
-        assert_eq!(tokenize("/**/"), tokens![(TOKEN_COMMENT, "/**/")]);
-        assert_eq!(tokenize("/***/"), tokens![(TOKEN_COMMENT, "/***/")]);
-        assert_eq!(
-            tokenize(
-                "{ a = /* multiline * comment */ 123;# single line\n} # single line at the end"
-            ),
-            tokens![
+        check("/**/", [(TOKEN_COMMENT, "/**/")]);
+        check("/***/", [(TOKEN_COMMENT, "/***/")]);
+        check(
+            "{ a = /* multiline * comment */ 123;# single line\n} # single line at the end",
+            [
                 (TOKEN_CURLY_B_OPEN, "{"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "a"),
@@ -807,14 +811,14 @@ mod tests {
                 (TOKEN_CURLY_B_CLOSE, "}"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_COMMENT, "# single line at the end"),
-            ]
+            ],
         );
     }
     #[test]
     fn math() {
-        assert_eq!(
-            tokenize("1 + 2 * 3"),
-            tokens![
+        check(
+            "1 + 2 * 3",
+            [
                 (TOKEN_INTEGER, "1"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_ADD, "+"),
@@ -824,11 +828,11 @@ mod tests {
                 (TOKEN_MUL, "*"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "3"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("5 * -(3 - 2)"),
-            tokens![
+        check(
+            "5 * -(3 - 2)",
+            [
                 (TOKEN_INTEGER, "5"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_MUL, "*"),
@@ -841,23 +845,19 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_PAREN_CLOSE, ")"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("a/ 3"), // <- could get mistaken for a path
-            tokens![
-                (TOKEN_IDENT, "a"),
-                (TOKEN_DIV, "/"),
-                (TOKEN_WHITESPACE, " "),
-                (TOKEN_INTEGER, "3"),
-            ]
+        check(
+            "a/ 3",
+            // <- could get mistaken for a path
+            [(TOKEN_IDENT, "a"), (TOKEN_DIV, "/"), (TOKEN_WHITESPACE, " "), (TOKEN_INTEGER, "3")],
         );
     }
     #[test]
     fn let_in() {
-        assert_eq!(
-            tokenize("let a = 3; in a"),
-            tokens![
+        check(
+            "let a = 3; in a",
+            [
                 (TOKEN_LET, "let"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "a"),
@@ -870,74 +870,74 @@ mod tests {
                 (TOKEN_IN, "in"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "a"),
-            ]
+            ],
         );
     }
     #[test]
     fn with() {
-        assert_eq!(
-            tokenize("with namespace; expr"),
-            tokens![
+        check(
+            "with namespace; expr",
+            [
                 (TOKEN_WITH, "with"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "namespace"),
                 (TOKEN_SEMICOLON, ";"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "expr"),
-            ]
+            ],
         );
     }
     #[test]
     fn paths() {
-        assert_eq!(tokenize("/hello/world"), path("/hello/world"));
-        assert_eq!(tokenize("hello/world"), path("hello/world"));
-        assert_eq!(tokenize("hello_/world"), path("hello_/world"));
-        assert_eq!(tokenize("a+3/5+b"), path("a+3/5+b"));
-        assert_eq!(tokenize("1-2/3"), path("1-2/3"));
-        assert_eq!(tokenize("./hello/world"), path("./hello/world"));
-        assert_eq!(tokenize("~/hello/world"), path("~/hello/world"));
-        assert_eq!(tokenize("<hello/world>"), path("<hello/world>"));
-        assert_eq!(tokenize("~"), error("~"));
-        assert_eq!(tokenize("~/"), error("~/"));
-        assert_eq!(tokenize("/a/"), error("/a/"));
+        check("/hello/world", path("/hello/world"));
+        check("hello/world", path("hello/world"));
+        check("hello_/world", path("hello_/world"));
+        check("a+3/5+b", path("a+3/5+b"));
+        check("1-2/3", path("1-2/3"));
+        check("./hello/world", path("./hello/world"));
+        check("~/hello/world", path("~/hello/world"));
+        check("<hello/world>", path("<hello/world>"));
+        check("~", error("~"));
+        check("~/", error("~/"));
+        check("/a/", error("/a/"));
     }
     #[test]
     fn test_path_no_newline() {
-        assert_eq!(
-            tokenize("import ./.\n"),
-            tokens![
+        check(
+            "import ./.\n",
+            [
                 (TOKEN_IDENT, "import"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_PATH, "./."),
                 (TOKEN_WHITESPACE, "\n"),
-            ]
+            ],
         );
     }
     #[test]
     fn test_path_interpol() {
-        assert_eq!(
-            tokenize("./${foo}"),
-            tokens![
+        check(
+            "./${foo}",
+            [
                 (TOKEN_PATH, "./"),
                 (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "foo"),
-                (TOKEN_INTERPOL_END, "}")
-            ]
+                (TOKEN_INTERPOL_END, "}"),
+            ],
         );
-        assert_eq!(
-            tokenize("./${foo} bar"),
-            tokens![
+        check(
+            "./${foo} bar",
+            [
                 (TOKEN_PATH, "./"),
                 (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "foo"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "bar"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("./${foo}${bar}"),
-            tokens![
+        check(
+            "./${foo}${bar}",
+            [
                 (TOKEN_PATH, "./"),
                 (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "foo"),
@@ -945,41 +945,41 @@ mod tests {
                 (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "bar"),
                 (TOKEN_INTERPOL_END, "}"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("./${foo}let"),
-            tokens![
+        check(
+            "./${foo}let",
+            [
                 (TOKEN_PATH, "./"),
                 (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "foo"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_PATH, "let"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("./${foo}.jpg"),
-            tokens![
+        check(
+            "./${foo}.jpg",
+            [
                 (TOKEN_PATH, "./"),
                 (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "foo"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_PATH, ".jpg"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("./${foo}/"),
-            tokens![
+        check(
+            "./${foo}/",
+            [
                 (TOKEN_PATH, "./"),
                 (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "foo"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_ERROR, "/"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("./${foo}a${bar}"),
-            tokens![
+        check(
+            "./${foo}a${bar}",
+            [
                 (TOKEN_PATH, "./"),
                 (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "foo"),
@@ -988,39 +988,39 @@ mod tests {
                 (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "bar"),
                 (TOKEN_INTERPOL_END, "}"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("\"./${foo}\""),
-            tokens![
+        check(
+            "\"./${foo}\"",
+            [
                 (TOKEN_STRING_START, "\""),
                 (TOKEN_STRING_CONTENT, "./"),
                 (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "foo"),
                 (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_STRING_END, "\""),
-            ]
+            ],
         );
     }
     #[test]
     fn uri() {
-        assert_eq!(
-            tokenize("https://google.com/?q=Hello+World"),
-            tokens![(TOKEN_URI, "https://google.com/?q=Hello+World")]
+        check(
+            "https://google.com/?q=Hello+World",
+            [(TOKEN_URI, "https://google.com/?q=Hello+World")],
         );
     }
     #[test]
     fn uri_with_underscore() {
-        assert_eq!(
-            tokenize("https://goo_gle.com/?q=Hello+World"),
-            tokens![(TOKEN_URI, "https://goo_gle.com/?q=Hello+World")]
+        check(
+            "https://goo_gle.com/?q=Hello+World",
+            [(TOKEN_URI, "https://goo_gle.com/?q=Hello+World")],
         );
     }
     #[test]
     fn list() {
-        assert_eq!(
-            tokenize(r#"[a 2 3 "lol"]"#),
-            tokens![
+        check(
+            r#"[a 2 3 "lol"]"#,
+            [
                 (TOKEN_SQUARE_B_OPEN, "["),
                 (TOKEN_IDENT, "a"),
                 (TOKEN_WHITESPACE, " "),
@@ -1032,11 +1032,11 @@ mod tests {
                 (TOKEN_STRING_CONTENT, r#"lol"#),
                 (TOKEN_STRING_END, "\""),
                 (TOKEN_SQUARE_B_CLOSE, "]"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("[1] ++ [2] ++ [3]"),
-            tokens![
+        check(
+            "[1] ++ [2] ++ [3]",
+            [
                 (TOKEN_SQUARE_B_OPEN, "["),
                 (TOKEN_INTEGER, "1"),
                 (TOKEN_SQUARE_B_CLOSE, "]"),
@@ -1052,14 +1052,14 @@ mod tests {
                 (TOKEN_SQUARE_B_OPEN, "["),
                 (TOKEN_INTEGER, "3"),
                 (TOKEN_SQUARE_B_CLOSE, "]"),
-            ]
+            ],
         );
     }
     #[test]
     fn lambda() {
-        assert_eq!(
-            tokenize("a: b: a + b"),
-            tokens![
+        check(
+            "a: b: a + b",
+            [
                 (TOKEN_IDENT, "a"),
                 (TOKEN_COLON, ":"),
                 (TOKEN_WHITESPACE, " "),
@@ -1071,21 +1071,18 @@ mod tests {
                 (TOKEN_ADD, "+"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "b"),
-            ]
+            ],
         );
     }
     #[test]
     fn lambda_arg_underscore() {
-        assert_eq!(
-            tokenize("_:null"),
-            tokens![(TOKEN_IDENT, "_"), (TOKEN_COLON, ":"), (TOKEN_IDENT, "null"),]
-        );
+        check("_:null", [(TOKEN_IDENT, "_"), (TOKEN_COLON, ":"), (TOKEN_IDENT, "null")]);
     }
     #[test]
     fn patterns() {
-        assert_eq!(
-            tokenize(r#"{ a, b ? "default", ... } @ outer"#),
-            tokens![
+        check(
+            r#"{ a, b ? "default", ... } @ outer"#,
+            [
                 (TOKEN_CURLY_B_OPEN, "{"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "a"),
@@ -1107,21 +1104,18 @@ mod tests {
                 (TOKEN_AT, "@"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "outer"),
-            ]
+            ],
         );
     }
     #[test]
     fn combine() {
-        assert_eq!(
-            tokenize("a//b"),
-            tokens![(TOKEN_IDENT, "a"), (TOKEN_UPDATE, "//"), (TOKEN_IDENT, "b")]
-        );
+        check("a//b", [(TOKEN_IDENT, "a"), (TOKEN_UPDATE, "//"), (TOKEN_IDENT, "b")]);
     }
     #[test]
     fn ifs() {
-        assert_eq!(
-            tokenize("false -> !false && false == true || true"),
-            tokens![
+        check(
+            "false -> !false && false == true || true",
+            [
                 (TOKEN_IDENT, "false"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IMPLICATION, "->"),
@@ -1129,7 +1123,7 @@ mod tests {
                 (TOKEN_INVERT, "!"),
                 (TOKEN_IDENT, "false"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_AND, "&&"),
+                (TOKEN_AND_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "false"),
                 (TOKEN_WHITESPACE, " "),
@@ -1137,21 +1131,21 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "true"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_OR, "||"),
+                (TOKEN_OR_OR, "||"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "true"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("1 < 2 && 2 <= 2 && 2 > 1 && 2 >= 2"),
-            tokens![
+        check(
+            "1 < 2 && 2 <= 2 && 2 > 1 && 2 >= 2",
+            [
                 (TOKEN_INTEGER, "1"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_LESS, "<"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_AND, "&&"),
+                (TOKEN_AND_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
@@ -1159,7 +1153,7 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_AND, "&&"),
+                (TOKEN_AND_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
@@ -1167,36 +1161,36 @@ mod tests {
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "1"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_AND, "&&"),
+                (TOKEN_AND_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_MORE_OR_EQ, ">="),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("1 == 1 && 2 != 3"),
-            tokens![
+        check(
+            "1 == 1 && 2 != 3",
+            [
                 (TOKEN_INTEGER, "1"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_EQUAL, "=="),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "1"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_AND, "&&"),
+                (TOKEN_AND_AND, "&&"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "2"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_NOT_EQUAL, "!="),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "3"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("a:[ b ]"),
-            tokens![
+        check(
+            "a:[ b ]",
+            [
                 (TOKEN_IDENT, "a"),
                 (TOKEN_COLON, ":"),
                 (TOKEN_SQUARE_B_OPEN, "["),
@@ -1204,11 +1198,11 @@ mod tests {
                 (TOKEN_IDENT, "b"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_SQUARE_B_CLOSE, "]"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("a:( b )"),
-            tokens![
+        check(
+            "a:( b )",
+            [
                 (TOKEN_IDENT, "a"),
                 (TOKEN_COLON, ":"),
                 (TOKEN_PAREN_OPEN, "("),
@@ -1216,11 +1210,11 @@ mod tests {
                 (TOKEN_IDENT, "b"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_PAREN_CLOSE, ")"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("if false then 1 else if true then 2 else 3"),
-            tokens![
+        check(
+            "if false then 1 else if true then 2 else 3",
+            [
                 (TOKEN_IF, "if"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_IDENT, "false"),
@@ -1242,33 +1236,34 @@ mod tests {
                 (TOKEN_ELSE, "else"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_INTEGER, "3"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize("x>=y"), // <- could be confused with store path because of the '>'
-            tokens![(TOKEN_IDENT, "x"), (TOKEN_MORE_OR_EQ, ">="), (TOKEN_IDENT, "y")]
+        check(
+            "x>=y",
+            // <- could be confused with store path because of the '>'
+            [(TOKEN_IDENT, "x"), (TOKEN_MORE_OR_EQ, ">="), (TOKEN_IDENT, "y")],
         );
     }
     #[test]
     fn dynamic_attrs() {
-        assert_eq!(
-            tokenize("a.${b}.c"),
-            tokens![
+        check(
+            "a.${b}.c",
+            [
                 (TOKEN_IDENT, "a"),
                 (TOKEN_DOT, "."),
-                (TOKEN_DYNAMIC_START, "${"),
+                (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_IDENT, "b"),
-                (TOKEN_DYNAMIC_END, "}"),
+                (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_DOT, "."),
                 (TOKEN_IDENT, "c"),
-            ]
+            ],
         );
-        assert_eq!(
-            tokenize(r#"a.${ { b = "${test}"; }.b }.c"#),
-            tokens![
+        check(
+            r#"a.${ { b = "${test}"; }.b }.c"#,
+            [
                 (TOKEN_IDENT, "a"),
                 (TOKEN_DOT, "."),
-                (TOKEN_DYNAMIC_START, "${"),
+                (TOKEN_INTERPOL_START, "${"),
                 (TOKEN_WHITESPACE, " "),
                 (TOKEN_CURLY_B_OPEN, "{"),
                 (TOKEN_WHITESPACE, " "),
@@ -1287,10 +1282,10 @@ mod tests {
                 (TOKEN_DOT, "."),
                 (TOKEN_IDENT, "b"),
                 (TOKEN_WHITESPACE, " "),
-                (TOKEN_DYNAMIC_END, "}"),
+                (TOKEN_INTERPOL_END, "}"),
                 (TOKEN_DOT, "."),
                 (TOKEN_IDENT, "c"),
-            ]
+            ],
         );
     }
 }

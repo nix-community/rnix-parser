@@ -4,9 +4,9 @@ NODE_ROOT 0..7 {
     TOKEN_IDENT("a") 0..1
   }
   NODE_ERROR 1..7 {
-    TOKEN_DYNAMIC_START("${") 1..3
+    TOKEN_INTERPOL_START("${") 1..3
     TOKEN_IDENT("b") 3..4
-    TOKEN_DYNAMIC_END("}") 4..5
+    TOKEN_INTERPOL_END("}") 4..5
     TOKEN_PATH("/c") 5..7
   }
 }

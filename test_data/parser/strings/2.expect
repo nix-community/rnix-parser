@@ -2,8 +2,8 @@ NODE_ROOT 0..99 {
   NODE_ATTR_SET 0..99 {
     TOKEN_CURLY_B_OPEN("{") 0..1
     TOKEN_WHITESPACE("\n  ") 1..4
-    NODE_KEY_VALUE 4..97 {
-      NODE_KEY 4..24 {
+    NODE_ATTRPATH_VALUE 4..97 {
+      NODE_ATTRPATH 4..24 {
         NODE_IDENT 4..24 {
           TOKEN_IDENT("more_complicated_url") 4..24
         }

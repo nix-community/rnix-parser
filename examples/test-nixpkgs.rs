@@ -21,7 +21,7 @@ fn recurse(path: &Path) -> Result<(), Box<dyn Error>> {
             return Ok(());
         }
 
-        let parsed = rnix::parse(&original).as_result()?.node().to_string();
+        let parsed = rnix::Root::parse(&original).tree().to_string();
         if original != parsed {
             eprintln!("Original input does not match parsed output!");
             println!("Input:");
