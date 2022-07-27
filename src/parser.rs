@@ -1005,17 +1005,4 @@ mod tests {
             }
         }
     }
-
-    #[test]
-    fn stack_overflow() {
-        for dir in std::fs::read_dir("test_data/stack_overflow").unwrap() {
-            let dir = dir.unwrap();
-            let path = dir.path();
-            let mut code = fs::read_to_string(&path).unwrap();
-            if code.ends_with('\n') {
-                code.truncate(code.len() - 1);
-            }
-            Root::parse(&code);
-        }
-    }
 }
