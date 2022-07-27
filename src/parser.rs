@@ -40,12 +40,9 @@ pub enum ParseError {
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParseError::Expected(location, kinds) => write!(
-                f,
-                "wanted any of {:?} at {}",
-                kinds,
-                usize::from(*location),
-            ),
+            ParseError::Expected(location, kinds) => {
+                write!(f, "wanted any of {:?} at {}", kinds, usize::from(*location),)
+            }
             ParseError::Unexpected(range) => {
                 write!(
                     f,
@@ -218,11 +215,12 @@ where
                 None
             }
             None => {
-                self.errors
-                .push(ParseError::UnexpectedEOFWanted(allowed_slice.to_vec().into_boxed_slice()));
+                self.errors.push(ParseError::UnexpectedEOFWanted(
+                    allowed_slice.to_vec().into_boxed_slice(),
+                ));
 
                 None
-            },
+            }
         }
     }
 
@@ -232,7 +230,7 @@ where
     ///
     /// This is not always wanted. For example, in `{ foo = 1 } // { bar = 2; }`, it would
     /// be better to recognize the semicolon as missing then move on, rather than bumping
-    /// all the way to the semicolon after `bar`. 
+    /// all the way to the semicolon after `bar`.
     fn expect_peek_any(&mut self, allowed_slice: &[SyntaxKind]) -> Option<SyntaxKind> {
         let allowed = TokenSet::from_slice(allowed_slice);
 
@@ -332,13 +330,12 @@ where
     fn parse_attrpath(&mut self) {
         self.start_node(NODE_ATTRPATH);
         loop {
-            match self.peek_any_or_missing(&[TOKEN_INTERPOL_START, TOKEN_STRING_START, TOKEN_IDENT]) {
+            match self.peek_any_or_missing(&[TOKEN_INTERPOL_START, TOKEN_STRING_START, TOKEN_IDENT])
+            {
                 Some(TOKEN_INTERPOL_START) => self.parse_dynamic(),
                 Some(TOKEN_STRING_START) => self.parse_string(),
                 Some(TOKEN_IDENT) => self.expect_ident(),
-                _ => {
-                    break
-                }
+                _ => break,
             }
 
             if self.peek() == Some(TOKEN_DOT) {
