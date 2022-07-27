@@ -16,8 +16,8 @@ NODE_ROOT 0..150 {
     NODE_LET_IN 31..150 {
       TOKEN_LET("let") 31..34
       TOKEN_WHITESPACE("\n  ") 34..37
-      NODE_KEY_VALUE 37..47 {
-        NODE_KEY 37..38 {
+      NODE_ATTRPATH_VALUE 37..47 {
+        NODE_ATTRPATH 37..38 {
           NODE_IDENT 37..38 {
             TOKEN_IDENT("a") 37..38
           }
@@ -44,8 +44,8 @@ NODE_ROOT 0..150 {
       NODE_ATTR_SET 51..150 {
         TOKEN_CURLY_B_OPEN("{") 51..52
         TOKEN_WHITESPACE("\n  ") 52..55
-        NODE_KEY_VALUE 55..65 {
-          NODE_KEY 55..56 {
+        NODE_ATTRPATH_VALUE 55..65 {
+          NODE_ATTRPATH 55..56 {
             NODE_IDENT 55..56 {
               TOKEN_IDENT("b") 55..56
             }
@@ -67,8 +67,8 @@ NODE_ROOT 0..150 {
           TOKEN_SEMICOLON(";") 64..65
         }
         TOKEN_WHITESPACE("\n\n  ") 65..69
-        NODE_KEY_VALUE 69..148 {
-          NODE_KEY 69..75 {
+        NODE_ATTRPATH_VALUE 69..148 {
+          NODE_ATTRPATH 69..75 {
             NODE_IDENT 69..75 {
               TOKEN_IDENT("legacy") 69..75
             }
@@ -81,8 +81,8 @@ NODE_ROOT 0..150 {
             TOKEN_WHITESPACE(" ") 81..82
             TOKEN_CURLY_B_OPEN("{") 82..83
             TOKEN_WHITESPACE("\n    ") 83..88
-            NODE_KEY_VALUE 88..113 {
-              NODE_KEY 88..105 {
+            NODE_ATTRPATH_VALUE 88..113 {
+              NODE_ATTRPATH 88..105 {
                 NODE_IDENT 88..105 {
                   TOKEN_IDENT("this_syntax_sucks") 88..105
                 }
@@ -96,8 +96,8 @@ NODE_ROOT 0..150 {
               TOKEN_SEMICOLON(";") 112..113
             }
             TOKEN_WHITESPACE("\n    ") 113..118
-            NODE_KEY_VALUE 118..143 {
-              NODE_KEY 118..122 {
+            NODE_ATTRPATH_VALUE 118..143 {
+              NODE_ATTRPATH 118..122 {
                 NODE_IDENT 118..122 {
                   TOKEN_IDENT("body") 118..122
                 }

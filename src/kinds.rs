@@ -14,6 +14,7 @@ pub enum SyntaxKind {
     TOKEN_IN,
     TOKEN_INHERIT,
     TOKEN_LET,
+    TOKEN_OR,
     TOKEN_REC,
     TOKEN_THEN,
     TOKEN_WITH,
@@ -44,7 +45,7 @@ pub enum SyntaxKind {
     TOKEN_MUL,
     TOKEN_DIV,
 
-    TOKEN_AND,
+    TOKEN_AND_AND,
     TOKEN_EQUAL,
     TOKEN_IMPLICATION,
     TOKEN_LESS,
@@ -52,11 +53,9 @@ pub enum SyntaxKind {
     TOKEN_MORE,
     TOKEN_MORE_OR_EQ,
     TOKEN_NOT_EQUAL,
-    TOKEN_OR,
+    TOKEN_OR_OR,
 
     // Identifiers and values
-    TOKEN_DYNAMIC_END,
-    TOKEN_DYNAMIC_START,
     TOKEN_FLOAT,
     TOKEN_IDENT,
     TOKEN_INTEGER,
@@ -70,7 +69,7 @@ pub enum SyntaxKind {
 
     NODE_APPLY,
     NODE_ASSERT,
-    NODE_KEY,
+    NODE_ATTRPATH,
     NODE_DYNAMIC,
     NODE_ERROR,
     NODE_IDENT,
@@ -86,18 +85,19 @@ pub enum SyntaxKind {
     NODE_LET_IN,
     NODE_LIST,
     NODE_BIN_OP,
-    NODE_OR_DEFAULT,
     NODE_PAREN,
     NODE_PATTERN,
     NODE_PAT_BIND,
     NODE_PAT_ENTRY,
     NODE_ROOT,
     NODE_ATTR_SET,
-    NODE_KEY_VALUE,
+    NODE_ATTRPATH_VALUE,
     NODE_UNARY_OP,
     NODE_LITERAL,
     NODE_WITH,
     NODE_PATH_WITH_INTERPOL,
+    // Attrpath existence check: foo ? bar.${baz}."bux"
+    NODE_HAS_ATTR,
 
     #[doc(hidden)]
     __LAST,
@@ -109,6 +109,7 @@ impl SyntaxKind {
     pub fn is_literal(self) -> bool {
         matches!(self, TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI)
     }
+
     /// Returns true if this token should be used as a function argument.
     /// ```ignore
     /// Example:

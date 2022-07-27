@@ -10,8 +10,8 @@ NODE_ROOT 0..306 {
     TOKEN_WHITESPACE("\n  ") 60..63
     TOKEN_COMMENT("# Adds the integers x and y together and returns the result") 63..122
     TOKEN_WHITESPACE("\n  ") 122..125
-    NODE_KEY_VALUE 125..196 {
-      NODE_KEY 125..128 {
+    NODE_ATTRPATH_VALUE 125..196 {
+      NODE_ATTRPATH 125..128 {
         NODE_IDENT 125..128 {
           TOKEN_IDENT("add") 125..128
         }
@@ -55,8 +55,8 @@ NODE_ROOT 0..306 {
     TOKEN_WHITESPACE("\n  ") 216..219
     TOKEN_COMMENT("# Returns the sum of the integer array nums") 219..262
     TOKEN_WHITESPACE("\n  ") 262..265
-    NODE_KEY_VALUE 265..304 {
-      NODE_KEY 265..268 {
+    NODE_ATTRPATH_VALUE 265..304 {
+      NODE_ATTRPATH 265..268 {
         NODE_IDENT 265..268 {
           TOKEN_IDENT("sum") 265..268
         }
@@ -78,8 +78,10 @@ NODE_ROOT 0..306 {
                   TOKEN_IDENT("builtins") 277..285
                 }
                 TOKEN_DOT(".") 285..286
-                NODE_IDENT 286..292 {
-                  TOKEN_IDENT("foldl\'") 286..292
+                NODE_ATTRPATH 286..292 {
+                  NODE_IDENT 286..292 {
+                    TOKEN_IDENT("foldl\'") 286..292
+                  }
                 }
               }
               TOKEN_WHITESPACE(" ") 292..293

@@ -2,8 +2,8 @@ NODE_ROOT 0..216 {
   NODE_LET_IN 0..216 {
     TOKEN_LET("let") 0..3
     TOKEN_WHITESPACE("\n  ") 3..6
-    NODE_KEY_VALUE 6..45 {
-      NODE_KEY 6..12 {
+    NODE_ATTRPATH_VALUE 6..45 {
+      NODE_ATTRPATH 6..12 {
         NODE_IDENT 6..12 {
           TOKEN_IDENT("define") 6..12
         }
@@ -26,14 +26,14 @@ NODE_ROOT 0..216 {
           NODE_ATTR_SET 26..44 {
             TOKEN_CURLY_B_OPEN("{") 26..27
             TOKEN_WHITESPACE(" ") 27..28
-            NODE_KEY_VALUE 28..42 {
-              NODE_KEY 28..35 {
+            NODE_ATTRPATH_VALUE 28..42 {
+              NODE_ATTRPATH 28..35 {
                 NODE_DYNAMIC 28..35 {
-                  TOKEN_DYNAMIC_START("${") 28..30
+                  TOKEN_INTERPOL_START("${") 28..30
                   NODE_IDENT 30..34 {
                     TOKEN_IDENT("name") 30..34
                   }
-                  TOKEN_DYNAMIC_END("}") 34..35
+                  TOKEN_INTERPOL_END("}") 34..35
                 }
               }
               TOKEN_WHITESPACE(" ") 35..36
@@ -52,8 +52,8 @@ NODE_ROOT 0..216 {
       TOKEN_SEMICOLON(";") 44..45
     }
     TOKEN_WHITESPACE("\n  ") 45..48
-    NODE_KEY_VALUE 48..62 {
-      NODE_KEY 48..51 {
+    NODE_ATTRPATH_VALUE 48..62 {
+      NODE_ATTRPATH 48..51 {
         NODE_IDENT 48..51 {
           TOKEN_IDENT("key") 48..51
         }
@@ -69,8 +69,8 @@ NODE_ROOT 0..216 {
       TOKEN_SEMICOLON(";") 61..62
     }
     TOKEN_WHITESPACE("\n  ") 62..65
-    NODE_KEY_VALUE 65..89 {
-      NODE_KEY 65..68 {
+    NODE_ATTRPATH_VALUE 65..89 {
+      NODE_ATTRPATH 65..68 {
         NODE_IDENT 65..68 {
           TOKEN_IDENT("set") 65..68
         }
@@ -81,8 +81,8 @@ NODE_ROOT 0..216 {
       NODE_ATTR_SET 71..88 {
         TOKEN_CURLY_B_OPEN("{") 71..72
         TOKEN_WHITESPACE(" ") 72..73
-        NODE_KEY_VALUE 73..79 {
-          NODE_KEY 73..74 {
+        NODE_ATTRPATH_VALUE 73..79 {
+          NODE_ATTRPATH 73..74 {
             NODE_IDENT 73..74 {
               TOKEN_IDENT("a") 73..74
             }
@@ -96,8 +96,8 @@ NODE_ROOT 0..216 {
           TOKEN_SEMICOLON(";") 78..79
         }
         TOKEN_WHITESPACE(" ") 79..80
-        NODE_KEY_VALUE 80..86 {
-          NODE_KEY 80..81 {
+        NODE_ATTRPATH_VALUE 80..86 {
+          NODE_ATTRPATH 80..81 {
             NODE_IDENT 80..81 {
               TOKEN_IDENT("b") 80..81
             }
@@ -116,8 +116,8 @@ NODE_ROOT 0..216 {
       TOKEN_SEMICOLON(";") 88..89
     }
     TOKEN_WHITESPACE("\n  ") 89..92
-    NODE_KEY_VALUE 92..110 {
-      NODE_KEY 92..103 {
+    NODE_ATTRPATH_VALUE 92..110 {
+      NODE_ATTRPATH 92..103 {
         NODE_IDENT 92..103 {
           TOKEN_IDENT("dynamic_key") 92..103
         }
@@ -161,8 +161,8 @@ NODE_ROOT 0..216 {
       NODE_ATTR_SET 140..216 {
         TOKEN_CURLY_B_OPEN("{") 140..141
         TOKEN_WHITESPACE("\n    ") 141..146
-        NODE_KEY_VALUE 146..168 {
-          NODE_KEY 146..160 {
+        NODE_ATTRPATH_VALUE 146..168 {
+          NODE_ATTRPATH 146..160 {
             NODE_STRING 146..154 {
               TOKEN_STRING_START("\"") 146..147
               NODE_STRING_INTERPOL 147..153 {
@@ -190,8 +190,8 @@ NODE_ROOT 0..216 {
           TOKEN_SEMICOLON(";") 167..168
         }
         TOKEN_WHITESPACE("\n    ") 168..173
-        NODE_KEY_VALUE 173..212 {
-          NODE_KEY 173..188 {
+        NODE_ATTRPATH_VALUE 173..212 {
+          NODE_ATTRPATH 173..188 {
             NODE_IDENT 173..188 {
               TOKEN_IDENT("dynamic_key_set") 173..188
             }
@@ -199,19 +199,21 @@ NODE_ROOT 0..216 {
           TOKEN_WHITESPACE(" ") 188..189
           TOKEN_ASSIGN("=") 189..190
           TOKEN_WHITESPACE(" ") 190..191
-          NODE_BIN_OP 191..211 {
+          NODE_HAS_ATTR 191..211 {
             NODE_IDENT 191..194 {
               TOKEN_IDENT("set") 191..194
             }
             TOKEN_WHITESPACE(" ") 194..195
             TOKEN_QUESTION("?") 195..196
             TOKEN_WHITESPACE(" ") 196..197
-            NODE_DYNAMIC 197..211 {
-              TOKEN_DYNAMIC_START("${") 197..199
-              NODE_IDENT 199..210 {
-                TOKEN_IDENT("dynamic_key") 199..210
+            NODE_ATTRPATH 197..211 {
+              NODE_DYNAMIC 197..211 {
+                TOKEN_INTERPOL_START("${") 197..199
+                NODE_IDENT 199..210 {
+                  TOKEN_IDENT("dynamic_key") 199..210
+                }
+                TOKEN_INTERPOL_END("}") 210..211
               }
-              TOKEN_DYNAMIC_END("}") 210..211
             }
           }
           TOKEN_SEMICOLON(";") 211..212
