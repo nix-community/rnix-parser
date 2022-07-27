@@ -32,6 +32,9 @@ pub enum ParseError {
     UnexpectedEOFWanted(Box<[SyntaxKind]>),
     /// DuplicatedArgs is used when formal arguments are duplicated, e.g. `{ a, a }`
     DuplicatedArgs(TextRange, String),
+    /// RecursionLimitExceeded is used when we're unable to parse further due to likely being close to
+    /// a stack overflow.
+    RecursionLimitExceeded,
 }
 
 impl fmt::Display for ParseError {
@@ -82,6 +85,7 @@ impl fmt::Display for ParseError {
                     usize::from(range.end())
                 )
             }
+            ParseError::RecursionLimitExceeded => write!(f, "recursion limit exceeded"),
         }
     }
 }
@@ -99,6 +103,10 @@ where
     buffer: VecDeque<Token<'s>>,
     iter: I,
     consumed: TextSize,
+
+    // Recursion depth, used for avoiding stack overflows. This may be incremented
+    // by any method as long as it is decremented when that method returns.
+    depth: u32,
 }
 impl<'s, I> Parser<'s, I>
 where
@@ -113,6 +121,8 @@ where
             buffer: VecDeque::with_capacity(1),
             iter,
             consumed: TextSize::from(0),
+
+            depth: 0,
         }
     }
 
@@ -717,7 +727,20 @@ where
     }
     /// Parse Nix code into an AST
     pub fn parse_expr(&mut self) -> Checkpoint {
-        match self.peek() {
+        // Limit chosen somewhat arbitrarily
+        if self.depth >= 512 {
+            self.errors.push(ParseError::RecursionLimitExceeded);
+            // Consume tokens to the end of the file. Erroring without bumping might cause
+            // infinite looping elsewhere.
+            self.start_error_node();
+            while self.peek().is_some() {
+                self.bump()
+            }
+            self.finish_error_node();
+            return self.checkpoint();
+        }
+        self.depth += 1;
+        let out = match self.peek() {
             Some(TOKEN_LET) => {
                 let checkpoint = self.checkpoint();
                 self.bump();
@@ -768,7 +791,9 @@ where
                 checkpoint
             }
             _ => self.parse_math(),
-        }
+        };
+        self.depth -= 1;
+        out
     }
 }
 
