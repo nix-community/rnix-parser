@@ -263,7 +263,7 @@ where
             ]) {
                 Some(TOKEN_STRING_CONTENT) => self.bump(),
                 Some(TOKEN_INTERPOL_START) => {
-                    self.start_node(NODE_STRING_INTERPOL);
+                    self.start_node(NODE_INTERPOL);
                     self.bump();
                     self.parse_expr();
                     self.expect(TOKEN_INTERPOL_END);
@@ -510,7 +510,7 @@ where
                         match self.peek_raw().map(|(t, _)| t) {
                             Some(TOKEN_PATH) => self.bump(),
                             Some(TOKEN_INTERPOL_START) => {
-                                self.start_node(NODE_STRING_INTERPOL);
+                                self.start_node(NODE_INTERPOL);
                                 self.bump();
                                 self.parse_expr();
                                 self.expect(TOKEN_INTERPOL_END);

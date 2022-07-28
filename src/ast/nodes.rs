@@ -275,7 +275,7 @@ node! { #[from(NODE_PATH)] struct Path; }
 
 node! { #[from(NODE_STRING)] struct Str; }
 
-node! { #[from(NODE_STRING_INTERPOL)] struct StrInterpol; }
+node! { #[from(NODE_INTERPOL)] struct StrInterpol; }
 
 impl StrInterpol {
     ng! { expr, Expr, 0 }

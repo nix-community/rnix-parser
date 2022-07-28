@@ -127,7 +127,7 @@ NODE_ROOT@0..216
           NODE_ATTRPATH@146..160
             NODE_STRING@146..154
               TOKEN_STRING_START@146..147 "\""
-              NODE_STRING_INTERPOL@147..153
+              NODE_INTERPOL@147..153
                 TOKEN_INTERPOL_START@147..149 "${"
                 NODE_IDENT@149..152
                   TOKEN_IDENT@149..152 "key"

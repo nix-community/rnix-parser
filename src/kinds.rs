@@ -78,7 +78,7 @@ pub enum SyntaxKind {
     NODE_INHERIT,
     NODE_INHERIT_FROM,
     NODE_STRING,
-    NODE_STRING_INTERPOL,
+    NODE_INTERPOL,
     NODE_LAMBDA,
     // An old let { x = 92; body = x; } syntax
     NODE_LEGACY_LET,
