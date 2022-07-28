@@ -1,5 +1,5 @@
-error: unexpected TOKEN_PAREN_OPEN at 12..13, wanted any of [TOKEN_IDENT]
-error: unexpected TOKEN_PAREN_CLOSE at 14..15, wanted any of [TOKEN_IDENT]
+error: unexpected TOKEN_PAREN_OPEN at 12..13, wanted any of [TOKEN_IDENT, TOKEN_OR]
+error: unexpected TOKEN_PAREN_CLOSE at 14..15, wanted any of [TOKEN_IDENT, TOKEN_OR]
 NODE_ROOT@0..20
   NODE_ATTR_SET@0..20
     TOKEN_CURLY_B_OPEN@0..1 "{"

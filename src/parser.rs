@@ -225,7 +225,7 @@ where
         }
     }
     fn expect_ident(&mut self) {
-        if self.expect_peek_any(&[TOKEN_IDENT]).is_some() {
+        if self.expect_peek_any(&[TOKEN_IDENT, TOKEN_OR]).is_some() {
             self.start_node(NODE_IDENT);
             self.bump();
             self.finish_node()
