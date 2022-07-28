@@ -172,8 +172,6 @@ node! {
         NODE_ERROR => Error,
         NODE_IF_ELSE => IfElse,
         NODE_SELECT => Select,
-        NODE_INHERIT => Inherit,
-        NODE_INHERIT_FROM => InheritFrom,
         NODE_STRING => Str,
         NODE_PATH => Path,
         NODE_LITERAL => Literal,
