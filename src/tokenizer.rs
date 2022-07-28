@@ -437,9 +437,7 @@ impl<'a> Tokenizer<'a> {
                 self.consume(|c| ('0'..='9').contains(&c));
                 if self.peek() == Some('.') {
                     self.next().unwrap();
-                    if self.consume(|c| ('0'..='9').contains(&c)) == 0 {
-                        return Some(TOKEN_ERROR);
-                    }
+                    self.consume(|c| ('0'..='9').contains(&c));
                     self.consume_scientific()
                 } else {
                     TOKEN_INTEGER
@@ -582,6 +580,10 @@ but expected
     #[test]
     fn float_scientific_no_leading_zero() {
         check(".5e1", [(TOKEN_FLOAT, ".5e1")]);
+    }
+    #[test]
+    fn float_no_decimal_part() {
+        check("1.", [(TOKEN_FLOAT, "1.")]);
     }
     #[test]
     fn float_scientific_plus() {
