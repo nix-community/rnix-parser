@@ -225,7 +225,7 @@ where
         }
     }
     fn expect_ident(&mut self) {
-        if self.expect_peek_any(&[TOKEN_IDENT, TOKEN_OR]).is_some() {
+        if self.expect_peek_any(&[TOKEN_IDENT]).is_some() {
             self.start_node(NODE_IDENT);
             self.bump();
             self.finish_node()
@@ -271,7 +271,13 @@ where
         match self.peek() {
             Some(TOKEN_INTERPOL_START) => self.parse_dynamic(),
             Some(TOKEN_STRING_START) => self.parse_string(),
-            _ => self.expect_ident(),
+            _ => {
+                if self.expect_peek_any(&[TOKEN_IDENT, TOKEN_OR]).is_some() {
+                    self.start_node(NODE_IDENT);
+                    self.bump();
+                    self.finish_node()
+                }
+            }
         }
     }
     fn parse_attrpath(&mut self) {
