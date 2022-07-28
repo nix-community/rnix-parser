@@ -95,7 +95,7 @@ pub enum SyntaxKind {
     NODE_UNARY_OP,
     NODE_LITERAL,
     NODE_WITH,
-    NODE_PATH_WITH_INTERPOL,
+    NODE_PATH,
     // Attrpath existence check: foo ? bar.${baz}."bux"
     NODE_HAS_ATTR,
 

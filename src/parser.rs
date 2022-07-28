@@ -502,34 +502,25 @@ where
             }
             TOKEN_STRING_START => self.parse_string(),
             TOKEN_PATH => {
-                let next = self.try_next();
-                if let Some((token, s)) = next {
-                    let is_complex_path = self.peek().map_or(false, |t| t == TOKEN_INTERPOL_START);
-                    self.builder.start_node(NixLanguage::kind_to_raw(if is_complex_path {
-                        NODE_PATH_WITH_INTERPOL
-                    } else {
-                        NODE_LITERAL
-                    }));
-                    self.manual_bump(s, token);
-                    if is_complex_path {
-                        loop {
-                            match self.peek_raw().map(|(t, _)| t) {
-                                Some(TOKEN_PATH) => self.bump(),
-                                Some(TOKEN_INTERPOL_START) => {
-                                    self.start_node(NODE_STRING_INTERPOL);
-                                    self.bump();
-                                    self.parse_expr();
-                                    self.expect(TOKEN_INTERPOL_END);
-                                    self.finish_node();
-                                }
-                                _ => break,
+                self.start_node(NODE_PATH);
+                self.bump();
+                let is_complex_path = self.peek().map_or(false, |t| t == TOKEN_INTERPOL_START);
+                if is_complex_path {
+                    loop {
+                        match self.peek_raw().map(|(t, _)| t) {
+                            Some(TOKEN_PATH) => self.bump(),
+                            Some(TOKEN_INTERPOL_START) => {
+                                self.start_node(NODE_STRING_INTERPOL);
+                                self.bump();
+                                self.parse_expr();
+                                self.expect(TOKEN_INTERPOL_END);
+                                self.finish_node();
                             }
+                            _ => break,
                         }
                     }
-                    self.finish_node();
-                } else {
-                    self.errors.push(ParseError::UnexpectedEOF);
                 }
+                self.finish_node();
             }
             t if t.is_literal() => {
                 self.start_node(NODE_LITERAL);

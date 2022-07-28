@@ -7,7 +7,6 @@ use crate::ast::{self, support::*};
 pub enum LiteralKind {
     Float(ast::Float),
     Integer(ast::Integer),
-    Path(ast::Path),
     Uri(ast::Uri),
 }
 
@@ -19,10 +18,6 @@ impl ast::Literal {
 
         if let Some(it) = token(self) {
             return LiteralKind::Integer(it);
-        }
-
-        if let Some(it) = token(self) {
-            return LiteralKind::Path(it);
         }
 
         if let Some(it) = token(self) {
