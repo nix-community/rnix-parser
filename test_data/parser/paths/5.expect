@@ -5,9 +5,9 @@ NODE_ROOT@0..20
     NODE_APPLY@0..19
       NODE_ERROR@0..1
         TOKEN_LESS@0..1 "<"
-      NODE_PATH_WITH_INTERPOL@1..19
+      NODE_PATH@1..19
         TOKEN_PATH@1..9 "nixpkgs/"
-        NODE_STRING_INTERPOL@9..15
+        NODE_INTERPOL@9..15
           TOKEN_INTERPOL_START@9..11 "${"
           NODE_IDENT@11..14
             TOKEN_IDENT@11..14 "foo"

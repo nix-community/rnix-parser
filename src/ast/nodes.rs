@@ -174,6 +174,8 @@ node! {
         NODE_SELECT => Select,
         NODE_INHERIT => Inherit,
         NODE_INHERIT_FROM => InheritFrom,
+        NODE_STRING => Str,
+        NODE_PATH => Path,
         NODE_LITERAL => Literal,
         NODE_LAMBDA => Lambda,
         NODE_LEGACY_LET => LegacyLet,
@@ -186,7 +188,6 @@ node! {
         NODE_UNARY_OP => UnaryOp,
         NODE_IDENT => Ident,
         NODE_WITH => With,
-        NODE_STRING => Str,
         NODE_HAS_ATTR => HasAttr,
     )]
     /// An expression. The fundamental nix ast type.
@@ -270,9 +271,11 @@ impl InheritFrom {
     tg! { r_paren_token, ")" }
 }
 
+node! { #[from(NODE_PATH)] struct Path; }
+
 node! { #[from(NODE_STRING)] struct Str; }
 
-node! { #[from(NODE_STRING_INTERPOL)] struct StrInterpol; }
+node! { #[from(NODE_INTERPOL)] struct StrInterpol; }
 
 impl StrInterpol {
     ng! { expr, Expr, 0 }

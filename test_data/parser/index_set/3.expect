@@ -11,7 +11,7 @@ NODE_ROOT@0..33
       TOKEN_DOT@20..21 "."
       NODE_STRING@21..28
         TOKEN_STRING_START@21..22 "\""
-        NODE_STRING_INTERPOL@22..27
+        NODE_INTERPOL@22..27
           TOKEN_INTERPOL_START@22..24 "${"
           NODE_IDENT@24..26
             TOKEN_IDENT@24..26 "hi"

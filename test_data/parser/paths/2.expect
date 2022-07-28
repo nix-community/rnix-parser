@@ -14,9 +14,9 @@ NODE_ROOT@0..91
           TOKEN_IDENT@10..11 "f"
         TOKEN_COLON@11..12 ":"
         TOKEN_WHITESPACE@12..13 " "
-        NODE_PATH_WITH_INTERPOL@13..28
+        NODE_PATH@13..28
           TOKEN_PATH@13..18 "./foo"
-          NODE_STRING_INTERPOL@18..24
+          NODE_INTERPOL@18..24
             TOKEN_INTERPOL_START@18..20 "${"
             NODE_IDENT@20..23
               TOKEN_IDENT@20..23 "bar"
@@ -38,35 +38,35 @@ NODE_ROOT@0..91
               NODE_IDENT@36..37
                 TOKEN_IDENT@36..37 "a"
               TOKEN_WHITESPACE@37..38 " "
-              NODE_LITERAL@38..43
+              NODE_PATH@38..43
                 TOKEN_PATH@38..43 "./bar"
             TOKEN_WHITESPACE@43..44 " "
-            NODE_PATH_WITH_INTERPOL@44..53
+            NODE_PATH@44..53
               TOKEN_PATH@44..49 "./baz"
-              NODE_STRING_INTERPOL@49..53
+              NODE_INTERPOL@49..53
                 TOKEN_INTERPOL_START@49..51 "${"
                 NODE_IDENT@51..52
                   TOKEN_IDENT@51..52 "x"
                 TOKEN_INTERPOL_END@52..53 "}"
           TOKEN_WHITESPACE@53..54 " "
-          NODE_PATH_WITH_INTERPOL@54..66
+          NODE_PATH@54..66
             TOKEN_PATH@54..61 "./snens"
-            NODE_STRING_INTERPOL@61..65
+            NODE_INTERPOL@61..65
               TOKEN_INTERPOL_START@61..63 "${"
               NODE_IDENT@63..64
                 TOKEN_IDENT@63..64 "x"
               TOKEN_INTERPOL_END@64..65 "}"
             TOKEN_PATH@65..66 "y"
         TOKEN_WHITESPACE@66..67 " "
-        NODE_PATH_WITH_INTERPOL@67..85
+        NODE_PATH@67..85
           TOKEN_PATH@67..72 "./qux"
-          NODE_STRING_INTERPOL@72..76
+          NODE_INTERPOL@72..76
             TOKEN_INTERPOL_START@72..74 "${"
             NODE_IDENT@74..75
               TOKEN_IDENT@74..75 "x"
             TOKEN_INTERPOL_END@75..76 "}"
           TOKEN_PATH@76..77 "."
-          NODE_STRING_INTERPOL@77..81
+          NODE_INTERPOL@77..81
             TOKEN_INTERPOL_START@77..79 "${"
             NODE_IDENT@79..80
               TOKEN_IDENT@79..80 "y"

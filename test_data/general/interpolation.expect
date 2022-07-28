@@ -30,7 +30,7 @@ NODE_ROOT@0..270
         NODE_STRING@39..56
           TOKEN_STRING_START@39..40 "\""
           TOKEN_STRING_CONTENT@40..46 "Hello "
-          NODE_STRING_INTERPOL@46..54
+          NODE_INTERPOL@46..54
             TOKEN_INTERPOL_START@46..48 "${"
             NODE_IDENT@48..53
               TOKEN_IDENT@48..53 "world"
@@ -49,7 +49,7 @@ NODE_ROOT@0..270
         NODE_STRING@72..267
           TOKEN_STRING_START@72..74 "''"
           TOKEN_STRING_CONTENT@74..101 "\n    The set's x valu ..."
-          NODE_STRING_INTERPOL@101..161
+          NODE_INTERPOL@101..161
             TOKEN_INTERPOL_START@101..103 "${"
             TOKEN_WHITESPACE@103..110 "\n      "
             NODE_SELECT@110..155
@@ -90,7 +90,7 @@ NODE_ROOT@0..270
             TOKEN_WHITESPACE@155..160 "\n    "
             TOKEN_INTERPOL_END@160..161 "}"
           TOKEN_STRING_CONTENT@161..253 "\n\n    This line shall ..."
-          NODE_STRING_INTERPOL@253..262
+          NODE_INTERPOL@253..262
             TOKEN_INTERPOL_START@253..255 "${"
             TOKEN_WHITESPACE@255..256 " "
             NODE_STRING@256..260

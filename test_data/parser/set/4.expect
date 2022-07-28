@@ -20,7 +20,7 @@ NODE_ROOT@0..33
       NODE_ATTRPATH@15..26
         NODE_STRING@15..21
           TOKEN_STRING_START@15..16 "\""
-          NODE_STRING_INTERPOL@16..20
+          NODE_INTERPOL@16..20
             TOKEN_INTERPOL_START@16..18 "${"
             NODE_IDENT@18..19
               TOKEN_IDENT@18..19 "c"
