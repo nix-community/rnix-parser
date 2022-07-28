@@ -452,7 +452,7 @@ impl<'a> Tokenizer<'a> {
     fn consume_scientific(&mut self) -> SyntaxKind {
         if self.peek() == Some('e') || self.peek() == Some('E') {
             self.next().unwrap();
-            if self.peek() == Some('-') {
+            if self.peek() == Some('-') || self.peek() == Some('+') {
                 self.next().unwrap();
             }
             if self.consume(|c| ('0'..='9').contains(&c)) == 0 {
@@ -582,6 +582,10 @@ but expected
     #[test]
     fn float_scientific_no_leading_zero() {
         check(".5e1", [(TOKEN_FLOAT, ".5e1")]);
+    }
+    #[test]
+    fn float_scientific_plus() {
+        check("1.2e+3", [(TOKEN_FLOAT, "1.2e+3")]);
     }
     #[test]
     fn basic_string_set() {
