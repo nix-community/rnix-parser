@@ -288,7 +288,7 @@ where
         loop {
             self.parse_attr();
 
-            if self.peek() == Some(TOKEN_DOT) {
+            if self.peek() == Some(T![.]) {
                 self.bump();
             } else {
                 break;
@@ -297,18 +297,18 @@ where
         self.finish_node();
     }
     fn parse_pattern(&mut self, bound: bool) {
-        if self.peek().map(|t| t == TOKEN_R_BRACE).unwrap_or(true) {
+        if self.peek().map(|t| t == T!['}']).unwrap_or(true) {
             self.bump();
         } else {
             loop {
-                match self.expect_peek_any(&[TOKEN_R_BRACE, T![...], TOKEN_IDENT]) {
-                    Some(TOKEN_R_BRACE) => {
+                match self.expect_peek_any(&[T!['}'], T![...], TOKEN_IDENT]) {
+                    Some(T!['}']) => {
                         self.bump();
                         break;
                     }
                     Some(T![...]) => {
                         self.bump();
-                        self.expect(TOKEN_R_BRACE);
+                        self.expect(T!['}']);
                         break;
                     }
                     Some(TOKEN_IDENT) => {
@@ -322,7 +322,7 @@ where
                         match self.peek() {
                             Some(T![,]) => self.bump(),
                             _ => {
-                                self.expect(TOKEN_R_BRACE);
+                                self.expect(T!['}']);
                                 break;
                             }
                         }
@@ -354,11 +354,11 @@ where
                     self.start_node(NODE_INHERIT);
                     self.bump();
 
-                    if self.peek() == Some(TOKEN_L_PAREN) {
+                    if self.peek() == Some(T!['(']) {
                         self.start_node(NODE_INHERIT_FROM);
                         self.bump();
                         self.parse_expr();
-                        self.expect(TOKEN_R_PAREN);
+                        self.expect(T![')']);
                         self.finish_node();
                     }
 
@@ -408,7 +408,7 @@ where
         };
         let checkpoint = self.checkpoint();
         match peek {
-            TOKEN_L_PAREN => {
+            T!['('] => {
                 self.start_node(NODE_PAREN);
                 self.bump();
                 self.parse_expr();
@@ -418,11 +418,11 @@ where
             T![rec] => {
                 self.start_node(NODE_ATTR_SET);
                 self.bump();
-                self.expect(TOKEN_L_BRACE);
-                self.parse_set(TOKEN_R_BRACE);
+                self.expect(T!['{']);
+                self.parse_set(T!['}']);
                 self.finish_node();
             }
-            TOKEN_L_BRACE => {
+            T!['{'] => {
                 // Do a lookahead:
                 let mut peek = [None, None];
                 for i in &mut peek {
@@ -442,10 +442,10 @@ where
                 match peek {
                     [Some(TOKEN_IDENT), Some(T![,])]
                     | [Some(TOKEN_IDENT), Some(T![?])]
-                    | [Some(TOKEN_IDENT), Some(TOKEN_R_BRACE)]
-                    | [Some(T![...]), Some(TOKEN_R_BRACE)]
-                    | [Some(TOKEN_R_BRACE), Some(T![:])]
-                    | [Some(TOKEN_R_BRACE), Some(T![@])] => {
+                    | [Some(TOKEN_IDENT), Some(T!['}'])]
+                    | [Some(T![...]), Some(T!['}'])]
+                    | [Some(T!['}']), Some(T![:])]
+                    | [Some(T!['}']), Some(T![@])] => {
                         // This looks like a pattern
                         self.start_node(NODE_LAMBDA);
 
@@ -463,15 +463,15 @@ where
                         // This looks like a set
                         self.start_node(NODE_ATTR_SET);
                         self.bump();
-                        self.parse_set(TOKEN_R_BRACE);
+                        self.parse_set(T!['}']);
                         self.finish_node();
                     }
                 }
             }
-            TOKEN_L_BRACK => {
+            T!['['] => {
                 self.start_node(NODE_LIST);
                 self.bump();
-                while self.peek().map(|t| t != TOKEN_R_BRACK).unwrap_or(false) {
+                while self.peek().map(|t| t != T![']']).unwrap_or(false) {
                     self.parse_simple();
                 }
                 self.bump();
@@ -521,7 +521,7 @@ where
                         self.bump();
                         self.finish_node(); // PatBind
 
-                        self.expect(TOKEN_L_BRACE);
+                        self.expect(T!['{']);
                         self.parse_pattern(true);
                         self.finish_node(); // Pattern
 
@@ -540,10 +540,10 @@ where
                     kind,
                     TextRange::new(start, end),
                     [
-                        TOKEN_L_PAREN,
+                        T!['('],
                         T![rec],
-                        TOKEN_L_BRACE,
-                        TOKEN_L_BRACK,
+                        T!['{'],
+                        T!['['],
                         TOKEN_STRING_START,
                         TOKEN_IDENT,
                     ]
@@ -553,7 +553,7 @@ where
             }
         };
 
-        if self.peek() == Some(TOKEN_DOT) {
+        if self.peek() == Some(T![.]) {
             self.start_node_at(checkpoint, NODE_SELECT);
             self.bump();
             self.parse_attrpath();
@@ -709,10 +709,10 @@ where
                 let checkpoint = self.checkpoint();
                 self.bump();
 
-                if self.peek() == Some(TOKEN_L_BRACE) {
+                if self.peek() == Some(T!['{']) {
                     self.start_node_at(checkpoint, NODE_LEGACY_LET);
                     self.bump();
-                    self.parse_set(TOKEN_R_BRACE);
+                    self.parse_set(T!['}']);
                     self.finish_node();
                 } else {
                     self.start_node_at(checkpoint, NODE_LET_IN);

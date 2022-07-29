@@ -270,9 +270,9 @@ impl Inherit {
 node! { #[from(NODE_INHERIT_FROM)] struct InheritFrom; }
 
 impl InheritFrom {
-    tg! { l_paren_token, "(" }
+    tg! { l_paren_token, '(' }
     ng! { expr, Expr, 0 }
-    tg! { r_paren_token, ")" }
+    tg! { r_paren_token, ')' }
 }
 
 node! { #[from(NODE_PATH)] struct Path; }
@@ -299,8 +299,8 @@ impl HasEntry for LegacyLet {}
 
 impl LegacyLet {
     tg! { let_token, let }
-    tg! { curly_open_token, "{" }
-    tg! { curly_close_token, "}" }
+    tg! { curly_open_token, '{' }
+    tg! { curly_close_token, '}' }
 }
 
 node! { #[from(NODE_LET_IN)] struct LetIn; }
@@ -316,9 +316,9 @@ impl LetIn {
 node! { #[from(NODE_LIST)] struct List; }
 
 impl List {
-    tg! { l_brack_token, "[" }
+    tg! { l_brack_token, '[' }
     ng! { items, [Expr] }
-    tg! { r_brack_token, "]" }
+    tg! { r_brack_token, ']' }
 }
 
 node! { #[from(NODE_BIN_OP)] struct BinOp; }
@@ -336,9 +336,9 @@ impl BinOp {
 node! { #[from(NODE_PAREN)] struct Paren; }
 
 impl Paren {
-    tg! { l_paren_token, "(" }
+    tg! { l_paren_token, '(' }
     ng! { expr, Expr, 0 }
-    tg! { r_paren_token, ")" }
+    tg! { r_paren_token, ')' }
 }
 
 node! { #[from(NODE_PAT_BIND)] struct PatBind; }
@@ -384,8 +384,8 @@ impl HasEntry for AttrSet {}
 
 impl AttrSet {
     tg! { rec_token, rec }
-    tg! { l_curly_token, "{" }
-    tg! { r_curly_token, "}" }
+    tg! { l_curly_token, '{' }
+    tg! { r_curly_token, '}' }
 }
 
 node! {

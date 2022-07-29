@@ -12,12 +12,12 @@ macro_rules! T {
     (then)    => ($crate::SyntaxKind::TOKEN_THEN);
     (with)    => ($crate::SyntaxKind::TOKEN_WITH);
 
-    ("{")     => ($crate::SyntaxKind::TOKEN_L_BRACE);
-    ("}")     => ($crate::SyntaxKind::TOKEN_R_BRACE);
-    ("[")     => ($crate::SyntaxKind::TOKEN_L_BRACK);
-    ("]")     => ($crate::SyntaxKind::TOKEN_R_BRACK);
-    ("(")     => ($crate::SyntaxKind::TOKEN_L_PAREN);
-    (")")     => ($crate::SyntaxKind::TOKEN_R_PAREN);
+    ('{')     => ($crate::SyntaxKind::TOKEN_L_BRACE);
+    ('}')     => ($crate::SyntaxKind::TOKEN_R_BRACE);
+    ('[')     => ($crate::SyntaxKind::TOKEN_L_BRACK);
+    (']')     => ($crate::SyntaxKind::TOKEN_R_BRACK);
+    ('(')     => ($crate::SyntaxKind::TOKEN_L_PAREN);
+    (')')     => ($crate::SyntaxKind::TOKEN_R_PAREN);
 
     (=)       => ($crate::SyntaxKind::TOKEN_ASSIGN);
     (@)       => ($crate::SyntaxKind::TOKEN_AT);
