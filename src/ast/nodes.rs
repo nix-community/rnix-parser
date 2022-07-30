@@ -172,8 +172,8 @@ node! {
         NODE_ERROR => Error,
         NODE_IF_ELSE => IfElse,
         NODE_SELECT => Select,
-        NODE_INHERIT => Inherit,
-        NODE_INHERIT_FROM => InheritFrom,
+        NODE_STRING => Str,
+        NODE_PATH => Path,
         NODE_LITERAL => Literal,
         NODE_LAMBDA => Lambda,
         NODE_LEGACY_LET => LegacyLet,
@@ -186,7 +186,6 @@ node! {
         NODE_UNARY_OP => UnaryOp,
         NODE_IDENT => Ident,
         NODE_WITH => With,
-        NODE_STRING => Str,
         NODE_HAS_ATTR => HasAttr,
         NODE_PATH_WITH_INTERPOL => PathWithInterpol,
     )]
@@ -232,6 +231,12 @@ impl Attrpath {
 
 node! { #[from(NODE_DYNAMIC)] struct Dynamic; }
 
+impl Dynamic {
+    tg! { interpol_start_token, TOKEN_INTERPOL_START }
+    ng! { expr, Expr, 0 }
+    tg! { interpol_end_token, TOKEN_INTERPOL_END }
+}
+
 node! { #[from(NODE_ERROR)] struct Error; }
 
 node! { #[from(NODE_IF_ELSE)] struct IfElse; }
@@ -271,9 +276,11 @@ impl InheritFrom {
     tg! { r_paren_token, ")" }
 }
 
+node! { #[from(NODE_PATH)] struct Path; }
+
 node! { #[from(NODE_STRING)] struct Str; }
 
-node! { #[from(NODE_STRING_INTERPOL)] struct StrInterpol; }
+node! { #[from(NODE_INTERPOL)] struct StrInterpol; }
 
 impl StrInterpol {
     ng! { expr, Expr, 0 }

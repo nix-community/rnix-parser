@@ -32,6 +32,9 @@ pub enum ParseError {
     UnexpectedEOFWanted(Box<[SyntaxKind]>),
     /// DuplicatedArgs is used when formal arguments are duplicated, e.g. `{ a, a }`
     DuplicatedArgs(TextRange, String),
+    /// RecursionLimitExceeded is used when we're unable to parse further due to likely being close to
+    /// a stack overflow.
+    RecursionLimitExceeded,
 }
 
 impl fmt::Display for ParseError {
@@ -82,6 +85,7 @@ impl fmt::Display for ParseError {
                     usize::from(range.end())
                 )
             }
+            ParseError::RecursionLimitExceeded => write!(f, "recursion limit exceeded"),
         }
     }
 }
@@ -99,6 +103,10 @@ where
     buffer: VecDeque<Token<'s>>,
     iter: I,
     consumed: TextSize,
+
+    // Recursion depth, used for avoiding stack overflows. This may be incremented
+    // by any method as long as it is decremented when that method returns.
+    depth: u32,
 }
 impl<'s, I> Parser<'s, I>
 where
@@ -113,6 +121,8 @@ where
             buffer: VecDeque::with_capacity(1),
             iter,
             consumed: TextSize::from(0),
+
+            depth: 0,
         }
     }
 
@@ -253,7 +263,7 @@ where
             ]) {
                 Some(TOKEN_STRING_CONTENT) => self.bump(),
                 Some(TOKEN_INTERPOL_START) => {
-                    self.start_node(NODE_STRING_INTERPOL);
+                    self.start_node(NODE_INTERPOL);
                     self.bump();
                     self.parse_expr();
                     self.expect(TOKEN_INTERPOL_END);
@@ -492,34 +502,25 @@ where
             }
             TOKEN_STRING_START => self.parse_string(),
             TOKEN_PATH => {
-                let next = self.try_next();
-                if let Some((token, s)) = next {
-                    let is_complex_path = self.peek().map_or(false, |t| t == TOKEN_INTERPOL_START);
-                    self.builder.start_node(NixLanguage::kind_to_raw(if is_complex_path {
-                        NODE_PATH_WITH_INTERPOL
-                    } else {
-                        NODE_LITERAL
-                    }));
-                    self.manual_bump(s, token);
-                    if is_complex_path {
-                        loop {
-                            match self.peek_raw().map(|(t, _)| t) {
-                                Some(TOKEN_PATH) => self.bump(),
-                                Some(TOKEN_INTERPOL_START) => {
-                                    self.start_node(NODE_STRING_INTERPOL);
-                                    self.bump();
-                                    self.parse_expr();
-                                    self.expect(TOKEN_INTERPOL_END);
-                                    self.finish_node();
-                                }
-                                _ => break,
+                self.start_node(NODE_PATH);
+                self.bump();
+                let is_complex_path = self.peek().map_or(false, |t| t == TOKEN_INTERPOL_START);
+                if is_complex_path {
+                    loop {
+                        match self.peek_raw().map(|(t, _)| t) {
+                            Some(TOKEN_PATH) => self.bump(),
+                            Some(TOKEN_INTERPOL_START) => {
+                                self.start_node(NODE_INTERPOL);
+                                self.bump();
+                                self.parse_expr();
+                                self.expect(TOKEN_INTERPOL_END);
+                                self.finish_node();
                             }
+                            _ => break,
                         }
                     }
-                    self.finish_node();
-                } else {
-                    self.errors.push(ParseError::UnexpectedEOF);
                 }
+                self.finish_node();
             }
             t if t.is_literal() => {
                 self.start_node(NODE_LITERAL);
@@ -717,7 +718,20 @@ where
     }
     /// Parse Nix code into an AST
     pub fn parse_expr(&mut self) -> Checkpoint {
-        match self.peek() {
+        // Limit chosen somewhat arbitrarily
+        if self.depth >= 512 {
+            self.errors.push(ParseError::RecursionLimitExceeded);
+            // Consume tokens to the end of the file. Erroring without bumping might cause
+            // infinite looping elsewhere.
+            self.start_error_node();
+            while self.peek().is_some() {
+                self.bump()
+            }
+            self.finish_error_node();
+            return self.checkpoint();
+        }
+        self.depth += 1;
+        let out = match self.peek() {
             Some(TOKEN_LET) => {
                 let checkpoint = self.checkpoint();
                 self.bump();
@@ -768,7 +782,9 @@ where
                 checkpoint
             }
             _ => self.parse_math(),
-        }
+        };
+        self.depth -= 1;
+        out
     }
 }
 
@@ -796,58 +812,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use rowan::{NodeOrToken, WalkEvent};
-
-    use crate::{Root, SyntaxNode};
+    use crate::Root;
 
     use super::*;
 
     use std::{env, ffi::OsStr, fmt::Write, fs, io::Write as IoWrite, path::PathBuf};
 
-    /// A struct that prints out the textual representation of a node in a
-    /// stable format. See TypedNode::dump.
-    pub struct TextDump(SyntaxNode);
-
-    impl fmt::Display for TextDump {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            let mut indent = 0;
-            let mut skip_newline = true;
-            for event in self.0.preorder_with_tokens() {
-                if skip_newline {
-                    skip_newline = false;
-                } else {
-                    writeln!(f)?;
-                }
-                match &event {
-                    WalkEvent::Enter(enter) => {
-                        write!(f, "{:i$}{:?}", "", enter.kind(), i = indent)?;
-                        if let NodeOrToken::Token(token) = enter {
-                            write!(f, "(\"{}\")", token.text().escape_default())?
-                        }
-                        write!(
-                            f,
-                            " {}..{}",
-                            usize::from(enter.text_range().start()),
-                            usize::from(enter.text_range().end())
-                        )?;
-                        if let NodeOrToken::Node(_) = enter {
-                            write!(f, " {{")?;
-                        }
-                        indent += 2;
-                    }
-                    WalkEvent::Leave(leave) => {
-                        indent -= 2;
-                        if let NodeOrToken::Node(_) = leave {
-                            write!(f, "{:i$}}}", "", i = indent)?;
-                        } else {
-                            skip_newline = true;
-                        }
-                    }
-                }
-            }
-            Ok(())
-        }
-    }
     //     #[test]
     //     fn whitespace_attachment_for_incomplete_code1() {
     //         let code = "{
@@ -941,7 +911,7 @@ mod tests {
             for error in parse.errors() {
                 writeln!(actual, "error: {}", error).unwrap();
             }
-            writeln!(actual, "{}", TextDump(parse.syntax())).unwrap();
+            writeln!(actual, "{:#?}", parse.syntax()).unwrap();
             if should_update {
                 let mut file =
                     fs::OpenOptions::new().write(true).truncate(true).open(&path).unwrap();
@@ -965,6 +935,7 @@ mod tests {
     #[rustfmt::skip]
     mod dir_tests {
         use super::test_dir;
+
         #[test]
         fn general() {
             test_dir("general");

@@ -26,7 +26,7 @@ impl ast::Str {
                     let line_count = text.lines().count();
                     let next_is_ast = child
                         .next_sibling_or_token()
-                        .map_or(false, |child| child.kind() == NODE_STRING_INTERPOL);
+                        .map_or(false, |child| child.kind() == NODE_INTERPOL);
                     for (i, line) in text.lines().enumerate().skip(if last_was_ast { 1 } else { 0 })
                     {
                         let indent: usize = indention(line).count();
@@ -44,7 +44,7 @@ impl ast::Str {
                     assert!(token.kind() == TOKEN_STRING_START || token.kind() == TOKEN_STRING_END)
                 }
                 NodeOrToken::Node(node) => {
-                    assert_eq!(node.kind(), NODE_STRING_INTERPOL);
+                    assert_eq!(node.kind(), NODE_INTERPOL);
                     parts.push(StrPart::Interpolation(
                         ast::StrInterpol::cast(node.clone()).unwrap(),
                     ));
@@ -58,9 +58,14 @@ impl ast::Str {
             if let StrPart::Literal(ref mut text) = part {
                 if multiline {
                     *text = remove_indent(text, i == 0, common);
+                    // If the last literal is of the form `X\nY`, exclude Y if it consists solely of spaces
                     if i == literals - 1 {
-                        // Last index
-                        remove_trailing(text);
+                        match text.rfind('\n') {
+                            Some(p) if text[p + 1..].chars().all(|c| c == ' ') => {
+                                text.truncate(p + 1);
+                            }
+                            _ => {}
+                        }
                     }
                 }
                 *text = unescape(text, multiline);
@@ -85,7 +90,7 @@ pub fn unescape(input: &str, multiline: bool) -> String {
     loop {
         match input.next() {
             None => break,
-            Some('"') if multiline => break,
+            Some('"') if !multiline => break,
             Some('\\') if !multiline => match input.next() {
                 None => break,
                 Some('n') => output.push('\n'),
@@ -180,18 +185,6 @@ pub fn remove_indent(input: &str, initial: bool, indent: usize) -> String {
     output
 }
 
-/// Remove any trailing whitespace from a string
-pub fn remove_trailing(string: &mut String) {
-    let trailing: usize = string
-        .chars()
-        .rev()
-        .take_while(|&c| c != '\n' && c.is_whitespace())
-        .map(char::len_utf8)
-        .sum();
-    let len = string.len();
-    string.truncate(len - trailing);
-}
-
 #[cfg(test)]
 mod tests {
     use crate::Root;
@@ -201,13 +194,38 @@ mod tests {
     #[test]
     fn string_unescapes() {
         assert_eq!(unescape(r#"Hello\n\"World\" :D"#, false), "Hello\n\"World\" :D");
+        assert_eq!(unescape(r#"\"Hello\""#, false), "\"Hello\"");
+
         assert_eq!(unescape(r#"Hello''\n'''World''' :D"#, true), "Hello\n''World'' :D");
+        assert_eq!(unescape(r#""Hello""#, true), "\"Hello\"");
     }
     #[test]
     fn string_remove_common_indent() {
         assert_eq!(remove_common_indent("\n  \n    \n \n "), "\n\n\n");
         assert_eq!(remove_common_indent("\n  \n    \n a\n"), " \n   \na\n");
         assert_eq!(remove_common_indent("  \n    \n a\n"), "   \na\n");
+    }
+    #[test]
+    fn parts_trailing_ws_single_line() {
+        let inp = "''hello ''";
+        let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
+        match expr {
+            ast::Expr::Str(str) => {
+                assert_eq!(str.parts(), vec![StrPart::Literal("hello ".to_string())])
+            }
+            _ => unreachable!(),
+        }
+    }
+    #[test]
+    fn parts_trailing_ws_multiline() {
+        let inp = "''hello\n ''";
+        let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
+        match expr {
+            ast::Expr::Str(str) => {
+                assert_eq!(str.parts(), vec![StrPart::Literal("hello\n".to_string())])
+            }
+            _ => unreachable!(),
+        }
     }
     #[test]
     fn parts() {

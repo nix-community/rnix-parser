@@ -9,6 +9,7 @@ mod tokens;
 
 use crate::{NixLanguage, SyntaxKind, SyntaxToken};
 
+pub use expr_ext::LiteralKind;
 pub use nodes::*;
 pub use operators::{BinOpKind, UnaryOpKind};
 pub use path_util::PathPart;

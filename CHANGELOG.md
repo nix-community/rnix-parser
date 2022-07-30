@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+* removes the `types` module and replaces it with `ast`
+
+* the `ast` modules has better types and sum types
+
+* removes `ParsedType` in favor of `Expr`
+
+* removes the `value` module. methods on `Value` go on the individual types. For example, string related methods go on `ast::Str`
+
+* `parse` changed to `Root::parse`
+
+* `NODE_OR_DEFAULT` is removed
+
+* `NODE_KEY` -> `NODE_ATTRPATH`, `NODE_KEY_VALUE` -> `NODE_ATTRPATH_VALUE`
+
+* `BinOp::IsSet` is removed since it's actually not a normal binary operator.
+
+* `NODE_SELECT` is flattened in favor of `NODE_ATTRPATH` which consists of multiple Attrs, including `a.b.c` and `a.b.c or expr`
+
+* `a or b` is Apply, not "OrDefault", which matches the result of Nix. Fixes #23
+
+* `${` is considered invalid at Expr places now, which matches the result of Nix.
+
+* remove `TOKEN_DYNAMIC_START` and `TOKEN_DYNAMIC_END`
+
+* rowan 15.0
+
+* various other parsing fixes
+
 ## [v0.10.2] - 2022-06-14
 
 * Correctly parse every possible case of path-interpolation in Nix code ([#85](https://github.com/nix-community/rnix-parser/issues/85)).

@@ -1,23 +1,17 @@
 error: unexpected TOKEN_LESS at 0..1, wanted any of [TOKEN_PAREN_OPEN, TOKEN_REC, TOKEN_CURLY_B_OPEN, TOKEN_SQUARE_B_OPEN, TOKEN_STRING_START, TOKEN_IDENT]
 error: unexpected end of file
-NODE_ROOT 0..20 {
-  NODE_BIN_OP 0..20 {
-    NODE_APPLY 0..19 {
-      NODE_ERROR 0..1 {
-        TOKEN_LESS("<") 0..1
-      }
-      NODE_PATH_WITH_INTERPOL 1..19 {
-        TOKEN_PATH("nixpkgs/") 1..9
-        NODE_STRING_INTERPOL 9..15 {
-          TOKEN_INTERPOL_START("${") 9..11
-          NODE_IDENT 11..14 {
-            TOKEN_IDENT("foo") 11..14
-          }
-          TOKEN_INTERPOL_END("}") 14..15
-        }
-        TOKEN_PATH("/bar") 15..19
-      }
-    }
-    TOKEN_MORE(">") 19..20
-  }
-}
+NODE_ROOT@0..20
+  NODE_BIN_OP@0..20
+    NODE_APPLY@0..19
+      NODE_ERROR@0..1
+        TOKEN_LESS@0..1 "<"
+      NODE_PATH@1..19
+        TOKEN_PATH@1..9 "nixpkgs/"
+        NODE_INTERPOL@9..15
+          TOKEN_INTERPOL_START@9..11 "${"
+          NODE_IDENT@11..14
+            TOKEN_IDENT@11..14 "foo"
+          TOKEN_INTERPOL_END@14..15 "}"
+        TOKEN_PATH@15..19 "/bar"
+    TOKEN_MORE@19..20 ">"
+

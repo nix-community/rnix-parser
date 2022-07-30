@@ -1,27 +1,20 @@
-NODE_ROOT 0..11 {
-  NODE_LAMBDA 0..11 {
-    NODE_IDENT 0..1 {
-      TOKEN_IDENT("a") 0..1
-    }
-    TOKEN_COLON(":") 1..2
-    TOKEN_WHITESPACE(" ") 2..3
-    NODE_LAMBDA 3..11 {
-      NODE_IDENT 3..4 {
-        TOKEN_IDENT("b") 3..4
-      }
-      TOKEN_COLON(":") 4..5
-      TOKEN_WHITESPACE(" ") 5..6
-      NODE_BIN_OP 6..11 {
-        NODE_IDENT 6..7 {
-          TOKEN_IDENT("a") 6..7
-        }
-        TOKEN_WHITESPACE(" ") 7..8
-        TOKEN_ADD("+") 8..9
-        TOKEN_WHITESPACE(" ") 9..10
-        NODE_IDENT 10..11 {
-          TOKEN_IDENT("b") 10..11
-        }
-      }
-    }
-  }
-}
+NODE_ROOT@0..11
+  NODE_LAMBDA@0..11
+    NODE_IDENT@0..1
+      TOKEN_IDENT@0..1 "a"
+    TOKEN_COLON@1..2 ":"
+    TOKEN_WHITESPACE@2..3 " "
+    NODE_LAMBDA@3..11
+      NODE_IDENT@3..4
+        TOKEN_IDENT@3..4 "b"
+      TOKEN_COLON@4..5 ":"
+      TOKEN_WHITESPACE@5..6 " "
+      NODE_BIN_OP@6..11
+        NODE_IDENT@6..7
+          TOKEN_IDENT@6..7 "a"
+        TOKEN_WHITESPACE@7..8 " "
+        TOKEN_ADD@8..9 "+"
+        TOKEN_WHITESPACE@9..10 " "
+        NODE_IDENT@10..11
+          TOKEN_IDENT@10..11 "b"
+

@@ -1,26 +1,19 @@
-NODE_ROOT 0..10 {
-  NODE_ATTR_SET 0..10 {
-    TOKEN_CURLY_B_OPEN("{") 0..1
-    NODE_ATTRPATH_VALUE 1..9 {
-      NODE_ATTRPATH 1..6 {
-        NODE_IDENT 1..2 {
-          TOKEN_IDENT("a") 1..2
-        }
-        TOKEN_DOT(".") 2..3
-        NODE_IDENT 3..4 {
-          TOKEN_IDENT("b") 3..4
-        }
-        TOKEN_DOT(".") 4..5
-        NODE_IDENT 5..6 {
-          TOKEN_IDENT("c") 5..6
-        }
-      }
-      TOKEN_ASSIGN("=") 6..7
-      NODE_LITERAL 7..8 {
-        TOKEN_INTEGER("1") 7..8
-      }
-      TOKEN_SEMICOLON(";") 8..9
-    }
-    TOKEN_CURLY_B_CLOSE("}") 9..10
-  }
-}
+NODE_ROOT@0..10
+  NODE_ATTR_SET@0..10
+    TOKEN_CURLY_B_OPEN@0..1 "{"
+    NODE_ATTRPATH_VALUE@1..9
+      NODE_ATTRPATH@1..6
+        NODE_IDENT@1..2
+          TOKEN_IDENT@1..2 "a"
+        TOKEN_DOT@2..3 "."
+        NODE_IDENT@3..4
+          TOKEN_IDENT@3..4 "b"
+        TOKEN_DOT@4..5 "."
+        NODE_IDENT@5..6
+          TOKEN_IDENT@5..6 "c"
+      TOKEN_ASSIGN@6..7 "="
+      NODE_LITERAL@7..8
+        TOKEN_INTEGER@7..8 "1"
+      TOKEN_SEMICOLON@8..9 ";"
+    TOKEN_CURLY_B_CLOSE@9..10 "}"
+

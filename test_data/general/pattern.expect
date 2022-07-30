@@ -1,75 +1,58 @@
-NODE_ROOT 0..51 {
-  NODE_LAMBDA 0..51 {
-    NODE_PATTERN 0..25 {
-      TOKEN_CURLY_B_OPEN("{") 0..1
-      TOKEN_WHITESPACE(" ") 1..2
-      NODE_PAT_ENTRY 2..23 {
-        NODE_IDENT 2..3 {
-          TOKEN_IDENT("a") 2..3
-        }
-        TOKEN_WHITESPACE(" ") 3..4
-        TOKEN_QUESTION("?") 4..5
-        TOKEN_WHITESPACE(" ") 5..6
-        NODE_LAMBDA 6..23 {
-          NODE_PATTERN 6..20 {
-            TOKEN_CURLY_B_OPEN("{") 6..7
-            TOKEN_WHITESPACE(" ") 7..8
-            NODE_PAT_ENTRY 8..18 {
-              NODE_IDENT 8..9 {
-                TOKEN_IDENT("b") 8..9
-              }
-              TOKEN_WHITESPACE(" ") 9..10
-              TOKEN_QUESTION("?") 10..11
-              TOKEN_WHITESPACE(" ") 11..12
-              NODE_STRING 12..18 {
-                TOKEN_STRING_START("\"") 12..13
-                TOKEN_STRING_CONTENT("test") 13..17
-                TOKEN_STRING_END("\"") 17..18
-              }
-            }
-            TOKEN_WHITESPACE(" ") 18..19
-            TOKEN_CURLY_B_CLOSE("}") 19..20
-          }
-          TOKEN_COLON(":") 20..21
-          TOKEN_WHITESPACE(" ") 21..22
-          NODE_IDENT 22..23 {
-            TOKEN_IDENT("b") 22..23
-          }
-        }
-      }
-      TOKEN_WHITESPACE(" ") 23..24
-      TOKEN_CURLY_B_CLOSE("}") 24..25
-    }
-    TOKEN_COLON(":") 25..26
-    TOKEN_WHITESPACE("\n") 26..27
-    NODE_LAMBDA 27..51 {
-      NODE_PATTERN 27..48 {
-        TOKEN_CURLY_B_OPEN("{") 27..28
-        TOKEN_WHITESPACE(" ") 28..29
-        NODE_PAT_ENTRY 29..34 {
-          NODE_IDENT 29..34 {
-            TOKEN_IDENT("value") 29..34
-          }
-        }
-        TOKEN_COMMA(",") 34..35
-        TOKEN_WHITESPACE(" ") 35..36
-        TOKEN_ELLIPSIS("...") 36..39
-        TOKEN_WHITESPACE(" ") 39..40
-        TOKEN_CURLY_B_CLOSE("}") 40..41
-        TOKEN_WHITESPACE(" ") 41..42
-        NODE_PAT_BIND 42..48 {
-          TOKEN_AT("@") 42..43
-          TOKEN_WHITESPACE(" ") 43..44
-          NODE_IDENT 44..48 {
-            TOKEN_IDENT("bind") 44..48
-          }
-        }
-      }
-      TOKEN_COLON(":") 48..49
-      TOKEN_WHITESPACE("\n") 49..50
-      NODE_LITERAL 50..51 {
-        TOKEN_INTEGER("1") 50..51
-      }
-    }
-  }
-}
+NODE_ROOT@0..51
+  NODE_LAMBDA@0..51
+    NODE_PATTERN@0..25
+      TOKEN_CURLY_B_OPEN@0..1 "{"
+      TOKEN_WHITESPACE@1..2 " "
+      NODE_PAT_ENTRY@2..23
+        NODE_IDENT@2..3
+          TOKEN_IDENT@2..3 "a"
+        TOKEN_WHITESPACE@3..4 " "
+        TOKEN_QUESTION@4..5 "?"
+        TOKEN_WHITESPACE@5..6 " "
+        NODE_LAMBDA@6..23
+          NODE_PATTERN@6..20
+            TOKEN_CURLY_B_OPEN@6..7 "{"
+            TOKEN_WHITESPACE@7..8 " "
+            NODE_PAT_ENTRY@8..18
+              NODE_IDENT@8..9
+                TOKEN_IDENT@8..9 "b"
+              TOKEN_WHITESPACE@9..10 " "
+              TOKEN_QUESTION@10..11 "?"
+              TOKEN_WHITESPACE@11..12 " "
+              NODE_STRING@12..18
+                TOKEN_STRING_START@12..13 "\""
+                TOKEN_STRING_CONTENT@13..17 "test"
+                TOKEN_STRING_END@17..18 "\""
+            TOKEN_WHITESPACE@18..19 " "
+            TOKEN_CURLY_B_CLOSE@19..20 "}"
+          TOKEN_COLON@20..21 ":"
+          TOKEN_WHITESPACE@21..22 " "
+          NODE_IDENT@22..23
+            TOKEN_IDENT@22..23 "b"
+      TOKEN_WHITESPACE@23..24 " "
+      TOKEN_CURLY_B_CLOSE@24..25 "}"
+    TOKEN_COLON@25..26 ":"
+    TOKEN_WHITESPACE@26..27 "\n"
+    NODE_LAMBDA@27..51
+      NODE_PATTERN@27..48
+        TOKEN_CURLY_B_OPEN@27..28 "{"
+        TOKEN_WHITESPACE@28..29 " "
+        NODE_PAT_ENTRY@29..34
+          NODE_IDENT@29..34
+            TOKEN_IDENT@29..34 "value"
+        TOKEN_COMMA@34..35 ","
+        TOKEN_WHITESPACE@35..36 " "
+        TOKEN_ELLIPSIS@36..39 "..."
+        TOKEN_WHITESPACE@39..40 " "
+        TOKEN_CURLY_B_CLOSE@40..41 "}"
+        TOKEN_WHITESPACE@41..42 " "
+        NODE_PAT_BIND@42..48
+          TOKEN_AT@42..43 "@"
+          TOKEN_WHITESPACE@43..44 " "
+          NODE_IDENT@44..48
+            TOKEN_IDENT@44..48 "bind"
+      TOKEN_COLON@48..49 ":"
+      TOKEN_WHITESPACE@49..50 "\n"
+      NODE_LITERAL@50..51
+        TOKEN_INTEGER@50..51 "1"
+
