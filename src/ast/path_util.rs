@@ -6,25 +6,16 @@ use crate::ast;
 use super::InterpolPart;
 
 impl ast::nodes::Path {
-    pub fn parts(&self) -> Vec<InterpolPart> {
-        let mut parts = Vec::new();
-
-        for child in self.syntax().children_with_tokens() {
-            match child {
-                NodeOrToken::Token(token) => {
-                    assert_eq!(token.kind(), TOKEN_PATH);
-                    parts.push(InterpolPart::Literal(token.text().to_string()));
-                }
-                NodeOrToken::Node(node) => {
-                    assert_eq!(node.kind(), NODE_INTERPOL);
-                    parts.push(InterpolPart::Interpolation(
-                        ast::Interpol::cast(node.clone()).unwrap(),
-                    ));
-                }
+    pub fn parts(&self) -> impl Iterator<Item = InterpolPart> {
+        self.syntax().children_with_tokens().map(|child| match child {
+            NodeOrToken::Token(token) => {
+                assert_eq!(token.kind(), TOKEN_PATH);
+                InterpolPart::Literal(token.text().to_string())
             }
-        }
-
-        parts
+            NodeOrToken::Node(node) => {
+                InterpolPart::Interpolation(ast::Interpol::cast(node.clone()).unwrap())
+            }
+        })
     }
 }
 
