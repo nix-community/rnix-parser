@@ -812,6 +812,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use expect_test::expect_file;
+
     use crate::Root;
 
     use super::*;
@@ -887,48 +889,28 @@ mod tests {
     //     }
 
     fn test_dir(name: &str) {
-        let should_update = env::var("UPDATE_TESTS").map(|s| s == "1").unwrap_or(false);
-        let dir: PathBuf = ["test_data", name].iter().collect();
+        let dir: PathBuf = [env!("CARGO_MANIFEST_DIR"), "test_data", name].iter().collect();
 
         for entry in dir.read_dir().unwrap() {
-            let entry = entry.unwrap();
-            let mut path = entry.path();
+            let path = entry.unwrap().path();
+
             if path.extension() != Some(OsStr::new("nix")) {
                 continue;
             }
+
             let mut code = fs::read_to_string(&path).unwrap();
             if code.ends_with('\n') {
                 code.truncate(code.len() - 1);
             }
             let parse = Root::parse(&code);
-            path.set_extension("expect");
-            if !path.exists() {
-                fs::File::create(&path).expect("Failed to create .expect file");
-            }
-            let expected = fs::read_to_string(&path).unwrap();
 
             let mut actual = String::new();
             for error in parse.errors() {
                 writeln!(actual, "error: {}", error).unwrap();
             }
             writeln!(actual, "{:#?}", parse.syntax()).unwrap();
-            if should_update {
-                let mut file =
-                    fs::OpenOptions::new().write(true).truncate(true).open(&path).unwrap();
-                write!(file, "{}", actual).unwrap();
-                continue;
-            }
 
-            if actual != expected {
-                path.set_extension("nix");
-                eprintln!("In {}:", path.display());
-                eprintln!("--- Actual ---");
-                eprintln!("{}", actual);
-                eprintln!("-- Expected ---");
-                eprintln!("{}", expected);
-                eprintln!("--- End ---");
-                panic!("Tests did not match");
-            }
+            expect_file![path.with_extension("expect")].assert_eq(&actual);
         }
     }
 
