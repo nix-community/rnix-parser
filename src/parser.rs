@@ -816,9 +816,7 @@ mod tests {
 
     use crate::Root;
 
-    use super::*;
-
-    use std::{env, ffi::OsStr, fmt::Write, fs, io::Write as IoWrite, path::PathBuf};
+    use std::{env, ffi::OsStr, fmt::Write, fs, path::PathBuf};
 
     //     #[test]
     //     fn whitespace_attachment_for_incomplete_code1() {
@@ -888,8 +886,9 @@ mod tests {
     //         );
     //     }
 
-    fn test_dir(name: &str) {
-        let dir: PathBuf = [env!("CARGO_MANIFEST_DIR"), "test_data", name].iter().collect();
+    #[test]
+    fn parser() {
+        let dir: PathBuf = [env!("CARGO_MANIFEST_DIR"), "test_data", "parser"].iter().collect();
 
         for entry in dir.read_dir().unwrap() {
             let path = entry.unwrap().path();
@@ -897,6 +896,8 @@ mod tests {
             if path.extension() != Some(OsStr::new("nix")) {
                 continue;
             }
+
+            println!("testing: {}", path.display());
 
             let mut code = fs::read_to_string(&path).unwrap();
             if code.ends_with('\n') {
@@ -911,26 +912,6 @@ mod tests {
             writeln!(actual, "{:#?}", parse.syntax()).unwrap();
 
             expect_file![path.with_extension("expect")].assert_eq(&actual);
-        }
-    }
-
-    #[rustfmt::skip]
-    mod dir_tests {
-        use super::test_dir;
-
-        #[test]
-        fn general() {
-            test_dir("general");
-        }
-
-        #[test]
-        fn parser() {
-            for dir in std::fs::read_dir("test_data/parser").unwrap() {
-                let dir = dir.unwrap();
-                let file_name = dir.file_name().into_string().unwrap();
-                println!("testing: {}", file_name);
-                test_dir(&format!("parser/{}", file_name));
-            }
         }
     }
 }

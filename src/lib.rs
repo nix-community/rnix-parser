@@ -120,7 +120,7 @@ mod tests {
     #[test]
     fn interpolation() {
         let root =
-            ast::Root::parse(include_str!("../test_data/general/interpolation.nix")).ok().unwrap();
+            ast::Root::parse(include_str!("../test_data/parser/interpolation.nix")).ok().unwrap();
         let let_in = ast::LetIn::try_from(root.expr().unwrap()).unwrap();
         let set = ast::AttrSet::try_from(let_in.body().unwrap()).unwrap();
         let entry = set.entries().nth(1).unwrap();
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn inherit() {
-        let root = ast::Root::parse(include_str!("../test_data/general/inherit.nix")).ok().unwrap();
+        let root = ast::Root::parse(include_str!("../test_data/parser/inherit.nix")).ok().unwrap();
         let let_in = ast::LetIn::try_from(root.expr().unwrap()).unwrap();
         let set = ast::AttrSet::try_from(let_in.body().unwrap()).unwrap();
         let inherit = set.inherits().nth(1).unwrap();
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn math() {
-        let root = ast::Root::parse(include_str!("../test_data/general/math.nix")).ok().unwrap();
+        let root = ast::Root::parse(include_str!("../test_data/parser/math.nix")).ok().unwrap();
         let op1 = ast::BinOp::try_from(root.expr().unwrap()).unwrap();
         let op2 = ast::BinOp::try_from(op1.lhs().unwrap()).unwrap();
         assert_eq!(op1.operator().unwrap(), ast::BinOpKind::Add);
