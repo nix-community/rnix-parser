@@ -129,11 +129,11 @@ mod tests {
 
         match &*value.parts() {
             &[
-                ast::StrPart::Literal(ref s1),
-                ast::StrPart::Interpolation(_),
-                ast::StrPart::Literal(ref s2),
-                ast::StrPart::Interpolation(_),
-                ast::StrPart::Literal(ref s3)
+                ast::InterpolPart::Literal(ref s1),
+                ast::InterpolPart::Interpolation(_),
+                ast::InterpolPart::Literal(ref s2),
+                ast::InterpolPart::Interpolation(_),
+                ast::InterpolPart::Literal(ref s3)
             ]
             if s1 == "The set's x value is: "
                 && s2 == "\n\nThis line shall have no indention\n  This line shall be indented by 2\n\n\n"

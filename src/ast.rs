@@ -1,6 +1,7 @@
 //! Provides a type system for the AST, in some sense
 
 mod expr_ext;
+mod interpol;
 mod nodes;
 mod operators;
 mod path_util;
@@ -10,10 +11,9 @@ mod tokens;
 use crate::{NixLanguage, SyntaxKind, SyntaxToken};
 
 pub use expr_ext::LiteralKind;
+pub use interpol::*;
 pub use nodes::*;
 pub use operators::{BinOpKind, UnaryOpKind};
-pub use path_util::PathPart;
-pub use str_util::StrPart;
 pub use tokens::*;
 
 pub trait AstNode: rowan::ast::AstNode<Language = NixLanguage> {}

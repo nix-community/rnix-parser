@@ -187,7 +187,6 @@ node! {
         NODE_IDENT => Ident,
         NODE_WITH => With,
         NODE_HAS_ATTR => HasAttr,
-        NODE_PATH_WITH_INTERPOL => PathWithInterpol,
     )]
     /// An expression. The fundamental nix ast type.
     enum Expr;
@@ -280,9 +279,9 @@ node! { #[from(NODE_PATH)] struct Path; }
 
 node! { #[from(NODE_STRING)] struct Str; }
 
-node! { #[from(NODE_INTERPOL)] struct StrInterpol; }
+node! { #[from(NODE_INTERPOL)] struct Interpol; }
 
-impl StrInterpol {
+impl Interpol {
     ng! { expr, Expr, 0 }
 }
 
@@ -430,5 +429,3 @@ impl HasAttr {
     tg! { question_token, ? }
     ng! { attrpath, Attrpath, 0 }
 }
-
-node! { #[from(NODE_PATH_WITH_INTERPOL)] struct PathWithInterpol; }
