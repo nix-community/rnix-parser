@@ -230,6 +230,12 @@ impl Attrpath {
 
 node! { #[from(NODE_DYNAMIC)] struct Dynamic; }
 
+impl Dynamic {
+    tg! { interpol_start_token, TOKEN_INTERPOL_START }
+    ng! { expr, Expr, 0 }
+    tg! { interpol_end_token, TOKEN_INTERPOL_END }
+}
+
 node! { #[from(NODE_ERROR)] struct Error; }
 
 node! { #[from(NODE_IF_ELSE)] struct IfElse; }
