@@ -117,13 +117,14 @@ mod tests {
 
     use crate::{
         ast::{self, HasEntry},
-        Root, SyntaxKind, tokenize,
+        tokenize, Root, SyntaxKind,
     };
 
     #[test]
     fn interpolation() {
-        let root =
-            ast::Root::parse(include_str!("../test_data/parser/interpolation.nix")).ok().unwrap();
+        let root = ast::Root::parse(include_str!("../test_data/parser/success/interpolation.nix"))
+            .ok()
+            .unwrap();
         let let_in = ast::LetIn::try_from(root.expr().unwrap()).unwrap();
         let set = ast::AttrSet::try_from(let_in.body().unwrap()).unwrap();
         let entry = set.entries().nth(1).unwrap();
@@ -147,7 +148,8 @@ mod tests {
 
     #[test]
     fn inherit() {
-        let root = ast::Root::parse(include_str!("../test_data/parser/inherit.nix")).ok().unwrap();
+        let root =
+            ast::Root::parse(include_str!("../test_data/parser/success/inherit.nix")).ok().unwrap();
         let let_in = ast::LetIn::try_from(root.expr().unwrap()).unwrap();
         let set = ast::AttrSet::try_from(let_in.body().unwrap()).unwrap();
         let inherit = set.inherits().nth(1).unwrap();
@@ -163,7 +165,8 @@ mod tests {
 
     #[test]
     fn math() {
-        let root = ast::Root::parse(include_str!("../test_data/parser/math.nix")).ok().unwrap();
+        let root =
+            ast::Root::parse(include_str!("../test_data/parser/success/math.nix")).ok().unwrap();
         let op1 = ast::BinOp::try_from(root.expr().unwrap()).unwrap();
         let op2 = ast::BinOp::try_from(op1.lhs().unwrap()).unwrap();
         assert_eq!(op1.operator().unwrap(), ast::BinOpKind::Add);
@@ -185,9 +188,13 @@ mod tests {
     where
         F: Fn(String) -> String,
     {
-        let dir: PathBuf = [env!("CARGO_MANIFEST_DIR"), "test_data", dir].iter().collect();
+        let base_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "test_data", dir].iter().collect();
+        let success_path = base_path.join("success");
+        let error_path = base_path.join("error");
 
-        for entry in dir.read_dir().unwrap() {
+        let entries = success_path.read_dir().unwrap().chain(error_path.read_dir().unwrap());
+
+        for entry in entries {
             let path = entry.unwrap().path();
 
             if path.extension() != Some(OsStr::new("nix")) {
@@ -206,29 +213,33 @@ mod tests {
         }
     }
 
+    fn dump_parse(code: String) -> String {
+        let parse = Root::parse(&code);
+
+        let mut actual = String::new();
+        for error in parse.errors() {
+            writeln!(actual, "error: {}", error).unwrap();
+        }
+        writeln!(actual, "{:#?}", parse.syntax()).unwrap();
+
+        actual
+    }
+
+    fn dump_tokenize(code: String) -> String {
+        let mut actual = String::new();
+        for (kind, str) in tokenize(&code) {
+            writeln!(actual, "{:?}, \"{}\"", kind, str).unwrap();
+        }
+        actual
+    }
+
     #[test]
     fn parser_dir_tests() {
-        dir_tests("parser", |code| {
-            let parse = Root::parse(&code);
-
-            let mut actual = String::new();
-            for error in parse.errors() {
-                writeln!(actual, "error: {}", error).unwrap();
-            }
-            writeln!(actual, "{:#?}", parse.syntax()).unwrap();
-
-            actual
-        })
+        dir_tests("parser", dump_parse)
     }
 
     #[test]
     fn tokenizer_dir_tests() {
-        dir_tests("tokenizer", |code| {
-            let mut actual = String::new();
-            for (kind, str) in tokenize(&code) {
-                writeln!(actual, "{:?}, \"{}\"", kind, str).unwrap();
-            }
-            actual
-        })
+        dir_tests("tokenizer", dump_tokenize)
     }
 }
