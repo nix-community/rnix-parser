@@ -1,0 +1,10 @@
+error: unexpected token at 3..4
+NODE_ROOT@0..5
+  NODE_ATTR_SET@0..2
+    TOKEN_CURLY_B_OPEN@0..1 "{"
+    TOKEN_CURLY_B_CLOSE@1..2 "}"
+  TOKEN_WHITESPACE@2..3 " "
+  NODE_ERROR@3..4
+    TOKEN_ASSIGN@3..4 "="
+  TOKEN_WHITESPACE@4..5 "\n"
+
