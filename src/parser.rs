@@ -812,12 +812,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use expect_test::expect_file;
-
-    use crate::Root;
-
-    use std::{env, ffi::OsStr, fmt::Write, fs, path::PathBuf};
-
     //     #[test]
     //     fn whitespace_attachment_for_incomplete_code1() {
     //         let code = "{
@@ -885,33 +879,4 @@ mod tests {
     //             .trim()
     //         );
     //     }
-
-    #[test]
-    fn parser() {
-        let dir: PathBuf = [env!("CARGO_MANIFEST_DIR"), "test_data", "parser"].iter().collect();
-
-        for entry in dir.read_dir().unwrap() {
-            let path = entry.unwrap().path();
-
-            if path.extension() != Some(OsStr::new("nix")) {
-                continue;
-            }
-
-            println!("testing: {}", path.display());
-
-            let mut code = fs::read_to_string(&path).unwrap();
-            if code.ends_with('\n') {
-                code.truncate(code.len() - 1);
-            }
-            let parse = Root::parse(&code);
-
-            let mut actual = String::new();
-            for error in parse.errors() {
-                writeln!(actual, "error: {}", error).unwrap();
-            }
-            writeln!(actual, "{:#?}", parse.syntax()).unwrap();
-
-            expect_file![path.with_extension("expect")].assert_eq(&actual);
-        }
-    }
 }

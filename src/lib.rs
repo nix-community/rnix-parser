@@ -110,11 +110,14 @@ macro_rules! match_ast {
 
 #[cfg(test)]
 mod tests {
+    use std::{ffi::OsStr, fmt::Write, fs, path::PathBuf};
+
+    use expect_test::expect_file;
     use rowan::ast::AstNode;
 
     use crate::{
         ast::{self, HasEntry},
-        SyntaxKind,
+        Root, SyntaxKind, tokenize,
     };
 
     #[test]
@@ -176,5 +179,56 @@ mod tests {
     fn t_macro() {
         assert_eq!(T![@], SyntaxKind::TOKEN_AT);
         assert!(matches!(SyntaxKind::TOKEN_PAREN_OPEN, T!["("]));
+    }
+
+    fn dir_tests<F>(dir: &str, get_actual: F)
+    where
+        F: Fn(String) -> String,
+    {
+        let dir: PathBuf = [env!("CARGO_MANIFEST_DIR"), "test_data", dir].iter().collect();
+
+        for entry in dir.read_dir().unwrap() {
+            let path = entry.unwrap().path();
+
+            if path.extension() != Some(OsStr::new("nix")) {
+                continue;
+            }
+
+            println!("testing: {}", path.display());
+
+            let mut code = fs::read_to_string(&path).unwrap();
+            if code.ends_with('\n') {
+                code.truncate(code.len() - 1);
+            }
+
+            let actual = get_actual(code);
+            expect_file![path.with_extension("expect")].assert_eq(&actual);
+        }
+    }
+
+    #[test]
+    fn parser_dir_tests() {
+        dir_tests("parser", |code| {
+            let parse = Root::parse(&code);
+
+            let mut actual = String::new();
+            for error in parse.errors() {
+                writeln!(actual, "error: {}", error).unwrap();
+            }
+            writeln!(actual, "{:#?}", parse.syntax()).unwrap();
+
+            actual
+        })
+    }
+
+    #[test]
+    fn tokenizer_dir_tests() {
+        dir_tests("tokenizer", |code| {
+            let mut actual = String::new();
+            for (kind, str) in tokenize(&code) {
+                writeln!(actual, "{:?}, \"{}\"", kind, str).unwrap();
+            }
+            actual
+        })
     }
 }
