@@ -213,33 +213,29 @@ mod tests {
         }
     }
 
-    fn dump_parse(code: String) -> String {
-        let parse = Root::parse(&code);
-
-        let mut actual = String::new();
-        for error in parse.errors() {
-            writeln!(actual, "error: {}", error).unwrap();
-        }
-        writeln!(actual, "{:#?}", parse.syntax()).unwrap();
-
-        actual
-    }
-
-    fn dump_tokenize(code: String) -> String {
-        let mut actual = String::new();
-        for (kind, str) in tokenize(&code) {
-            writeln!(actual, "{:?}, \"{}\"", kind, str).unwrap();
-        }
-        actual
-    }
-
     #[test]
     fn parser_dir_tests() {
-        dir_tests("parser", dump_parse)
+        dir_tests("parser", |code| {
+            let parse = Root::parse(&code);
+
+            let mut actual = String::new();
+            for error in parse.errors() {
+                writeln!(actual, "error: {}", error).unwrap();
+            }
+            writeln!(actual, "{:#?}", parse.syntax()).unwrap();
+
+            actual
+        })
     }
 
     #[test]
     fn tokenizer_dir_tests() {
-        dir_tests("tokenizer", dump_tokenize)
+        dir_tests("tokenizer", |code| {
+            let mut actual = String::new();
+            for (kind, str) in tokenize(&code) {
+                writeln!(actual, "{:?}, \"{}\"", kind, str).unwrap();
+            }
+            actual
+        })
     }
 }
