@@ -6,8 +6,8 @@ NODE_ROOT@0..10
         NODE_IDENT@0..1
           TOKEN_IDENT@0..1 "f"
         TOKEN_AT@1..2 "@"
-      TOKEN_CURLY_B_OPEN@2..3 "{"
-      TOKEN_CURLY_B_CLOSE@3..4 "}"
+      TOKEN_L_BRACE@2..3 "{"
+      TOKEN_R_BRACE@3..4 "}"
       NODE_ERROR@4..6
         TOKEN_AT@4..5 "@"
         NODE_IDENT@5..6

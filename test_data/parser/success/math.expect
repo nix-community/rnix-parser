@@ -24,7 +24,7 @@ NODE_ROOT@0..23
       TOKEN_DIV@14..15 "/"
       TOKEN_WHITESPACE@15..16 " "
       NODE_PAREN@16..23
-        TOKEN_PAREN_OPEN@16..17 "("
+        TOKEN_L_PAREN@16..17 "("
         NODE_BIN_OP@17..22
           NODE_LITERAL@17..18
             TOKEN_INTEGER@17..18 "5"
@@ -33,5 +33,5 @@ NODE_ROOT@0..23
           TOKEN_WHITESPACE@20..21 " "
           NODE_LITERAL@21..22
             TOKEN_INTEGER@21..22 "6"
-        TOKEN_PAREN_CLOSE@22..23 ")"
+        TOKEN_R_PAREN@22..23 ")"
 

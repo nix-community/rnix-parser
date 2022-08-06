@@ -297,18 +297,18 @@ where
         self.finish_node();
     }
     fn parse_pattern(&mut self, bound: bool) {
-        if self.peek().map(|t| t == TOKEN_CURLY_B_CLOSE).unwrap_or(true) {
+        if self.peek().map(|t| t == TOKEN_R_BRACE).unwrap_or(true) {
             self.bump();
         } else {
             loop {
-                match self.expect_peek_any(&[TOKEN_CURLY_B_CLOSE, TOKEN_ELLIPSIS, TOKEN_IDENT]) {
-                    Some(TOKEN_CURLY_B_CLOSE) => {
+                match self.expect_peek_any(&[TOKEN_R_BRACE, TOKEN_ELLIPSIS, TOKEN_IDENT]) {
+                    Some(TOKEN_R_BRACE) => {
                         self.bump();
                         break;
                     }
                     Some(TOKEN_ELLIPSIS) => {
                         self.bump();
-                        self.expect(TOKEN_CURLY_B_CLOSE);
+                        self.expect(TOKEN_R_BRACE);
                         break;
                     }
                     Some(TOKEN_IDENT) => {
@@ -322,7 +322,7 @@ where
                         match self.peek() {
                             Some(TOKEN_COMMA) => self.bump(),
                             _ => {
-                                self.expect(TOKEN_CURLY_B_CLOSE);
+                                self.expect(TOKEN_R_BRACE);
                                 break;
                             }
                         }
@@ -354,11 +354,11 @@ where
                     self.start_node(NODE_INHERIT);
                     self.bump();
 
-                    if self.peek() == Some(TOKEN_PAREN_OPEN) {
+                    if self.peek() == Some(TOKEN_L_PAREN) {
                         self.start_node(NODE_INHERIT_FROM);
                         self.bump();
                         self.parse_expr();
-                        self.expect(TOKEN_PAREN_CLOSE);
+                        self.expect(TOKEN_R_PAREN);
                         self.finish_node();
                     }
 
@@ -392,7 +392,8 @@ where
         }
         self.bump(); // the final close, like '}'
     }
-    fn parse_val(&mut self) -> Checkpoint {
+
+    fn parse_simple(&mut self) -> Checkpoint {
         let peek = match self.peek() {
             Some(it) => it,
             None => {
@@ -407,7 +408,7 @@ where
         };
         let checkpoint = self.checkpoint();
         match peek {
-            TOKEN_PAREN_OPEN => {
+            TOKEN_L_PAREN => {
                 self.start_node(NODE_PAREN);
                 self.bump();
                 self.parse_expr();
@@ -417,11 +418,11 @@ where
             TOKEN_REC => {
                 self.start_node(NODE_ATTR_SET);
                 self.bump();
-                self.expect(TOKEN_CURLY_B_OPEN);
-                self.parse_set(TOKEN_CURLY_B_CLOSE);
+                self.expect(TOKEN_L_BRACE);
+                self.parse_set(TOKEN_R_BRACE);
                 self.finish_node();
             }
-            TOKEN_CURLY_B_OPEN => {
+            TOKEN_L_BRACE => {
                 // Do a lookahead:
                 let mut peek = [None, None];
                 for i in &mut peek {
@@ -441,10 +442,10 @@ where
                 match peek {
                     [Some(TOKEN_IDENT), Some(TOKEN_COMMA)]
                     | [Some(TOKEN_IDENT), Some(TOKEN_QUESTION)]
-                    | [Some(TOKEN_IDENT), Some(TOKEN_CURLY_B_CLOSE)]
-                    | [Some(TOKEN_ELLIPSIS), Some(TOKEN_CURLY_B_CLOSE)]
-                    | [Some(TOKEN_CURLY_B_CLOSE), Some(TOKEN_COLON)]
-                    | [Some(TOKEN_CURLY_B_CLOSE), Some(TOKEN_AT)] => {
+                    | [Some(TOKEN_IDENT), Some(TOKEN_R_BRACE)]
+                    | [Some(TOKEN_ELLIPSIS), Some(TOKEN_R_BRACE)]
+                    | [Some(TOKEN_R_BRACE), Some(TOKEN_COLON)]
+                    | [Some(TOKEN_R_BRACE), Some(TOKEN_AT)] => {
                         // This looks like a pattern
                         self.start_node(NODE_LAMBDA);
 
@@ -462,16 +463,16 @@ where
                         // This looks like a set
                         self.start_node(NODE_ATTR_SET);
                         self.bump();
-                        self.parse_set(TOKEN_CURLY_B_CLOSE);
+                        self.parse_set(TOKEN_R_BRACE);
                         self.finish_node();
                     }
                 }
             }
-            TOKEN_SQUARE_B_OPEN => {
+            TOKEN_L_BRACK => {
                 self.start_node(NODE_LIST);
                 self.bump();
-                while self.peek().map(|t| t != TOKEN_SQUARE_B_CLOSE).unwrap_or(false) {
-                    self.parse_val();
+                while self.peek().map(|t| t != TOKEN_R_BRACK).unwrap_or(false) {
+                    self.parse_simple();
                 }
                 self.bump();
                 self.finish_node();
@@ -520,7 +521,7 @@ where
                         self.bump();
                         self.finish_node(); // PatBind
 
-                        self.expect(TOKEN_CURLY_B_OPEN);
+                        self.expect(TOKEN_L_BRACE);
                         self.parse_pattern(true);
                         self.finish_node(); // Pattern
 
@@ -539,10 +540,10 @@ where
                     kind,
                     TextRange::new(start, end),
                     [
-                        TOKEN_PAREN_OPEN,
+                        TOKEN_L_PAREN,
                         TOKEN_REC,
-                        TOKEN_CURLY_B_OPEN,
-                        TOKEN_SQUARE_B_OPEN,
+                        TOKEN_L_BRACE,
+                        TOKEN_L_BRACK,
                         TOKEN_STRING_START,
                         TOKEN_IDENT,
                     ]
@@ -558,7 +559,7 @@ where
             self.parse_attrpath();
             if self.peek() == Some(TOKEN_OR) {
                 self.bump();
-                self.parse_val();
+                self.parse_simple();
             }
             self.finish_node();
 
@@ -581,11 +582,11 @@ where
         checkpoint
     }
     fn parse_fn(&mut self) -> Checkpoint {
-        let checkpoint = self.parse_val();
+        let checkpoint = self.parse_simple();
 
         while self.peek().map(|t| t.is_fn_arg()).unwrap_or(false) {
             self.start_node_at(checkpoint, NODE_APPLY);
-            self.parse_val();
+            self.parse_simple();
             self.finish_node();
         }
         checkpoint
@@ -712,10 +713,10 @@ where
                 let checkpoint = self.checkpoint();
                 self.bump();
 
-                if self.peek() == Some(TOKEN_CURLY_B_OPEN) {
+                if self.peek() == Some(TOKEN_L_BRACE) {
                     self.start_node_at(checkpoint, NODE_LEGACY_LET);
                     self.bump();
-                    self.parse_set(TOKEN_CURLY_B_CLOSE);
+                    self.parse_set(TOKEN_R_BRACE);
                     self.finish_node();
                 } else {
                     self.start_node_at(checkpoint, NODE_LET_IN);

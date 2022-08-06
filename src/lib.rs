@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn t_macro() {
         assert_eq!(T![@], SyntaxKind::TOKEN_AT);
-        assert!(matches!(SyntaxKind::TOKEN_PAREN_OPEN, T!["("]));
+        assert!(matches!(SyntaxKind::TOKEN_L_PAREN, T!["("]));
     }
 
     fn dir_tests<F>(dir: &str, get_actual: F)
