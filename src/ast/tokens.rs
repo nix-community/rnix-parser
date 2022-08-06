@@ -68,6 +68,6 @@ impl Integer {
     }
 }
 
-token! { #[from(TOKEN_PATH)] struct Path; }
+token! { #[from(TOKEN_PATH)] struct PathContent; }
 
 token! { #[from(TOKEN_URI)] struct Uri; }
