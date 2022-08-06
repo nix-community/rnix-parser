@@ -38,7 +38,7 @@ macro_rules! T {
 
     (&&)      => ($crate::SyntaxKind::TOKEN_AND_AND);
     (==)      => ($crate::SyntaxKind::TOKEN_EQUAL);
-    (=>)      => ($crate::SyntaxKind::TOKEN_IMPLICATION);
+    (->)      => ($crate::SyntaxKind::TOKEN_IMPLICATION);
     (<)       => ($crate::SyntaxKind::TOKEN_LESS);
     (<=)      => ($crate::SyntaxKind::TOKEN_LESS_OR_EQ);
     (>)       => ($crate::SyntaxKind::TOKEN_MORE);
