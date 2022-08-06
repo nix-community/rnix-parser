@@ -301,12 +301,12 @@ where
             self.bump();
         } else {
             loop {
-                match self.expect_peek_any(&[TOKEN_R_BRACE, TOKEN_ELLIPSIS, TOKEN_IDENT]) {
+                match self.expect_peek_any(&[TOKEN_R_BRACE, T![...], TOKEN_IDENT]) {
                     Some(TOKEN_R_BRACE) => {
                         self.bump();
                         break;
                     }
-                    Some(TOKEN_ELLIPSIS) => {
+                    Some(T![...]) => {
                         self.bump();
                         self.expect(TOKEN_R_BRACE);
                         break;
@@ -314,13 +314,13 @@ where
                     Some(TOKEN_IDENT) => {
                         self.start_node(NODE_PAT_ENTRY);
                         self.bump();
-                        if let Some(TOKEN_QUESTION) = self.peek() {
+                        if let Some(T![?]) = self.peek() {
                             self.bump();
                             self.parse_expr();
                         }
                         self.finish_node();
                         match self.peek() {
-                            Some(TOKEN_COMMA) => self.bump(),
+                            Some(T![,]) => self.bump(),
                             _ => {
                                 self.expect(TOKEN_R_BRACE);
                                 break;
@@ -333,7 +333,7 @@ where
             }
         }
 
-        if self.peek() == Some(TOKEN_AT) {
+        if self.peek() == Some(T![@]) {
             let kind = if bound { NODE_ERROR } else { NODE_PAT_BIND };
             self.start_node(kind);
             let start = self.get_text_position();
@@ -350,7 +350,7 @@ where
             match self.peek() {
                 None => break,
                 token if token == Some(until) => break,
-                Some(TOKEN_INHERIT) => {
+                Some(T![inherit]) => {
                     self.start_node(NODE_INHERIT);
                     self.bump();
 
@@ -364,7 +364,7 @@ where
 
                     loop {
                         match self.peek() {
-                            Some(t) if t != TOKEN_SEMICOLON => {
+                            Some(t) if t != T![;] => {
                                 self.parse_attr();
                             }
                             Some(_) => {
@@ -377,15 +377,15 @@ where
                         }
                     }
 
-                    self.expect(TOKEN_SEMICOLON);
+                    self.expect(T![;]);
                     self.finish_node();
                 }
                 Some(_) => {
                     self.start_node(NODE_ATTRPATH_VALUE);
                     self.parse_attrpath();
-                    self.expect(TOKEN_ASSIGN);
+                    self.expect(T![=]);
                     self.parse_expr();
-                    self.expect(TOKEN_SEMICOLON);
+                    self.expect(T![;]);
                     self.finish_node();
                 }
             }
@@ -415,7 +415,7 @@ where
                 self.bump();
                 self.finish_node();
             }
-            TOKEN_REC => {
+            T![rec] => {
                 self.start_node(NODE_ATTR_SET);
                 self.bump();
                 self.expect(TOKEN_L_BRACE);
@@ -440,12 +440,12 @@ where
                 }
 
                 match peek {
-                    [Some(TOKEN_IDENT), Some(TOKEN_COMMA)]
-                    | [Some(TOKEN_IDENT), Some(TOKEN_QUESTION)]
+                    [Some(TOKEN_IDENT), Some(T![,])]
+                    | [Some(TOKEN_IDENT), Some(T![?])]
                     | [Some(TOKEN_IDENT), Some(TOKEN_R_BRACE)]
-                    | [Some(TOKEN_ELLIPSIS), Some(TOKEN_R_BRACE)]
-                    | [Some(TOKEN_R_BRACE), Some(TOKEN_COLON)]
-                    | [Some(TOKEN_R_BRACE), Some(TOKEN_AT)] => {
+                    | [Some(T![...]), Some(TOKEN_R_BRACE)]
+                    | [Some(TOKEN_R_BRACE), Some(T![:])]
+                    | [Some(TOKEN_R_BRACE), Some(T![@])] => {
                         // This looks like a pattern
                         self.start_node(NODE_LAMBDA);
 
@@ -454,7 +454,7 @@ where
                         self.parse_pattern(false);
                         self.finish_node();
 
-                        self.expect(TOKEN_COLON);
+                        self.expect(T![:]);
                         self.parse_expr();
 
                         self.finish_node();
@@ -508,13 +508,13 @@ where
                 self.expect_ident();
 
                 match self.peek() {
-                    Some(TOKEN_COLON) => {
+                    Some(T![:]) => {
                         self.start_node_at(checkpoint, NODE_LAMBDA);
                         self.bump();
                         self.parse_expr();
                         self.finish_node();
                     }
-                    Some(TOKEN_AT) => {
+                    Some(T![@]) => {
                         self.start_node_at(checkpoint, NODE_LAMBDA);
                         self.start_node_at(checkpoint, NODE_PATTERN);
                         self.start_node_at(checkpoint, NODE_PAT_BIND);
@@ -525,7 +525,7 @@ where
                         self.parse_pattern(true);
                         self.finish_node(); // Pattern
 
-                        self.expect(TOKEN_COLON);
+                        self.expect(T![:]);
                         self.parse_expr();
                         self.finish_node(); // Lambda
                     }
@@ -541,7 +541,7 @@ where
                     TextRange::new(start, end),
                     [
                         TOKEN_L_PAREN,
-                        TOKEN_REC,
+                        T![rec],
                         TOKEN_L_BRACE,
                         TOKEN_L_BRACK,
                         TOKEN_STRING_START,
@@ -637,7 +637,7 @@ where
     }
     fn parse_hasattr(&mut self) -> Checkpoint {
         let checkpoint = self.parse_negate();
-        while self.peek().map(|t| t == TOKEN_QUESTION).unwrap_or(false) {
+        while self.peek().map(|t| t == T![?]).unwrap_or(false) {
             self.start_node_at(checkpoint, NODE_HAS_ATTR);
             self.bump();
             self.parse_attrpath();
@@ -649,7 +649,7 @@ where
         self.handle_operation_right(Self::parse_hasattr, T![++] | ())
     }
     fn parse_mul(&mut self) -> Checkpoint {
-        self.handle_operation_left(false, Self::parse_concat, TOKEN_MUL | TOKEN_DIV)
+        self.handle_operation_left(false, Self::parse_concat, T![*] | T![/])
     }
     fn parse_add(&mut self) -> Checkpoint {
         self.handle_operation_left(false, Self::parse_mul, T![+] | T![-])
@@ -670,11 +670,7 @@ where
         self.handle_operation_right(Self::parse_invert, T!["//"] | ())
     }
     fn parse_compare(&mut self) -> Checkpoint {
-        self.handle_operation_left(
-            true,
-            Self::parse_merge,
-            TOKEN_LESS | TOKEN_LESS_OR_EQ | TOKEN_MORE | TOKEN_MORE_OR_EQ,
-        )
+        self.handle_operation_left(true, Self::parse_merge, T![<] | T![<=] | T![>] | T![>=])
     }
     fn parse_equal(&mut self) -> Checkpoint {
         self.handle_operation_left(true, Self::parse_compare, T![==] | T![!=])
@@ -720,28 +716,28 @@ where
                     self.finish_node();
                 } else {
                     self.start_node_at(checkpoint, NODE_LET_IN);
-                    self.parse_set(TOKEN_IN);
+                    self.parse_set(T![in]);
                     self.parse_expr();
                     self.finish_node();
                 }
                 checkpoint
             }
-            Some(TOKEN_WITH) => {
+            Some(T![with]) => {
                 let checkpoint = self.checkpoint();
                 self.start_node(NODE_WITH);
                 self.bump();
                 self.parse_expr();
-                self.expect(TOKEN_SEMICOLON);
+                self.expect(T![;]);
                 self.parse_expr();
                 self.finish_node();
                 checkpoint
             }
-            Some(TOKEN_IF) => {
+            Some(T![if]) => {
                 let checkpoint = self.checkpoint();
                 self.start_node(NODE_IF_ELSE);
                 self.bump();
                 self.parse_expr();
-                self.expect(TOKEN_THEN);
+                self.expect(T![then]);
                 self.parse_expr();
                 self.expect(TOKEN_ELSE);
                 self.parse_expr();
@@ -753,7 +749,7 @@ where
                 self.start_node(NODE_ASSERT);
                 self.bump();
                 self.parse_expr();
-                self.expect(TOKEN_SEMICOLON);
+                self.expect(T![;]);
                 self.parse_expr();
                 self.finish_node();
                 checkpoint
