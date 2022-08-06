@@ -3,7 +3,7 @@ error: unexpected end of file, wanted any of [TOKEN_SEMICOLON]
 error: unexpected end of file
 NODE_ROOT@0..50
   NODE_ATTR_SET@0..48
-    TOKEN_CURLY_B_OPEN@0..1 "{"
+    TOKEN_L_BRACE@0..1 "{"
     TOKEN_WHITESPACE@1..4 "\n  "
     NODE_ATTRPATH_VALUE@4..48
       NODE_ATTRPATH@4..11
