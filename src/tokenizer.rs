@@ -56,12 +56,14 @@ pub struct Tokenizer<'a> {
     ctx: Vec<Context>,
     state: State<'a>,
 }
+
 impl<'a> Tokenizer<'a> {
-    /// Create a new instance
     pub fn new(input: &'a str) -> Self {
         Self { ctx: Vec::new(), state: State { input, offset: 0 } }
     }
+}
 
+impl Tokenizer<'_> {
     fn remaining(&self) -> &str {
         &self.state.input[self.state.offset..]
     }
@@ -314,7 +316,7 @@ impl<'a> Tokenizer<'a> {
                 if let Some(Context::Interpol { brackets }) = self.ctx.last_mut() {
                     *brackets += 1;
                 }
-                TOKEN_CURLY_B_OPEN
+                TOKEN_L_BRACE
             }
             '}' => {
                 if let Some(Context::Interpol { brackets }) = self.ctx.last_mut() {
@@ -326,10 +328,10 @@ impl<'a> Tokenizer<'a> {
                         }
                     }
                 }
-                TOKEN_CURLY_B_CLOSE
+                TOKEN_R_BRACE
             }
-            '[' => TOKEN_SQUARE_B_OPEN,
-            ']' => TOKEN_SQUARE_B_CLOSE,
+            '[' => TOKEN_L_BRACK,
+            ']' => TOKEN_R_BRACK,
             '@' => TOKEN_AT,
             ':' => TOKEN_COLON,
             ',' => TOKEN_COMMA,
@@ -344,8 +346,8 @@ impl<'a> Tokenizer<'a> {
             '=' => TOKEN_ASSIGN,
             '?' => TOKEN_QUESTION,
             ';' => TOKEN_SEMICOLON,
-            '(' => TOKEN_PAREN_OPEN,
-            ')' => TOKEN_PAREN_CLOSE,
+            '(' => TOKEN_L_PAREN,
+            ')' => TOKEN_R_PAREN,
             '+' if self.peek() == Some('+') => {
                 self.next().unwrap();
                 TOKEN_CONCAT
@@ -466,25 +468,5 @@ impl<'a> Iterator for Tokenizer<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.state;
         self.next_inner().map(|syntax_kind| (syntax_kind, self.str_since(start)))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::str;
-
-    use super::tokenize;
-
-    fn fuzz<B: AsRef<[u8]>>(b: B) {
-        let s = str::from_utf8(b.as_ref()).unwrap();
-        println!("`{s}`");
-        tokenize(s);
-    }
-
-    #[test]
-    fn test_fuzz() {
-        fuzz("\"");
-        fuzz([39, 39, 34]);
-        fuzz([39, 39, 39, 39, 92]);
     }
 }
