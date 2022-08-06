@@ -82,7 +82,7 @@ impl<'a> Tokenizer<'a> {
         }
         starts_with
     }
-    fn str_since<'p>(&self, past: State<'p>) -> &'p str {
+    fn str_since<'a>(&self, past: State<'a>) -> &'a str {
         &past.input[past.offset..self.state.offset]
     }
 

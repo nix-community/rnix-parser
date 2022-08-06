@@ -1,9 +1,6 @@
 //! The parser: turns a series of tokens into an AST
 
-use std::{
-    collections::{HashMap, VecDeque},
-    fmt,
-};
+use std::{collections::VecDeque, fmt};
 
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, TextRange, TextSize};
 
@@ -92,15 +89,15 @@ impl fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-struct Parser<'s, I>
+struct Parser<'a, I>
 where
-    I: Iterator<Item = Token<'s>>,
+    I: Iterator<Item = Token<'a>>,
 {
     builder: GreenNodeBuilder<'static>,
     errors: Vec<ParseError>,
 
-    trivia_buffer: Vec<Token<'s>>,
-    buffer: VecDeque<Token<'s>>,
+    trivia_buffer: Vec<Token<'a>>,
+    buffer: VecDeque<Token<'a>>,
     iter: I,
     consumed: TextSize,
 
@@ -108,9 +105,9 @@ where
     // by any method as long as it is decremented when that method returns.
     depth: u32,
 }
-impl<'s, I> Parser<'s, I>
+impl<'a, I> Parser<'a, I>
 where
-    I: Iterator<Item = Token<'s>>,
+    I: Iterator<Item = Token<'a>>,
 {
     fn new(iter: I) -> Self {
         Self {
@@ -130,7 +127,7 @@ where
         self.consumed
     }
 
-    fn peek_raw(&mut self) -> Option<&Token<'s>> {
+    fn peek_raw(&mut self) -> Option<&Token<'a>> {
         if self.buffer.is_empty() {
             if let Some(token) = self.iter.next() {
                 self.buffer.push_back(token);
@@ -183,14 +180,14 @@ where
             None => self.errors.push(ParseError::UnexpectedEOF),
         }
     }
-    fn try_next(&mut self) -> Option<Token<'s>> {
+    fn try_next(&mut self) -> Option<Token<'a>> {
         self.buffer.pop_front().or_else(|| self.iter.next())
     }
     fn manual_bump(&mut self, s: &str, token: SyntaxKind) {
         self.consumed += TextSize::of(s);
         self.builder.token(NixLanguage::kind_to_raw(token), s)
     }
-    fn peek_data(&mut self) -> Option<&Token<'s>> {
+    fn peek_data(&mut self) -> Option<&Token<'a>> {
         while self.peek_raw().map(|&(t, _)| t.is_trivia()).unwrap_or(false) {
             self.bump();
         }
@@ -234,6 +231,7 @@ where
             self.bump();
         }
     }
+
     fn expect_ident(&mut self) {
         if self.expect_peek_any(&[TOKEN_IDENT]).is_some() {
             self.start_node(NODE_IDENT);
@@ -251,6 +249,7 @@ where
         self.bump();
         self.finish_node();
     }
+
     fn parse_string(&mut self) {
         self.start_node(NODE_STRING);
         self.expect(TOKEN_STRING_START);
@@ -301,7 +300,6 @@ where
         if self.peek().map(|t| t == TOKEN_CURLY_B_CLOSE).unwrap_or(true) {
             self.bump();
         } else {
-            let mut args = HashMap::<&str, TextSize>::new();
             loop {
                 match self.expect_peek_any(&[TOKEN_CURLY_B_CLOSE, TOKEN_ELLIPSIS, TOKEN_IDENT]) {
                     Some(TOKEN_CURLY_B_CLOSE) => {
@@ -315,34 +313,12 @@ where
                     }
                     Some(TOKEN_IDENT) => {
                         self.start_node(NODE_PAT_ENTRY);
-                        let tp = self.get_text_position();
-                        let mut ident_done = false;
-                        if let Some((_, ident_name)) = self.peek_raw() {
-                            let contains = args.contains_key(*ident_name);
-                            args.insert(ident_name, tp);
-                            if contains {
-                                let id_str = ident_name.to_string();
-                                ident_done = true;
-                                self.start_error_node();
-                                self.expect_ident();
-                                let fin = self.finish_error_node();
-                                self.errors.push(ParseError::DuplicatedArgs(
-                                    TextRange::new(tp, fin),
-                                    id_str,
-                                ));
-                            }
-                        }
-
-                        if !ident_done {
-                            self.expect_ident();
-                        }
-
+                        self.bump();
                         if let Some(TOKEN_QUESTION) = self.peek() {
                             self.bump();
                             self.parse_expr();
                         }
                         self.finish_node();
-
                         match self.peek() {
                             Some(TOKEN_COMMA) => self.bump(),
                             _ => {
