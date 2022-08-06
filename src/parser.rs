@@ -539,16 +539,9 @@ where
                 self.errors.push(ParseError::UnexpectedWanted(
                     kind,
                     TextRange::new(start, end),
-                    [
-                        T!['('],
-                        T![rec],
-                        T!['{'],
-                        T!['['],
-                        TOKEN_STRING_START,
-                        TOKEN_IDENT,
-                    ]
-                    .to_vec()
-                    .into_boxed_slice(),
+                    [T!['('], T![rec], T!['{'], T!['['], TOKEN_STRING_START, TOKEN_IDENT]
+                        .to_vec()
+                        .into_boxed_slice(),
                 ));
             }
         };
@@ -603,25 +596,27 @@ where
             self.parse_fn()
         }
     }
-    fn handle_operation_left(
-        &mut self,
-        once: bool,
-        next: fn(&mut Self) -> Checkpoint,
-        ops: TokenSet,
-    ) -> Checkpoint {
+    fn parse_non_assoc(&mut self, next: fn(&mut Self) -> Checkpoint, ops: TokenSet) -> Checkpoint {
+        let checkpoint = next(self);
+        if self.peek().map(|t| ops.contains(t)).unwrap_or(false) {
+            self.start_node_at(checkpoint, NODE_BIN_OP);
+            self.bump();
+            next(self);
+            self.finish_node();
+        }
+        checkpoint
+    }
+    fn parse_left_assoc(&mut self, next: fn(&mut Self) -> Checkpoint, ops: TokenSet) -> Checkpoint {
         let checkpoint = next(self);
         while self.peek().map(|t| ops.contains(t)).unwrap_or(false) {
             self.start_node_at(checkpoint, NODE_BIN_OP);
             self.bump();
             next(self);
             self.finish_node();
-            if once {
-                break;
-            }
         }
         checkpoint
     }
-    fn handle_operation_right(
+    fn parse_right_assoc(
         &mut self,
         next: fn(&mut Self) -> Checkpoint,
         ops: TokenSet,
@@ -630,7 +625,7 @@ where
         if self.peek().map(|t| ops.contains(t)).unwrap_or(false) {
             self.start_node_at(checkpoint, NODE_BIN_OP);
             self.bump();
-            self.handle_operation_right(next, ops);
+            self.parse_right_assoc(next, ops);
             self.finish_node();
         }
         checkpoint
@@ -646,13 +641,13 @@ where
         checkpoint
     }
     fn parse_concat(&mut self) -> Checkpoint {
-        self.handle_operation_right(Self::parse_hasattr, T![++] | ())
+        self.parse_right_assoc(Self::parse_hasattr, T![++] | ())
     }
     fn parse_mul(&mut self) -> Checkpoint {
-        self.handle_operation_left(false, Self::parse_concat, T![*] | T![/])
+        self.parse_left_assoc(Self::parse_concat, T![*] | T![/])
     }
     fn parse_add(&mut self) -> Checkpoint {
-        self.handle_operation_left(false, Self::parse_mul, T![+] | T![-])
+        self.parse_left_assoc(Self::parse_mul, T![+] | T![-])
     }
     fn parse_invert(&mut self) -> Checkpoint {
         if self.peek() == Some(TOKEN_INVERT) {
@@ -667,22 +662,22 @@ where
         }
     }
     fn parse_merge(&mut self) -> Checkpoint {
-        self.handle_operation_right(Self::parse_invert, T!["//"] | ())
+        self.parse_right_assoc(Self::parse_invert, T!["//"] | ())
     }
     fn parse_compare(&mut self) -> Checkpoint {
-        self.handle_operation_left(true, Self::parse_merge, T![<] | T![<=] | T![>] | T![>=])
+        self.parse_non_assoc(Self::parse_merge, T![<] | T![<=] | T![>] | T![>=])
     }
     fn parse_equal(&mut self) -> Checkpoint {
-        self.handle_operation_left(true, Self::parse_compare, T![==] | T![!=])
+        self.parse_non_assoc(Self::parse_compare, T![==] | T![!=])
     }
     fn parse_and(&mut self) -> Checkpoint {
-        self.handle_operation_left(false, Self::parse_equal, T![&&] | ())
+        self.parse_left_assoc(Self::parse_equal, T![&&] | ())
     }
     fn parse_or(&mut self) -> Checkpoint {
-        self.handle_operation_left(false, Self::parse_and, T![||] | ())
+        self.parse_left_assoc(Self::parse_and, T![||] | ())
     }
     fn parse_implication(&mut self) -> Checkpoint {
-        self.handle_operation_right(Self::parse_or, T![->] | ())
+        self.parse_right_assoc(Self::parse_or, T![->] | ())
     }
     #[inline(always)]
     fn parse_math(&mut self) -> Checkpoint {
