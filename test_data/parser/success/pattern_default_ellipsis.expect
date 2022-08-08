@@ -1,0 +1,30 @@
+NODE_ROOT@0..28
+  NODE_LAMBDA@0..28
+    NODE_PATTERN@0..25
+      TOKEN_CURLY_B_OPEN@0..1 "{"
+      TOKEN_WHITESPACE@1..2 " "
+      NODE_PAT_ENTRY@2..3
+        NODE_IDENT@2..3
+          TOKEN_IDENT@2..3 "a"
+      TOKEN_COMMA@3..4 ","
+      TOKEN_WHITESPACE@4..5 " "
+      NODE_PAT_ENTRY@5..18
+        NODE_IDENT@5..6
+          TOKEN_IDENT@5..6 "b"
+        TOKEN_WHITESPACE@6..7 " "
+        TOKEN_QUESTION@7..8 "?"
+        TOKEN_WHITESPACE@8..9 " "
+        NODE_STRING@9..18
+          TOKEN_STRING_START@9..10 "\""
+          TOKEN_STRING_CONTENT@10..17 "default"
+          TOKEN_STRING_END@17..18 "\""
+      TOKEN_COMMA@18..19 ","
+      TOKEN_WHITESPACE@19..20 " "
+      TOKEN_ELLIPSIS@20..23 "..."
+      TOKEN_WHITESPACE@23..24 " "
+      TOKEN_CURLY_B_CLOSE@24..25 "}"
+    TOKEN_COLON@25..26 ":"
+    TOKEN_WHITESPACE@26..27 " "
+    NODE_IDENT@27..28
+      TOKEN_IDENT@27..28 "a"
+

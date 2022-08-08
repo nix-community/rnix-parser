@@ -1,0 +1,8 @@
+NODE_ROOT@0..6
+  NODE_LAMBDA@0..6
+    NODE_IDENT@0..1
+      TOKEN_IDENT@0..1 "_"
+    TOKEN_COLON@1..2 ":"
+    NODE_IDENT@2..6
+      TOKEN_IDENT@2..6 "null"
+

@@ -1,0 +1,11 @@
+NODE_ROOT@0..20
+  NODE_WITH@0..20
+    TOKEN_WITH@0..4 "with"
+    TOKEN_WHITESPACE@4..5 " "
+    NODE_IDENT@5..14
+      TOKEN_IDENT@5..14 "namespace"
+    TOKEN_SEMICOLON@14..15 ";"
+    TOKEN_WHITESPACE@15..16 " "
+    NODE_IDENT@16..20
+      TOKEN_IDENT@16..20 "expr"
+

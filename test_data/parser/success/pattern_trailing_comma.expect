@@ -1,0 +1,13 @@
+NODE_ROOT@0..6
+  NODE_LAMBDA@0..6
+    NODE_PATTERN@0..4
+      TOKEN_CURLY_B_OPEN@0..1 "{"
+      NODE_PAT_ENTRY@1..2
+        NODE_IDENT@1..2
+          TOKEN_IDENT@1..2 "a"
+      TOKEN_COMMA@2..3 ","
+      TOKEN_CURLY_B_CLOSE@3..4 "}"
+    TOKEN_COLON@4..5 ":"
+    NODE_IDENT@5..6
+      TOKEN_IDENT@5..6 "a"
+

@@ -216,7 +216,10 @@ mod tests {
     #[test]
     fn string_unescapes() {
         assert_eq!(unescape(r#"Hello\n\"World\" :D"#, false), "Hello\n\"World\" :D");
+        assert_eq!(unescape(r#"\"Hello\""#, false), "\"Hello\"");
+
         assert_eq!(unescape(r#"Hello''\n'''World''' :D"#, true), "Hello\n''World'' :D");
+        assert_eq!(unescape(r#""Hello""#, true), "\"Hello\"");
     }
     #[test]
     fn parts_leading_ws() {
@@ -225,6 +228,28 @@ mod tests {
         match expr {
             ast::Expr::Str(str) => {
                 assert_eq!(str.parts(), vec![StrPart::Literal("hello\nworld".to_string())])
+            }
+            _ => unreachable!(),
+        }
+    }
+    #[test]
+    fn parts_trailing_ws_single_line() {
+        let inp = "''hello ''";
+        let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
+        match expr {
+            ast::Expr::Str(str) => {
+                assert_eq!(str.parts(), vec![StrPart::Literal("hello ".to_string())])
+            }
+            _ => unreachable!(),
+        }
+    }
+    #[test]
+    fn parts_trailing_ws_multiline() {
+        let inp = "''hello\n ''";
+        let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
+        match expr {
+            ast::Expr::Str(str) => {
+                assert_eq!(str.parts(), vec![StrPart::Literal("hello\n".to_string())])
             }
             _ => unreachable!(),
         }

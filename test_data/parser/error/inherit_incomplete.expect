@@ -1,0 +1,11 @@
+error: unexpected end of file
+error: unexpected end of file, wanted any of [TOKEN_SEMICOLON]
+error: unexpected end of file
+error: unexpected end of file
+NODE_ROOT@0..13
+  NODE_LET_IN@0..13
+    TOKEN_LET@0..3 "let"
+    TOKEN_WHITESPACE@3..6 "\n  "
+    NODE_INHERIT@6..13
+      TOKEN_INHERIT@6..13 "inherit"
+

@@ -1,0 +1,32 @@
+NODE_ROOT@0..20
+  NODE_BIN_OP@0..20
+    NODE_BIN_OP@0..3
+      NODE_LITERAL@0..1
+        TOKEN_INTEGER@0..1 "1"
+      TOKEN_LESS@1..2 "<"
+      NODE_LITERAL@2..3
+        TOKEN_INTEGER@2..3 "2"
+    TOKEN_OR_OR@3..5 "||"
+    NODE_BIN_OP@5..20
+      NODE_BIN_OP@5..14
+        NODE_BIN_OP@5..9
+          NODE_LITERAL@5..6
+            TOKEN_INTEGER@5..6 "2"
+          TOKEN_LESS_OR_EQ@6..8 "<="
+          NODE_LITERAL@8..9
+            TOKEN_INTEGER@8..9 "2"
+        TOKEN_AND_AND@9..11 "&&"
+        NODE_BIN_OP@11..14
+          NODE_LITERAL@11..12
+            TOKEN_INTEGER@11..12 "2"
+          TOKEN_MORE@12..13 ">"
+          NODE_LITERAL@13..14
+            TOKEN_INTEGER@13..14 "1"
+      TOKEN_AND_AND@14..16 "&&"
+      NODE_BIN_OP@16..20
+        NODE_LITERAL@16..17
+          TOKEN_INTEGER@16..17 "2"
+        TOKEN_MORE_OR_EQ@17..19 ">="
+        NODE_LITERAL@19..20
+          TOKEN_INTEGER@19..20 "2"
+
