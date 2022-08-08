@@ -78,7 +78,7 @@ pub enum SyntaxKind {
     NODE_INHERIT,
     NODE_INHERIT_FROM,
     NODE_STRING,
-    NODE_STRING_INTERPOL,
+    NODE_INTERPOL,
     NODE_LAMBDA,
     NODE_IDENT_PARAM,
     // An old let { x = 92; body = x; } syntax
@@ -96,7 +96,7 @@ pub enum SyntaxKind {
     NODE_UNARY_OP,
     NODE_LITERAL,
     NODE_WITH,
-    NODE_PATH_WITH_INTERPOL,
+    NODE_PATH,
     // Attrpath existence check: foo ? bar.${baz}."bux"
     NODE_HAS_ATTR,
 

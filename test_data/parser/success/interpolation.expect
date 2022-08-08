@@ -1,0 +1,107 @@
+NODE_ROOT@0..270
+  NODE_LET_IN@0..270
+    TOKEN_LET@0..3 "let"
+    TOKEN_WHITESPACE@3..6 "\n  "
+    NODE_ATTRPATH_VALUE@6..22
+      NODE_ATTRPATH@6..11
+        NODE_IDENT@6..11
+          TOKEN_IDENT@6..11 "world"
+      TOKEN_WHITESPACE@11..12 " "
+      TOKEN_ASSIGN@12..13 "="
+      TOKEN_WHITESPACE@13..14 " "
+      NODE_STRING@14..21
+        TOKEN_STRING_START@14..15 "\""
+        TOKEN_STRING_CONTENT@15..20 "World"
+        TOKEN_STRING_END@20..21 "\""
+      TOKEN_SEMICOLON@21..22 ";"
+    TOKEN_WHITESPACE@22..23 "\n"
+    TOKEN_IN@23..25 "in"
+    TOKEN_WHITESPACE@25..26 " "
+    NODE_ATTR_SET@26..270
+      TOKEN_CURLY_B_OPEN@26..27 "{"
+      TOKEN_WHITESPACE@27..30 "\n  "
+      NODE_ATTRPATH_VALUE@30..57
+        NODE_ATTRPATH@30..36
+          NODE_IDENT@30..36
+            TOKEN_IDENT@30..36 "string"
+        TOKEN_WHITESPACE@36..37 " "
+        TOKEN_ASSIGN@37..38 "="
+        TOKEN_WHITESPACE@38..39 " "
+        NODE_STRING@39..56
+          TOKEN_STRING_START@39..40 "\""
+          TOKEN_STRING_CONTENT@40..46 "Hello "
+          NODE_INTERPOL@46..54
+            TOKEN_INTERPOL_START@46..48 "${"
+            NODE_IDENT@48..53
+              TOKEN_IDENT@48..53 "world"
+            TOKEN_INTERPOL_END@53..54 "}"
+          TOKEN_STRING_CONTENT@54..55 "!"
+          TOKEN_STRING_END@55..56 "\""
+        TOKEN_SEMICOLON@56..57 ";"
+      TOKEN_WHITESPACE@57..60 "\n  "
+      NODE_ATTRPATH_VALUE@60..268
+        NODE_ATTRPATH@60..69
+          NODE_IDENT@60..69
+            TOKEN_IDENT@60..69 "multiline"
+        TOKEN_WHITESPACE@69..70 " "
+        TOKEN_ASSIGN@70..71 "="
+        TOKEN_WHITESPACE@71..72 " "
+        NODE_STRING@72..267
+          TOKEN_STRING_START@72..74 "''"
+          TOKEN_STRING_CONTENT@74..101 "\n    The set's x valu ..."
+          NODE_INTERPOL@101..161
+            TOKEN_INTERPOL_START@101..103 "${"
+            TOKEN_WHITESPACE@103..110 "\n      "
+            NODE_SELECT@110..155
+              NODE_ATTR_SET@110..153
+                TOKEN_CURLY_B_OPEN@110..111 "{"
+                TOKEN_WHITESPACE@111..120 "\n        "
+                NODE_ATTRPATH_VALUE@120..128
+                  NODE_ATTRPATH@120..121
+                    NODE_IDENT@120..121
+                      TOKEN_IDENT@120..121 "x"
+                  TOKEN_WHITESPACE@121..122 " "
+                  TOKEN_ASSIGN@122..123 "="
+                  TOKEN_WHITESPACE@123..124 " "
+                  NODE_STRING@124..127
+                    TOKEN_STRING_START@124..125 "\""
+                    TOKEN_STRING_CONTENT@125..126 "1"
+                    TOKEN_STRING_END@126..127 "\""
+                  TOKEN_SEMICOLON@127..128 ";"
+                TOKEN_WHITESPACE@128..137 "\n        "
+                NODE_ATTRPATH_VALUE@137..145
+                  NODE_ATTRPATH@137..138
+                    NODE_IDENT@137..138
+                      TOKEN_IDENT@137..138 "y"
+                  TOKEN_WHITESPACE@138..139 " "
+                  TOKEN_ASSIGN@139..140 "="
+                  TOKEN_WHITESPACE@140..141 " "
+                  NODE_STRING@141..144
+                    TOKEN_STRING_START@141..142 "\""
+                    TOKEN_STRING_CONTENT@142..143 "2"
+                    TOKEN_STRING_END@143..144 "\""
+                  TOKEN_SEMICOLON@144..145 ";"
+                TOKEN_WHITESPACE@145..152 "\n      "
+                TOKEN_CURLY_B_CLOSE@152..153 "}"
+              TOKEN_DOT@153..154 "."
+              NODE_ATTRPATH@154..155
+                NODE_IDENT@154..155
+                  TOKEN_IDENT@154..155 "x"
+            TOKEN_WHITESPACE@155..160 "\n    "
+            TOKEN_INTERPOL_END@160..161 "}"
+          TOKEN_STRING_CONTENT@161..253 "\n\n    This line shall ..."
+          NODE_INTERPOL@253..262
+            TOKEN_INTERPOL_START@253..255 "${"
+            TOKEN_WHITESPACE@255..256 " "
+            NODE_STRING@256..260
+              TOKEN_STRING_START@256..257 "\""
+              TOKEN_STRING_CONTENT@257..259 "hi"
+              TOKEN_STRING_END@259..260 "\""
+            TOKEN_WHITESPACE@260..261 " "
+            TOKEN_INTERPOL_END@261..262 "}"
+          TOKEN_STRING_CONTENT@262..265 "\n  "
+          TOKEN_STRING_END@265..267 "''"
+        TOKEN_SEMICOLON@267..268 ";"
+      TOKEN_WHITESPACE@268..269 "\n"
+      TOKEN_CURLY_B_CLOSE@269..270 "}"
+

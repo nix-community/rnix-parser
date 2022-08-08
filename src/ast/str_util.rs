@@ -26,7 +26,7 @@ impl ast::Str {
                     let line_count = text.lines().count();
                     let next_is_ast = child
                         .next_sibling_or_token()
-                        .map_or(false, |child| child.kind() == NODE_STRING_INTERPOL);
+                        .map_or(false, |child| child.kind() == NODE_INTERPOL);
                     for (i, line) in text.lines().enumerate().skip(if last_was_ast { 1 } else { 0 })
                     {
                         let indent: usize = indention(line).count();
@@ -44,7 +44,7 @@ impl ast::Str {
                     assert!(token.kind() == TOKEN_STRING_START || token.kind() == TOKEN_STRING_END)
                 }
                 NodeOrToken::Node(node) => {
-                    assert_eq!(node.kind(), NODE_STRING_INTERPOL);
+                    assert_eq!(node.kind(), NODE_INTERPOL);
                     parts.push(StrPart::Interpolation(
                         ast::StrInterpol::cast(node.clone()).unwrap(),
                     ));
