@@ -1,34 +1,43 @@
 use crate::kinds::SyntaxKind::*;
 use rowan::{ast::AstNode as OtherAstNode, NodeOrToken};
 
-use crate::{
-    ast::{self, AstNode},
-    SyntaxElement, SyntaxToken,
-};
+use crate::ast;
 
-use super::InterpolPart;
+use super::{support::children_tokens_u, AstToken, InterpolPart, StrContent};
 
 impl ast::Str {
-    pub fn parts(&self) -> Vec<InterpolPart> {
-        fn children_tokens<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
-            parent.syntax().children_with_tokens().filter_map(SyntaxElement::into_token)
-        }
+    pub fn parts(&self) -> impl Iterator<Item = InterpolPart<StrContent>> {
+        self.syntax().children_with_tokens().filter_map(|child| match child {
+            NodeOrToken::Token(token) if token.kind() == TOKEN_STRING_CONTENT => {
+                Some(InterpolPart::Literal(StrContent::cast(token).unwrap()))
+            }
+            NodeOrToken::Token(token) => {
+                assert!(token.kind() == TOKEN_STRING_START || token.kind() == TOKEN_STRING_END);
+                None
+            }
+            NodeOrToken::Node(node) => {
+                assert_eq!(node.kind(), NODE_INTERPOL);
+                Some(InterpolPart::Interpolation(ast::Interpol::cast(node.clone()).unwrap()))
+            }
+        })
+    }
 
-        let mut parts = Vec::new();
+    pub fn parts_parsed(&self) -> Vec<InterpolPart<String>> {
+        let mut parsed_parts = Vec::new();
         let mut literals = 0;
         let mut common = std::usize::MAX;
-        let multiline = children_tokens(self).next().map_or(false, |t| t.text() == "''");
+        let multiline = children_tokens_u(self).next().map_or(false, |t| t.text() == "''");
         let mut last_was_ast = false;
 
-        for child in self.syntax().children_with_tokens() {
-            match &child {
-                NodeOrToken::Token(token) if token.kind() == TOKEN_STRING_CONTENT => {
-                    let text: &str = token.text();
+        let mut parts = self.parts().peekable();
+
+        while let Some(part) = parts.next() {
+            match part {
+                InterpolPart::Literal(literal) => {
+                    let text: &str = literal.syntax().text();
 
                     let line_count = text.lines().count();
-                    let next_is_ast = child
-                        .next_sibling_or_token()
-                        .map_or(false, |child| child.kind() == NODE_INTERPOL);
+                    let next_is_ast = matches!(parts.peek(), Some(InterpolPart::Interpolation(_)));
                     for (i, line) in text.lines().enumerate().skip(if last_was_ast { 1 } else { 0 })
                     {
                         let indent: usize = indention(line).count();
@@ -39,24 +48,18 @@ impl ast::Str {
                         }
                         common = common.min(indent);
                     }
-                    parts.push(InterpolPart::Literal(text.to_string()));
+                    parsed_parts.push(InterpolPart::Literal(text.to_string()));
                     literals += 1;
                 }
-                NodeOrToken::Token(token) => {
-                    assert!(token.kind() == TOKEN_STRING_START || token.kind() == TOKEN_STRING_END)
-                }
-                NodeOrToken::Node(node) => {
-                    assert_eq!(node.kind(), NODE_INTERPOL);
-                    parts.push(InterpolPart::Interpolation(
-                        ast::Interpol::cast(node.clone()).unwrap(),
-                    ));
+                InterpolPart::Interpolation(interpol) => {
+                    parsed_parts.push(InterpolPart::Interpolation(interpol));
                     last_was_ast = true;
                 }
             }
         }
 
         let mut i = 0;
-        for part in parts.iter_mut() {
+        for part in parsed_parts.iter_mut() {
             if let InterpolPart::Literal(ref mut text) = part {
                 if multiline {
                     *text = remove_indent(text, i == 0, common);
@@ -75,7 +78,7 @@ impl ast::Str {
             }
         }
 
-        parts
+        parsed_parts
     }
 }
 
@@ -207,7 +210,7 @@ mod tests {
         let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
         match expr {
             ast::Expr::Str(str) => {
-                assert_eq!(str.parts(), vec![InterpolPart::Literal("hello ".to_string())])
+                assert_eq!(str.parts_parsed(), vec![InterpolPart::Literal("hello ".to_string())])
             }
             _ => unreachable!(),
         }
@@ -218,7 +221,7 @@ mod tests {
         let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
         match expr {
             ast::Expr::Str(str) => {
-                assert_eq!(str.parts(), vec![InterpolPart::Literal("hello\n".to_string())])
+                assert_eq!(str.parts_parsed(), vec![InterpolPart::Literal("hello\n".to_string())])
             }
             _ => unreachable!(),
         }
@@ -251,7 +254,7 @@ mod tests {
                 "#
         .replace("|trailing-whitespace", "");
 
-        if let [InterpolPart::Literal(lit)] = &ast::Str::parts(&string_node(txtin.as_str()))[..] {
+        if let [InterpolPart::Literal(lit)] = &ast::Str::parts_parsed(&string_node(txtin.as_str()))[..] {
             assert_eq!(lit,
                 // Get the below with nix repl
                 "    \n          \nThis is a multiline string :D\n  indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\ntwo single quotes: ''\nthree single quotes: '''\n"
@@ -263,7 +266,7 @@ mod tests {
 
     #[test]
     fn parts_ast() {
-        fn assert_eq_ast_ctn(it: &mut dyn Iterator<Item = InterpolPart>, x: &str) {
+        fn assert_eq_ast_ctn(it: &mut dyn Iterator<Item = InterpolPart<String>>, x: &str) {
             let tmp = it.next().expect("unexpected EOF");
             if let InterpolPart::Interpolation(astn) = tmp {
                 assert_eq!(astn.expr().unwrap().syntax().to_string(), x);
@@ -295,7 +298,7 @@ mod tests {
         let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
         match expr {
             ast::Expr::Str(s) => {
-                let mut it = s.parts().into_iter();
+                let mut it = s.parts_parsed().into_iter();
                 assert_eq!(
                     it.next().unwrap(),
                     InterpolPart::Literal("\nThis version of Nixpkgs requires Nix >= ".to_string())
