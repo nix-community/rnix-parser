@@ -1,6 +1,6 @@
 error: unexpected TOKEN_STRING_START at 10..28, wanted any of [TOKEN_ASSIGN]
 error: unexpected TOKEN_STRING_START at 78..98, wanted any of [TOKEN_ASSIGN]
-error: unexpected TOKEN_CURLY_B_CLOSE at 162..166, wanted any of [TOKEN_ASSIGN]
+error: unexpected TOKEN_R_BRACE at 162..166, wanted any of [TOKEN_ASSIGN]
 error: unexpected end of file, wanted any of [TOKEN_ASSIGN]
 error: unexpected end of file
 error: unexpected end of file, wanted any of [TOKEN_SEMICOLON]
@@ -9,7 +9,7 @@ error: unexpected end of file, wanted any of [TOKEN_SEMICOLON]
 error: unexpected end of file
 NODE_ROOT@0..166
   NODE_ATTR_SET@0..166
-    TOKEN_CURLY_B_OPEN@0..1 "{"
+    TOKEN_L_BRACE@0..1 "{"
     TOKEN_WHITESPACE@1..4 "\n  "
     NODE_ATTRPATH_VALUE@4..33
       NODE_ATTRPATH@4..9
@@ -35,7 +35,7 @@ NODE_ROOT@0..166
       TOKEN_ASSIGN@41..42 "="
       TOKEN_WHITESPACE@42..43 " "
       NODE_ATTR_SET@43..119
-        TOKEN_CURLY_B_OPEN@43..44 "{"
+        TOKEN_L_BRACE@43..44 "{"
         TOKEN_WHITESPACE@44..49 "\n    "
         NODE_ATTRPATH_VALUE@49..65
           NODE_ATTRPATH@49..54
@@ -71,7 +71,7 @@ NODE_ROOT@0..166
             TOKEN_STRING_END@113..114 "\""
           TOKEN_SEMICOLON@114..115 ";"
         TOKEN_WHITESPACE@115..118 "\n  "
-        TOKEN_CURLY_B_CLOSE@118..119 "}"
+        TOKEN_R_BRACE@118..119 "}"
       TOKEN_SEMICOLON@119..120 ";"
     TOKEN_WHITESPACE@120..123 "\n  "
     NODE_ATTRPATH_VALUE@123..166
@@ -82,7 +82,7 @@ NODE_ROOT@0..166
       TOKEN_ASSIGN@129..130 "="
       TOKEN_WHITESPACE@130..131 " "
       NODE_ATTR_SET@131..166
-        TOKEN_CURLY_B_OPEN@131..132 "{"
+        TOKEN_L_BRACE@131..132 "{"
         TOKEN_WHITESPACE@132..137 "\n    "
         NODE_ATTRPATH_VALUE@137..150
           NODE_ATTRPATH@137..142
@@ -103,8 +103,8 @@ NODE_ROOT@0..166
               TOKEN_IDENT@155..159 "aaaa"
           TOKEN_WHITESPACE@159..162 "\n  "
           NODE_ERROR@162..166
-            TOKEN_CURLY_B_CLOSE@162..163 "}"
+            TOKEN_R_BRACE@162..163 "}"
             TOKEN_SEMICOLON@163..164 ";"
             TOKEN_WHITESPACE@164..165 "\n"
-            TOKEN_CURLY_B_CLOSE@165..166 "}"
+            TOKEN_R_BRACE@165..166 "}"
 
