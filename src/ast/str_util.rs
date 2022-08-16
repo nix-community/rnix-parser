@@ -254,7 +254,9 @@ mod tests {
                 "#
         .replace("|trailing-whitespace", "");
 
-        if let [InterpolPart::Literal(lit)] = &ast::Str::parts_parsed(&string_node(txtin.as_str()))[..] {
+        if let [InterpolPart::Literal(lit)] =
+            &ast::Str::parts_parsed(&string_node(txtin.as_str()))[..]
+        {
             assert_eq!(lit,
                 // Get the below with nix repl
                 "    \n          \nThis is a multiline string :D\n  indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\ntwo single quotes: ''\nthree single quotes: '''\n"
