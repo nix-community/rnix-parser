@@ -1,8 +1,7 @@
 use crate::{NixLanguage, SyntaxKind, SyntaxKind::*, SyntaxNode, SyntaxToken};
 
 use super::{operators::BinOpKind, support::*, AstNode, UnaryOpKind};
-use rowan::ast::AstChildren;
-use rowan::ast::AstNode as OtherAstNode;
+use rowan::ast::{AstChildren, AstNode as OtherAstNode};
 
 pub trait HasEntry: AstNode {
     fn entries(&self) -> AstChildren<Entry>
@@ -61,9 +60,13 @@ macro_rules! node {
                 &self.0
             }
         }
+
+        impl $name {
+            pub const KIND: SyntaxKind = $kind;
+        }
     };
     (
-        #[case($($kind:ident => $variant:ident),* $(,)?)]
+        #[from($($variant:ident),* $(,)?)]
         $(#[$meta:meta])*
         enum $name:ident;
     ) => {
@@ -85,13 +88,13 @@ macro_rules! node {
             type Language = NixLanguage;
 
             fn can_cast(kind: SyntaxKind) -> bool {
-                matches!(kind, $($kind)|*)
+                matches!(kind, $($variant::KIND)|*)
             }
 
             fn cast(syntax: SyntaxNode) -> Option<Self> {
                 let res = match syntax.kind() {
                     $(
-                        $kind => $name::$variant($variant(syntax))
+                        $variant::KIND => $name::$variant($variant(syntax))
                     ),*,
                     _ => return None,
                 };
@@ -166,37 +169,37 @@ macro_rules! ng {
 node! { #[from(NODE_LITERAL)] struct Literal; }
 
 node! {
-    #[case(
-        NODE_APPLY => Apply,
-        NODE_ASSERT => Assert,
-        NODE_ERROR => Error,
-        NODE_IF_ELSE => IfElse,
-        NODE_SELECT => Select,
-        NODE_STRING => Str,
-        NODE_PATH => Path,
-        NODE_LITERAL => Literal,
-        NODE_LAMBDA => Lambda,
-        NODE_LEGACY_LET => LegacyLet,
-        NODE_LET_IN => LetIn,
-        NODE_LIST => List,
-        NODE_BIN_OP => BinOp,
-        NODE_PAREN => Paren,
-        NODE_ROOT => Root,
-        NODE_ATTR_SET => AttrSet,
-        NODE_UNARY_OP => UnaryOp,
-        NODE_IDENT => Ident,
-        NODE_WITH => With,
-        NODE_HAS_ATTR => HasAttr,
+    #[from(
+        Apply,
+        Assert,
+        Error,
+        IfElse,
+        Select,
+        Str,
+        Path,
+        Literal,
+        Lambda,
+        LegacyLet,
+        LetIn,
+        List,
+        BinOp,
+        Paren,
+        Root,
+        AttrSet,
+        UnaryOp,
+        Ident,
+        With,
+        HasAttr,
     )]
     /// An expression. The fundamental nix ast type.
     enum Expr;
 }
 
 node! {
-    #[case(
-        NODE_IDENT => Ident,
-        NODE_DYNAMIC => Dynamic,
-        NODE_STRING => Str,
+    #[from(
+        Ident,
+        Dynamic,
+        Str,
     )]
     enum Attr;
 }
@@ -356,9 +359,9 @@ impl PatEntry {
 }
 
 node! {
-    #[case(
-        NODE_PATTERN => Pattern,
-        NODE_IDENT => Ident,
+    #[from(
+        Pattern,
+        Ident,
     )]
     enum Param;
 }
@@ -389,9 +392,9 @@ impl AttrSet {
 }
 
 node! {
-    #[case(
-        NODE_INHERIT => Inherit,
-        NODE_ATTRPATH_VALUE => AttrpathValue,
+    #[from(
+        Inherit,
+        AttrpathValue,
     )]
     enum Entry;
 }
