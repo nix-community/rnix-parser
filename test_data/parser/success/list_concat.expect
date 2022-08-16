@@ -1,0 +1,21 @@
+NODE_ROOT@0..15
+  NODE_BIN_OP@0..15
+    NODE_LIST@0..3
+      TOKEN_L_BRACK@0..1 "["
+      NODE_LITERAL@1..2
+        TOKEN_INTEGER@1..2 "1"
+      TOKEN_R_BRACK@2..3 "]"
+    TOKEN_CONCAT@3..5 "++"
+    NODE_BIN_OP@5..15
+      NODE_LIST@5..10
+        TOKEN_L_BRACK@5..6 "["
+        NODE_IDENT@6..9
+          TOKEN_IDENT@6..9 "two"
+        TOKEN_R_BRACK@9..10 "]"
+      TOKEN_CONCAT@10..12 "++"
+      NODE_LIST@12..15
+        TOKEN_L_BRACK@12..13 "["
+        NODE_LITERAL@13..14
+          TOKEN_INTEGER@13..14 "3"
+        TOKEN_R_BRACK@14..15 "]"
+

@@ -1,9 +1,6 @@
 //! The parser: turns a series of tokens into an AST
 
-use std::{
-    collections::{HashMap, VecDeque},
-    fmt,
-};
+use std::{collections::VecDeque, fmt};
 
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, TextRange, TextSize};
 
@@ -92,15 +89,15 @@ impl fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-struct Parser<'s, I>
+struct Parser<'a, I>
 where
-    I: Iterator<Item = Token<'s>>,
+    I: Iterator<Item = Token<'a>>,
 {
     builder: GreenNodeBuilder<'static>,
     errors: Vec<ParseError>,
 
-    trivia_buffer: Vec<Token<'s>>,
-    buffer: VecDeque<Token<'s>>,
+    trivia_buffer: Vec<Token<'a>>,
+    buffer: VecDeque<Token<'a>>,
     iter: I,
     consumed: TextSize,
 
@@ -108,9 +105,9 @@ where
     // by any method as long as it is decremented when that method returns.
     depth: u32,
 }
-impl<'s, I> Parser<'s, I>
+impl<'a, I> Parser<'a, I>
 where
-    I: Iterator<Item = Token<'s>>,
+    I: Iterator<Item = Token<'a>>,
 {
     fn new(iter: I) -> Self {
         Self {
@@ -130,7 +127,7 @@ where
         self.consumed
     }
 
-    fn peek_raw(&mut self) -> Option<&Token<'s>> {
+    fn peek_raw(&mut self) -> Option<&Token<'a>> {
         if self.buffer.is_empty() {
             if let Some(token) = self.iter.next() {
                 self.buffer.push_back(token);
@@ -183,14 +180,14 @@ where
             None => self.errors.push(ParseError::UnexpectedEOF),
         }
     }
-    fn try_next(&mut self) -> Option<Token<'s>> {
+    fn try_next(&mut self) -> Option<Token<'a>> {
         self.buffer.pop_front().or_else(|| self.iter.next())
     }
     fn manual_bump(&mut self, s: &str, token: SyntaxKind) {
         self.consumed += TextSize::of(s);
         self.builder.token(NixLanguage::kind_to_raw(token), s)
     }
-    fn peek_data(&mut self) -> Option<&Token<'s>> {
+    fn peek_data(&mut self) -> Option<&Token<'a>> {
         while self.peek_raw().map(|&(t, _)| t.is_trivia()).unwrap_or(false) {
             self.bump();
         }
@@ -234,6 +231,7 @@ where
             self.bump();
         }
     }
+
     fn expect_ident(&mut self) {
         if self.expect_peek_any(&[TOKEN_IDENT]).is_some() {
             self.start_node(NODE_IDENT);
@@ -251,6 +249,7 @@ where
         self.bump();
         self.finish_node();
     }
+
     fn parse_string(&mut self) {
         self.start_node(NODE_STRING);
         self.expect(TOKEN_STRING_START);
@@ -289,7 +288,7 @@ where
         loop {
             self.parse_attr();
 
-            if self.peek() == Some(TOKEN_DOT) {
+            if self.peek() == Some(T![.]) {
                 self.bump();
             } else {
                 break;
@@ -298,55 +297,32 @@ where
         self.finish_node();
     }
     fn parse_pattern(&mut self, bound: bool) {
-        if self.peek().map(|t| t == TOKEN_CURLY_B_CLOSE).unwrap_or(true) {
+        if self.peek().map(|t| t == T!['}']).unwrap_or(true) {
             self.bump();
         } else {
-            let mut args = HashMap::<&str, TextSize>::new();
             loop {
-                match self.expect_peek_any(&[TOKEN_CURLY_B_CLOSE, TOKEN_ELLIPSIS, TOKEN_IDENT]) {
-                    Some(TOKEN_CURLY_B_CLOSE) => {
+                match self.expect_peek_any(&[T!['}'], T![...], TOKEN_IDENT]) {
+                    Some(T!['}']) => {
                         self.bump();
                         break;
                     }
-                    Some(TOKEN_ELLIPSIS) => {
+                    Some(T![...]) => {
                         self.bump();
-                        self.expect(TOKEN_CURLY_B_CLOSE);
+                        self.expect(T!['}']);
                         break;
                     }
                     Some(TOKEN_IDENT) => {
                         self.start_node(NODE_PAT_ENTRY);
-                        let tp = self.get_text_position();
-                        let mut ident_done = false;
-                        if let Some((_, ident_name)) = self.peek_raw() {
-                            let contains = args.contains_key(*ident_name);
-                            args.insert(ident_name, tp);
-                            if contains {
-                                let id_str = ident_name.to_string();
-                                ident_done = true;
-                                self.start_error_node();
-                                self.expect_ident();
-                                let fin = self.finish_error_node();
-                                self.errors.push(ParseError::DuplicatedArgs(
-                                    TextRange::new(tp, fin),
-                                    id_str,
-                                ));
-                            }
-                        }
-
-                        if !ident_done {
-                            self.expect_ident();
-                        }
-
-                        if let Some(TOKEN_QUESTION) = self.peek() {
+                        self.bump();
+                        if let Some(T![?]) = self.peek() {
                             self.bump();
                             self.parse_expr();
                         }
                         self.finish_node();
-
                         match self.peek() {
-                            Some(TOKEN_COMMA) => self.bump(),
+                            Some(T![,]) => self.bump(),
                             _ => {
-                                self.expect(TOKEN_CURLY_B_CLOSE);
+                                self.expect(T!['}']);
                                 break;
                             }
                         }
@@ -357,7 +333,7 @@ where
             }
         }
 
-        if self.peek() == Some(TOKEN_AT) {
+        if self.peek() == Some(T![@]) {
             let kind = if bound { NODE_ERROR } else { NODE_PAT_BIND };
             self.start_node(kind);
             let start = self.get_text_position();
@@ -374,21 +350,21 @@ where
             match self.peek() {
                 None => break,
                 token if token == Some(until) => break,
-                Some(TOKEN_INHERIT) => {
+                Some(T![inherit]) => {
                     self.start_node(NODE_INHERIT);
                     self.bump();
 
-                    if self.peek() == Some(TOKEN_PAREN_OPEN) {
+                    if self.peek() == Some(T!['(']) {
                         self.start_node(NODE_INHERIT_FROM);
                         self.bump();
                         self.parse_expr();
-                        self.expect(TOKEN_PAREN_CLOSE);
+                        self.expect(T![')']);
                         self.finish_node();
                     }
 
                     loop {
                         match self.peek() {
-                            Some(t) if t != TOKEN_SEMICOLON => {
+                            Some(t) if t != T![;] => {
                                 self.parse_attr();
                             }
                             Some(_) => {
@@ -401,22 +377,23 @@ where
                         }
                     }
 
-                    self.expect(TOKEN_SEMICOLON);
+                    self.expect(T![;]);
                     self.finish_node();
                 }
                 Some(_) => {
                     self.start_node(NODE_ATTRPATH_VALUE);
                     self.parse_attrpath();
-                    self.expect(TOKEN_ASSIGN);
+                    self.expect(T![=]);
                     self.parse_expr();
-                    self.expect(TOKEN_SEMICOLON);
+                    self.expect(T![;]);
                     self.finish_node();
                 }
             }
         }
         self.bump(); // the final close, like '}'
     }
-    fn parse_val(&mut self) -> Checkpoint {
+
+    fn parse_simple(&mut self) -> Checkpoint {
         let peek = match self.peek() {
             Some(it) => it,
             None => {
@@ -431,21 +408,21 @@ where
         };
         let checkpoint = self.checkpoint();
         match peek {
-            TOKEN_PAREN_OPEN => {
+            T!['('] => {
                 self.start_node(NODE_PAREN);
                 self.bump();
                 self.parse_expr();
                 self.bump();
                 self.finish_node();
             }
-            TOKEN_REC => {
+            T![rec] => {
                 self.start_node(NODE_ATTR_SET);
                 self.bump();
-                self.expect(TOKEN_CURLY_B_OPEN);
-                self.parse_set(TOKEN_CURLY_B_CLOSE);
+                self.expect(T!['{']);
+                self.parse_set(T!['}']);
                 self.finish_node();
             }
-            TOKEN_CURLY_B_OPEN => {
+            T!['{'] => {
                 // Do a lookahead:
                 let mut peek = [None, None];
                 for i in &mut peek {
@@ -463,12 +440,12 @@ where
                 }
 
                 match peek {
-                    [Some(TOKEN_IDENT), Some(TOKEN_COMMA)]
-                    | [Some(TOKEN_IDENT), Some(TOKEN_QUESTION)]
-                    | [Some(TOKEN_IDENT), Some(TOKEN_CURLY_B_CLOSE)]
-                    | [Some(TOKEN_ELLIPSIS), Some(TOKEN_CURLY_B_CLOSE)]
-                    | [Some(TOKEN_CURLY_B_CLOSE), Some(TOKEN_COLON)]
-                    | [Some(TOKEN_CURLY_B_CLOSE), Some(TOKEN_AT)] => {
+                    [Some(TOKEN_IDENT), Some(T![,])]
+                    | [Some(TOKEN_IDENT), Some(T![?])]
+                    | [Some(TOKEN_IDENT), Some(T!['}'])]
+                    | [Some(T![...]), Some(T!['}'])]
+                    | [Some(T!['}']), Some(T![:])]
+                    | [Some(T!['}']), Some(T![@])] => {
                         // This looks like a pattern
                         self.start_node(NODE_LAMBDA);
 
@@ -477,7 +454,7 @@ where
                         self.parse_pattern(false);
                         self.finish_node();
 
-                        self.expect(TOKEN_COLON);
+                        self.expect(T![:]);
                         self.parse_expr();
 
                         self.finish_node();
@@ -486,16 +463,16 @@ where
                         // This looks like a set
                         self.start_node(NODE_ATTR_SET);
                         self.bump();
-                        self.parse_set(TOKEN_CURLY_B_CLOSE);
+                        self.parse_set(T!['}']);
                         self.finish_node();
                     }
                 }
             }
-            TOKEN_SQUARE_B_OPEN => {
+            T!['['] => {
                 self.start_node(NODE_LIST);
                 self.bump();
-                while self.peek().map(|t| t != TOKEN_SQUARE_B_CLOSE).unwrap_or(false) {
-                    self.parse_val();
+                while self.peek().map(|t| t != T![']']).unwrap_or(false) {
+                    self.parse_simple();
                 }
                 self.bump();
                 self.finish_node();
@@ -531,24 +508,24 @@ where
                 self.expect_ident();
 
                 match self.peek() {
-                    Some(TOKEN_COLON) => {
+                    Some(T![:]) => {
                         self.start_node_at(checkpoint, NODE_LAMBDA);
                         self.bump();
                         self.parse_expr();
                         self.finish_node();
                     }
-                    Some(TOKEN_AT) => {
+                    Some(T![@]) => {
                         self.start_node_at(checkpoint, NODE_LAMBDA);
                         self.start_node_at(checkpoint, NODE_PATTERN);
                         self.start_node_at(checkpoint, NODE_PAT_BIND);
                         self.bump();
                         self.finish_node(); // PatBind
 
-                        self.expect(TOKEN_CURLY_B_OPEN);
+                        self.expect(T!['{']);
                         self.parse_pattern(true);
                         self.finish_node(); // Pattern
 
-                        self.expect(TOKEN_COLON);
+                        self.expect(T![:]);
                         self.parse_expr();
                         self.finish_node(); // Lambda
                     }
@@ -562,27 +539,20 @@ where
                 self.errors.push(ParseError::UnexpectedWanted(
                     kind,
                     TextRange::new(start, end),
-                    [
-                        TOKEN_PAREN_OPEN,
-                        TOKEN_REC,
-                        TOKEN_CURLY_B_OPEN,
-                        TOKEN_SQUARE_B_OPEN,
-                        TOKEN_STRING_START,
-                        TOKEN_IDENT,
-                    ]
-                    .to_vec()
-                    .into_boxed_slice(),
+                    [T!['('], T![rec], T!['{'], T!['['], TOKEN_STRING_START, TOKEN_IDENT]
+                        .to_vec()
+                        .into_boxed_slice(),
                 ));
             }
         };
 
-        if self.peek() == Some(TOKEN_DOT) {
+        if self.peek() == Some(T![.]) {
             self.start_node_at(checkpoint, NODE_SELECT);
             self.bump();
             self.parse_attrpath();
-            if self.peek() == Some(TOKEN_OR) {
+            if self.peek() == Some(T![or]) {
                 self.bump();
-                self.parse_val();
+                self.parse_simple();
             }
             self.finish_node();
 
@@ -593,7 +563,7 @@ where
         // Eg.
         // "a b or c" => "((a (b or)) c)"
         // "or a" => fail
-        } else if self.peek() == Some(TOKEN_OR) {
+        } else if self.peek() == Some(T![or]) {
             self.start_node_at(checkpoint, NODE_APPLY);
             self.start_node(NODE_IDENT);
             let (_, s) = self.try_next().unwrap();
@@ -605,17 +575,17 @@ where
         checkpoint
     }
     fn parse_fn(&mut self) -> Checkpoint {
-        let checkpoint = self.parse_val();
+        let checkpoint = self.parse_simple();
 
         while self.peek().map(|t| t.is_fn_arg()).unwrap_or(false) {
             self.start_node_at(checkpoint, NODE_APPLY);
-            self.parse_val();
+            self.parse_simple();
             self.finish_node();
         }
         checkpoint
     }
     fn parse_negate(&mut self) -> Checkpoint {
-        if self.peek() == Some(TOKEN_SUB) {
+        if self.peek() == Some(T![-]) {
             let checkpoint = self.checkpoint();
             self.start_node(NODE_UNARY_OP);
             self.bump();
@@ -626,41 +596,43 @@ where
             self.parse_fn()
         }
     }
-    fn handle_operation_left(
-        &mut self,
-        once: bool,
-        next: fn(&mut Self) -> Checkpoint,
-        ops: &[SyntaxKind],
-    ) -> Checkpoint {
+    fn parse_non_assoc(&mut self, next: fn(&mut Self) -> Checkpoint, ops: TokenSet) -> Checkpoint {
         let checkpoint = next(self);
-        while self.peek().map(|t| ops.contains(&t)).unwrap_or(false) {
+        if self.peek().map(|t| ops.contains(t)).unwrap_or(false) {
             self.start_node_at(checkpoint, NODE_BIN_OP);
             self.bump();
             next(self);
             self.finish_node();
-            if once {
-                break;
-            }
         }
         checkpoint
     }
-    fn handle_operation_right(
-        &mut self,
-        next: fn(&mut Self) -> Checkpoint,
-        ops: &[SyntaxKind],
-    ) -> Checkpoint {
+    fn parse_left_assoc(&mut self, next: fn(&mut Self) -> Checkpoint, ops: TokenSet) -> Checkpoint {
         let checkpoint = next(self);
-        if self.peek().map(|t| ops.contains(&t)).unwrap_or(false) {
+        while self.peek().map(|t| ops.contains(t)).unwrap_or(false) {
             self.start_node_at(checkpoint, NODE_BIN_OP);
             self.bump();
-            self.handle_operation_right(next, ops);
+            next(self);
+            self.finish_node();
+        }
+        checkpoint
+    }
+    fn parse_right_assoc(
+        &mut self,
+        next: fn(&mut Self) -> Checkpoint,
+        ops: TokenSet,
+    ) -> Checkpoint {
+        let checkpoint = next(self);
+        if self.peek().map(|t| ops.contains(t)).unwrap_or(false) {
+            self.start_node_at(checkpoint, NODE_BIN_OP);
+            self.bump();
+            self.parse_right_assoc(next, ops);
             self.finish_node();
         }
         checkpoint
     }
     fn parse_hasattr(&mut self) -> Checkpoint {
         let checkpoint = self.parse_negate();
-        while self.peek().map(|t| t == TOKEN_QUESTION).unwrap_or(false) {
+        while self.peek().map(|t| t == T![?]).unwrap_or(false) {
             self.start_node_at(checkpoint, NODE_HAS_ATTR);
             self.bump();
             self.parse_attrpath();
@@ -669,13 +641,13 @@ where
         checkpoint
     }
     fn parse_concat(&mut self) -> Checkpoint {
-        self.handle_operation_right(Self::parse_hasattr, &[TOKEN_CONCAT])
+        self.parse_right_assoc(Self::parse_hasattr, T![++] | ())
     }
     fn parse_mul(&mut self) -> Checkpoint {
-        self.handle_operation_left(false, Self::parse_concat, &[TOKEN_MUL, TOKEN_DIV])
+        self.parse_left_assoc(Self::parse_concat, T![*] | T![/])
     }
     fn parse_add(&mut self) -> Checkpoint {
-        self.handle_operation_left(false, Self::parse_mul, &[TOKEN_ADD, TOKEN_SUB])
+        self.parse_left_assoc(Self::parse_mul, T![+] | T![-])
     }
     fn parse_invert(&mut self) -> Checkpoint {
         if self.peek() == Some(TOKEN_INVERT) {
@@ -690,26 +662,22 @@ where
         }
     }
     fn parse_merge(&mut self) -> Checkpoint {
-        self.handle_operation_right(Self::parse_invert, &[TOKEN_UPDATE])
+        self.parse_right_assoc(Self::parse_invert, T!["//"] | ())
     }
     fn parse_compare(&mut self) -> Checkpoint {
-        self.handle_operation_left(
-            true,
-            Self::parse_merge,
-            &[TOKEN_LESS, TOKEN_LESS_OR_EQ, TOKEN_MORE, TOKEN_MORE_OR_EQ],
-        )
+        self.parse_non_assoc(Self::parse_merge, T![<] | T![<=] | T![>] | T![>=])
     }
     fn parse_equal(&mut self) -> Checkpoint {
-        self.handle_operation_left(true, Self::parse_compare, &[TOKEN_EQUAL, TOKEN_NOT_EQUAL])
+        self.parse_non_assoc(Self::parse_compare, T![==] | T![!=])
     }
     fn parse_and(&mut self) -> Checkpoint {
-        self.handle_operation_left(false, Self::parse_equal, &[TOKEN_AND_AND])
+        self.parse_left_assoc(Self::parse_equal, T![&&] | ())
     }
     fn parse_or(&mut self) -> Checkpoint {
-        self.handle_operation_left(false, Self::parse_and, &[TOKEN_OR_OR])
+        self.parse_left_assoc(Self::parse_and, T![||] | ())
     }
     fn parse_implication(&mut self) -> Checkpoint {
-        self.handle_operation_right(Self::parse_or, &[TOKEN_IMPLICATION])
+        self.parse_right_assoc(Self::parse_or, T![->] | ())
     }
     #[inline(always)]
     fn parse_math(&mut self) -> Checkpoint {
@@ -732,51 +700,51 @@ where
         }
         self.depth += 1;
         let out = match self.peek() {
-            Some(TOKEN_LET) => {
+            Some(T![let]) => {
                 let checkpoint = self.checkpoint();
                 self.bump();
 
-                if self.peek() == Some(TOKEN_CURLY_B_OPEN) {
+                if self.peek() == Some(T!['{']) {
                     self.start_node_at(checkpoint, NODE_LEGACY_LET);
                     self.bump();
-                    self.parse_set(TOKEN_CURLY_B_CLOSE);
+                    self.parse_set(T!['}']);
                     self.finish_node();
                 } else {
                     self.start_node_at(checkpoint, NODE_LET_IN);
-                    self.parse_set(TOKEN_IN);
+                    self.parse_set(T![in]);
                     self.parse_expr();
                     self.finish_node();
                 }
                 checkpoint
             }
-            Some(TOKEN_WITH) => {
+            Some(T![with]) => {
                 let checkpoint = self.checkpoint();
                 self.start_node(NODE_WITH);
                 self.bump();
                 self.parse_expr();
-                self.expect(TOKEN_SEMICOLON);
+                self.expect(T![;]);
                 self.parse_expr();
                 self.finish_node();
                 checkpoint
             }
-            Some(TOKEN_IF) => {
+            Some(T![if]) => {
                 let checkpoint = self.checkpoint();
                 self.start_node(NODE_IF_ELSE);
                 self.bump();
                 self.parse_expr();
-                self.expect(TOKEN_THEN);
+                self.expect(T![then]);
                 self.parse_expr();
                 self.expect(TOKEN_ELSE);
                 self.parse_expr();
                 self.finish_node();
                 checkpoint
             }
-            Some(TOKEN_ASSERT) => {
+            Some(T![assert]) => {
                 let checkpoint = self.checkpoint();
                 self.start_node(NODE_ASSERT);
                 self.bump();
                 self.parse_expr();
-                self.expect(TOKEN_SEMICOLON);
+                self.expect(T![;]);
                 self.parse_expr();
                 self.finish_node();
                 checkpoint
@@ -808,147 +776,4 @@ where
     }
     parser.builder.finish_node();
     (parser.builder.finish(), parser.errors)
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::Root;
-
-    use super::*;
-
-    use std::{env, ffi::OsStr, fmt::Write, fs, io::Write as IoWrite, path::PathBuf};
-
-    //     #[test]
-    //     fn whitespace_attachment_for_incomplete_code1() {
-    //         let code = "{
-    //   traceIf =
-    //     # predicate to check
-    //     pred:
-
-    // ";
-    //         let ast = crate::parse(code);
-    //         let actual = format!("{}", ast.root().dump());
-    //         // The core thing we want to check here is that `\n\n` belongs to the
-    //         // root node, and not to some incomplete inner node.
-    //         assert_eq!(
-    //             actual.trim(),
-    //             r##"
-    // NODE_ROOT 0..50 {
-    //   NODE_ATTR_SET 0..48 {
-    //     TOKEN_CURLY_B_OPEN("{") 0..1
-    //     TOKEN_WHITESPACE("\n  ") 1..4
-    //     NODE_KEY_VALUE 4..48 {
-    //       NODE_KEY 4..11 {
-    //         NODE_IDENT 4..11 {
-    //           TOKEN_IDENT("traceIf") 4..11
-    //         }
-    //       }
-    //       TOKEN_WHITESPACE(" ") 11..12
-    //       TOKEN_ASSIGN("=") 12..13
-    //       TOKEN_WHITESPACE("\n    ") 13..18
-    //       TOKEN_COMMENT("# predicate to check") 18..38
-    //       TOKEN_WHITESPACE("\n    ") 38..43
-    //       NODE_LAMBDA 43..48 {
-    //         NODE_IDENT 43..47 {
-    //           TOKEN_IDENT("pred") 43..47
-    //         }
-    //         TOKEN_COLON(":") 47..48
-    //       }
-    //     }
-    //   }
-    //   TOKEN_WHITESPACE("\n\n") 48..50
-    // }"##
-    //             .trim()
-    //         );
-    //     }
-
-    //     #[test]
-    //     fn whitespace_attachment_for_incomplete_code2() {
-    //         let code = "{} =
-    // ";
-    //         let ast = crate::parse(code);
-    //         let actual = format!("{}", ast.root().dump());
-    //         assert_eq!(
-    //             actual.trim(),
-    //             r##"
-    // NODE_ROOT 0..5 {
-    //   NODE_ATTR_SET 0..2 {
-    //     TOKEN_CURLY_B_OPEN("{") 0..1
-    //     TOKEN_CURLY_B_CLOSE("}") 1..2
-    //   }
-    //   TOKEN_WHITESPACE(" ") 2..3
-    //   NODE_ERROR 3..4 {
-    //     TOKEN_ASSIGN("=") 3..4
-    //   }
-    //   TOKEN_WHITESPACE("\n") 4..5
-    // }"##
-    //             .trim()
-    //         );
-    //     }
-
-    fn test_dir(name: &str) {
-        let should_update = env::var("UPDATE_TESTS").map(|s| s == "1").unwrap_or(false);
-        let dir: PathBuf = ["test_data", name].iter().collect();
-
-        for entry in dir.read_dir().unwrap() {
-            let entry = entry.unwrap();
-            let mut path = entry.path();
-            if path.extension() != Some(OsStr::new("nix")) {
-                continue;
-            }
-            let mut code = fs::read_to_string(&path).unwrap();
-            if code.ends_with('\n') {
-                code.truncate(code.len() - 1);
-            }
-            let parse = Root::parse(&code);
-            path.set_extension("expect");
-            if !path.exists() {
-                fs::File::create(&path).expect("Failed to create .expect file");
-            }
-            let expected = fs::read_to_string(&path).unwrap();
-
-            let mut actual = String::new();
-            for error in parse.errors() {
-                writeln!(actual, "error: {}", error).unwrap();
-            }
-            writeln!(actual, "{:#?}", parse.syntax()).unwrap();
-            if should_update {
-                let mut file =
-                    fs::OpenOptions::new().write(true).truncate(true).open(&path).unwrap();
-                write!(file, "{}", actual).unwrap();
-                continue;
-            }
-
-            if actual != expected {
-                path.set_extension("nix");
-                eprintln!("In {}:", path.display());
-                eprintln!("--- Actual ---");
-                eprintln!("{}", actual);
-                eprintln!("-- Expected ---");
-                eprintln!("{}", expected);
-                eprintln!("--- End ---");
-                panic!("Tests did not match");
-            }
-        }
-    }
-
-    #[rustfmt::skip]
-    mod dir_tests {
-        use super::test_dir;
-
-        #[test]
-        fn general() {
-            test_dir("general");
-        }
-
-        #[test]
-        fn parser() {
-            for dir in std::fs::read_dir("test_data/parser").unwrap() {
-                let dir = dir.unwrap();
-                let file_name = dir.file_name().into_string().unwrap();
-                println!("testing: {}", file_name);
-                test_dir(&format!("parser/{}", file_name));
-            }
-        }
-    }
 }

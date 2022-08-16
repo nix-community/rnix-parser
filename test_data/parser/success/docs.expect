@@ -1,0 +1,82 @@
+NODE_ROOT@0..306
+  TOKEN_COMMENT@0..35 "# Test used by exampl ..."
+  TOKEN_WHITESPACE@35..36 "\n"
+  NODE_ATTR_SET@36..306
+    TOKEN_REC@36..39 "rec"
+    TOKEN_WHITESPACE@39..40 " "
+    TOKEN_L_BRACE@40..41 "{"
+    TOKEN_WHITESPACE@41..44 "\n  "
+    TOKEN_COMMENT@44..60 "# Usage: add x y"
+    TOKEN_WHITESPACE@60..63 "\n  "
+    TOKEN_COMMENT@63..122 "# Adds the integers x ..."
+    TOKEN_WHITESPACE@122..125 "\n  "
+    NODE_ATTRPATH_VALUE@125..196
+      NODE_ATTRPATH@125..128
+        NODE_IDENT@125..128
+          TOKEN_IDENT@125..128 "add"
+      TOKEN_WHITESPACE@128..129 " "
+      TOKEN_ASSIGN@129..130 "="
+      TOKEN_WHITESPACE@130..135 "\n    "
+      TOKEN_COMMENT@135..150 "# First integer"
+      TOKEN_WHITESPACE@150..155 "\n    "
+      NODE_LAMBDA@155..195
+        NODE_IDENT@155..156
+          TOKEN_IDENT@155..156 "x"
+        TOKEN_COLON@156..157 ":"
+        TOKEN_WHITESPACE@157..162 "\n    "
+        TOKEN_COMMENT@162..178 "# Second integer"
+        TOKEN_WHITESPACE@178..183 "\n    "
+        NODE_LAMBDA@183..195
+          NODE_IDENT@183..184
+            TOKEN_IDENT@183..184 "y"
+          TOKEN_COLON@184..185 ":"
+          TOKEN_WHITESPACE@185..190 "\n    "
+          NODE_BIN_OP@190..195
+            NODE_IDENT@190..191
+              TOKEN_IDENT@190..191 "x"
+            TOKEN_WHITESPACE@191..192 " "
+            TOKEN_ADD@192..193 "+"
+            TOKEN_WHITESPACE@193..194 " "
+            NODE_IDENT@194..195
+              TOKEN_IDENT@194..195 "y"
+      TOKEN_SEMICOLON@195..196 ";"
+    TOKEN_WHITESPACE@196..199 "\n  "
+    TOKEN_COMMENT@199..216 "# Usage: sum nums"
+    TOKEN_WHITESPACE@216..219 "\n  "
+    TOKEN_COMMENT@219..262 "# Returns the sum of  ..."
+    TOKEN_WHITESPACE@262..265 "\n  "
+    NODE_ATTRPATH_VALUE@265..304
+      NODE_ATTRPATH@265..268
+        NODE_IDENT@265..268
+          TOKEN_IDENT@265..268 "sum"
+      TOKEN_WHITESPACE@268..269 " "
+      TOKEN_ASSIGN@269..270 "="
+      TOKEN_WHITESPACE@270..271 " "
+      NODE_LAMBDA@271..303
+        NODE_IDENT@271..275
+          TOKEN_IDENT@271..275 "nums"
+        TOKEN_COLON@275..276 ":"
+        TOKEN_WHITESPACE@276..277 " "
+        NODE_APPLY@277..303
+          NODE_APPLY@277..298
+            NODE_APPLY@277..296
+              NODE_SELECT@277..292
+                NODE_IDENT@277..285
+                  TOKEN_IDENT@277..285 "builtins"
+                TOKEN_DOT@285..286 "."
+                NODE_ATTRPATH@286..292
+                  NODE_IDENT@286..292
+                    TOKEN_IDENT@286..292 "foldl'"
+              TOKEN_WHITESPACE@292..293 " "
+              NODE_IDENT@293..296
+                TOKEN_IDENT@293..296 "add"
+            TOKEN_WHITESPACE@296..297 " "
+            NODE_LITERAL@297..298
+              TOKEN_INTEGER@297..298 "0"
+          TOKEN_WHITESPACE@298..299 " "
+          NODE_IDENT@299..303
+            TOKEN_IDENT@299..303 "nums"
+      TOKEN_SEMICOLON@303..304 ";"
+    TOKEN_WHITESPACE@304..305 "\n"
+    TOKEN_R_BRACE@305..306 "}"
+
