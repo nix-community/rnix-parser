@@ -122,8 +122,8 @@ impl SyntaxKind {
     /// ```
     pub fn is_fn_arg(self) -> bool {
         match self {
-            TOKEN_REC | TOKEN_L_BRACE | TOKEN_L_BRACK | TOKEN_L_PAREN
-            | TOKEN_STRING_START | TOKEN_IDENT => true,
+            TOKEN_REC | TOKEN_L_BRACE | TOKEN_L_BRACK | TOKEN_L_PAREN | TOKEN_STRING_START
+            | TOKEN_IDENT => true,
             _ => self.is_literal(),
         }
     }
