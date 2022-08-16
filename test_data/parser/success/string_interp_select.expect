@@ -8,7 +8,7 @@ NODE_ROOT@0..43
       TOKEN_WHITESPACE@11..12 " "
       NODE_SELECT@12..38
         NODE_ATTR_SET@12..32
-          TOKEN_CURLY_B_OPEN@12..13 "{"
+          TOKEN_L_BRACE@12..13 "{"
           TOKEN_WHITESPACE@13..14 " "
           NODE_ATTRPATH_VALUE@14..30
             NODE_ATTRPATH@14..19
@@ -23,7 +23,7 @@ NODE_ROOT@0..43
               TOKEN_STRING_END@28..29 "\""
             TOKEN_SEMICOLON@29..30 ";"
           TOKEN_WHITESPACE@30..31 " "
-          TOKEN_CURLY_B_CLOSE@31..32 "}"
+          TOKEN_R_BRACE@31..32 "}"
         TOKEN_DOT@32..33 "."
         NODE_ATTRPATH@33..38
           NODE_IDENT@33..38

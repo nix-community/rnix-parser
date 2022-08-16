@@ -4,10 +4,10 @@ NODE_ROOT@0..7
       TOKEN_IDENT@0..1 "m"
     TOKEN_COLON@1..2 ":"
     NODE_LIST@2..7
-      TOKEN_SQUARE_B_OPEN@2..3 "["
+      TOKEN_L_BRACK@2..3 "["
       TOKEN_WHITESPACE@3..4 " "
       NODE_IDENT@4..5
         TOKEN_IDENT@4..5 "m"
       TOKEN_WHITESPACE@5..6 " "
-      TOKEN_SQUARE_B_CLOSE@6..7 "]"
+      TOKEN_R_BRACK@6..7 "]"
 

@@ -20,10 +20,10 @@ pub enum SyntaxKind {
     TOKEN_WITH,
 
     // Symbols
-    TOKEN_CURLY_B_OPEN,
-    TOKEN_CURLY_B_CLOSE,
-    TOKEN_SQUARE_B_OPEN,
-    TOKEN_SQUARE_B_CLOSE,
+    TOKEN_L_BRACE,
+    TOKEN_R_BRACE,
+    TOKEN_L_BRACK,
+    TOKEN_R_BRACK,
     TOKEN_ASSIGN,
     TOKEN_AT,
     TOKEN_COLON,
@@ -34,8 +34,8 @@ pub enum SyntaxKind {
     TOKEN_SEMICOLON,
 
     // Operators
-    TOKEN_PAREN_OPEN,
-    TOKEN_PAREN_CLOSE,
+    TOKEN_L_PAREN,
+    TOKEN_R_PAREN,
     TOKEN_CONCAT,
     TOKEN_INVERT,
     TOKEN_UPDATE,
@@ -122,8 +122,8 @@ impl SyntaxKind {
     /// ```
     pub fn is_fn_arg(self) -> bool {
         match self {
-            TOKEN_REC | TOKEN_CURLY_B_OPEN | TOKEN_SQUARE_B_OPEN | TOKEN_PAREN_OPEN
-            | TOKEN_STRING_START | TOKEN_IDENT => true,
+            TOKEN_REC | TOKEN_L_BRACE | TOKEN_L_BRACK | TOKEN_L_PAREN | TOKEN_STRING_START
+            | TOKEN_IDENT => true,
             _ => self.is_literal(),
         }
     }

@@ -1,9 +1,9 @@
 NODE_ROOT@0..71
   NODE_LIST@0..71
-    TOKEN_SQUARE_B_OPEN@0..1 "["
+    TOKEN_L_BRACK@0..1 "["
     TOKEN_WHITESPACE@1..4 "\n  "
     NODE_PAREN@4..17
-      TOKEN_PAREN_OPEN@4..5 "("
+      TOKEN_L_PAREN@4..5 "("
       NODE_BIN_OP@5..16
         NODE_IDENT@5..6
           TOKEN_IDENT@5..6 "a"
@@ -18,10 +18,10 @@ NODE_ROOT@0..71
           TOKEN_WHITESPACE@14..15 " "
           NODE_IDENT@15..16
             TOKEN_IDENT@15..16 "c"
-      TOKEN_PAREN_CLOSE@16..17 ")"
+      TOKEN_R_PAREN@16..17 ")"
     TOKEN_WHITESPACE@17..20 "\n  "
     NODE_PAREN@20..33
-      TOKEN_PAREN_OPEN@20..21 "("
+      TOKEN_L_PAREN@20..21 "("
       NODE_BIN_OP@21..32
         NODE_IDENT@21..22
           TOKEN_IDENT@21..22 "a"
@@ -36,10 +36,10 @@ NODE_ROOT@0..71
           TOKEN_WHITESPACE@30..31 " "
           NODE_IDENT@31..32
             TOKEN_IDENT@31..32 "c"
-      TOKEN_PAREN_CLOSE@32..33 ")"
+      TOKEN_R_PAREN@32..33 ")"
     TOKEN_WHITESPACE@33..36 "\n  "
     NODE_PAREN@36..49
-      TOKEN_PAREN_OPEN@36..37 "("
+      TOKEN_L_PAREN@36..37 "("
       NODE_BIN_OP@37..48
         NODE_IDENT@37..38
           TOKEN_IDENT@37..38 "a"
@@ -54,10 +54,10 @@ NODE_ROOT@0..71
           TOKEN_WHITESPACE@46..47 " "
           NODE_IDENT@47..48
             TOKEN_IDENT@47..48 "c"
-      TOKEN_PAREN_CLOSE@48..49 ")"
+      TOKEN_R_PAREN@48..49 ")"
     TOKEN_WHITESPACE@49..52 "\n  "
     NODE_PAREN@52..69
-      TOKEN_PAREN_OPEN@52..53 "("
+      TOKEN_L_PAREN@52..53 "("
       NODE_BIN_OP@53..68
         NODE_BIN_OP@53..63
           NODE_BIN_OP@53..58
@@ -78,7 +78,7 @@ NODE_ROOT@0..71
         TOKEN_WHITESPACE@66..67 " "
         NODE_IDENT@67..68
           TOKEN_IDENT@67..68 "d"
-      TOKEN_PAREN_CLOSE@68..69 ")"
+      TOKEN_R_PAREN@68..69 ")"
     TOKEN_WHITESPACE@69..70 "\n"
-    TOKEN_SQUARE_B_CLOSE@70..71 "]"
+    TOKEN_R_BRACK@70..71 "]"
 
