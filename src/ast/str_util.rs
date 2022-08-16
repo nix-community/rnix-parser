@@ -1,18 +1,13 @@
 use crate::kinds::SyntaxKind::*;
 use rowan::{ast::AstNode as OtherAstNode, NodeOrToken};
 
-use crate::{
-    ast::{self, AstNode},
-    SyntaxElement, SyntaxToken,
-};
+use crate::ast;
+
+use super::support::children_tokens_u;
 
 impl ast::Str {
     pub fn parts(&self) -> Vec<StrPart> {
-        fn children_tokens<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
-            parent.syntax().children_with_tokens().filter_map(SyntaxElement::into_token)
-        }
-
-        let multiline = children_tokens(self).next().map_or(false, |t| t.text() == "''");
+        let multiline = children_tokens_u(self).next().map_or(false, |t| t.text() == "''");
         let mut is_first_literal = true;
         let mut at_start_of_line = true;
         let mut min_indent = 1000000;
