@@ -207,6 +207,7 @@ node! {
 node! { #[from(NODE_IDENT)] struct Ident; }
 
 impl Ident {
+    // A NODE_IDENT may either have a nested TOKEN_OR if the identifier was "or" or TOKEN_IDENT for everything else
     tg! { ident_token, TOKEN_IDENT }
 }
 
@@ -282,9 +283,9 @@ node! { #[from(NODE_PATH)] struct Path; }
 
 node! { #[from(NODE_STRING)] struct Str; }
 
-node! { #[from(NODE_INTERPOL)] struct StrInterpol; }
+node! { #[from(NODE_INTERPOL)] struct Interpol; }
 
-impl StrInterpol {
+impl Interpol {
     ng! { expr, Expr, 0 }
 }
 
