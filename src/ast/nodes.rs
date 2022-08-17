@@ -209,7 +209,6 @@ node! { #[from(NODE_IDENT)] struct Ident; }
 impl Ident {
     // A NODE_IDENT may either have a nested TOKEN_OR if the identifier was "or" or TOKEN_IDENT for everything else
     tg! { ident_token, TOKEN_IDENT }
-    tg! { or_token, TOKEN_OR }
 }
 
 node! { #[from(NODE_APPLY)] struct Apply; }

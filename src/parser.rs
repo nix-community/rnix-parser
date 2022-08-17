@@ -283,7 +283,8 @@ where
             _ => {
                 if self.expect_peek_any(&[TOKEN_IDENT, TOKEN_OR]).is_some() {
                     self.start_node(NODE_IDENT);
-                    self.bump();
+                    let (_, s) = self.try_next().unwrap();
+                    self.manual_bump(s, TOKEN_IDENT);
                     self.finish_node()
                 }
             }

@@ -1,0 +1,43 @@
+NODE_ROOT@0..37
+  NODE_ATTR_SET@0..37
+    TOKEN_CURLY_B_OPEN@0..1 "{"
+    TOKEN_WHITESPACE@1..4 "\n  "
+    NODE_ATTRPATH_VALUE@4..16
+      NODE_ATTRPATH@4..9
+        NODE_IDENT@4..5
+          TOKEN_IDENT@4..5 "a"
+        TOKEN_DOT@5..6 "."
+        NODE_IDENT@6..7
+          TOKEN_IDENT@6..7 "b"
+        TOKEN_DOT@7..8 "."
+        NODE_IDENT@8..9
+          TOKEN_IDENT@8..9 "c"
+      TOKEN_WHITESPACE@9..10 " "
+      TOKEN_ASSIGN@10..11 "="
+      TOKEN_WHITESPACE@11..12 " "
+      NODE_LITERAL@12..15
+        TOKEN_INTEGER@12..15 "324"
+      TOKEN_SEMICOLON@15..16 ";"
+    TOKEN_WHITESPACE@16..19 "\n  "
+    NODE_ATTRPATH_VALUE@19..35
+      NODE_ATTRPATH@19..28
+        NODE_IDENT@19..20
+          TOKEN_IDENT@19..20 "a"
+        TOKEN_DOT@20..21 "."
+        NODE_IDENT@21..23
+          TOKEN_IDENT@21..23 "or"
+        TOKEN_DOT@23..24 "."
+        NODE_IDENT@24..25
+          TOKEN_IDENT@24..25 "b"
+        TOKEN_DOT@25..26 "."
+        NODE_IDENT@26..28
+          TOKEN_IDENT@26..28 "or"
+      TOKEN_WHITESPACE@28..29 " "
+      TOKEN_ASSIGN@29..30 "="
+      TOKEN_WHITESPACE@30..31 " "
+      NODE_LITERAL@31..34
+        TOKEN_INTEGER@31..34 "234"
+      TOKEN_SEMICOLON@34..35 ";"
+    TOKEN_WHITESPACE@35..36 "\n"
+    TOKEN_CURLY_B_CLOSE@36..37 "}"
+
