@@ -147,7 +147,8 @@ impl ast::Str {
                         normalized_parts.push(InterpolPart::Literal(unescape(&str, multiline)));
                         i += 1;
                     } else {
-                        normalized_parts.push(InterpolPart::Literal(unescape(token_text, multiline)));
+                        normalized_parts
+                            .push(InterpolPart::Literal(unescape(token_text, multiline)));
                     }
                 }
             }
@@ -228,7 +229,10 @@ mod tests {
         let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
         match expr {
             ast::Expr::Str(str) => {
-                assert_eq!(str.normalized_parts(), vec![InterpolPart::Literal("hello\nworld".to_string())])
+                assert_eq!(
+                    str.normalized_parts(),
+                    vec![InterpolPart::Literal("hello\nworld".to_string())]
+                )
             }
             _ => unreachable!(),
         }
