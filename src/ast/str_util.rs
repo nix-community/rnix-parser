@@ -22,7 +22,7 @@ impl ast::Str {
         })
     }
 
-    pub fn parts_parsed(&self) -> Vec<InterpolPart<String>> {
+    pub fn normalized_parts(&self) -> Vec<InterpolPart<String>> {
         let mut parsed_parts = Vec::new();
         let mut literals = 0;
         let mut common = std::usize::MAX;
@@ -210,7 +210,10 @@ mod tests {
         let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
         match expr {
             ast::Expr::Str(str) => {
-                assert_eq!(str.parts_parsed(), vec![InterpolPart::Literal("hello ".to_string())])
+                assert_eq!(
+                    str.normalized_parts(),
+                    vec![InterpolPart::Literal("hello ".to_string())]
+                )
             }
             _ => unreachable!(),
         }
@@ -221,7 +224,10 @@ mod tests {
         let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
         match expr {
             ast::Expr::Str(str) => {
-                assert_eq!(str.parts_parsed(), vec![InterpolPart::Literal("hello\n".to_string())])
+                assert_eq!(
+                    str.normalized_parts(),
+                    vec![InterpolPart::Literal("hello\n".to_string())]
+                )
             }
             _ => unreachable!(),
         }
@@ -255,7 +261,7 @@ mod tests {
         .replace("|trailing-whitespace", "");
 
         if let [InterpolPart::Literal(lit)] =
-            &ast::Str::parts_parsed(&string_node(txtin.as_str()))[..]
+            &ast::Str::normalized_parts(&string_node(txtin.as_str()))[..]
         {
             assert_eq!(lit,
                 // Get the below with nix repl
@@ -300,7 +306,7 @@ mod tests {
         let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
         match expr {
             ast::Expr::Str(s) => {
-                let mut it = s.parts_parsed().into_iter();
+                let mut it = s.normalized_parts().into_iter();
                 assert_eq!(
                     it.next().unwrap(),
                     InterpolPart::Literal("\nThis version of Nixpkgs requires Nix >= ".to_string())

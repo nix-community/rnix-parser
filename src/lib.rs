@@ -131,7 +131,7 @@ mod tests {
         let attrpath_value = ast::AttrpathValue::try_from(entry).unwrap();
         let value = ast::Str::try_from(attrpath_value.value().unwrap()).unwrap();
 
-        match &*value.parts_parsed() {
+        match &*value.normalized_parts() {
             &[
                 ast::InterpolPart::Literal(ref s1),
                 ast::InterpolPart::Interpolation(_),

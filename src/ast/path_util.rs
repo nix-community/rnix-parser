@@ -17,17 +17,6 @@ impl ast::nodes::Path {
             }
         })
     }
-
-    pub fn parts_parsed(&self) -> Vec<InterpolPart<String>> {
-        self.parts()
-            .map(|part| match part {
-                InterpolPart::Literal(literal) => {
-                    InterpolPart::Literal(literal.syntax().text().to_string())
-                }
-                InterpolPart::Interpolation(interpol) => InterpolPart::Interpolation(interpol),
-            })
-            .collect()
-    }
 }
 
 #[cfg(test)]
@@ -35,13 +24,13 @@ mod tests {
     use rowan::ast::AstNode;
 
     use crate::{
-        ast::{self, InterpolPart},
+        ast::{self, AstToken, InterpolPart, PathContent},
         Root,
     };
 
     #[test]
     fn parts() {
-        fn assert_eq_ast_ctn(it: &mut dyn Iterator<Item = InterpolPart<String>>, x: &str) {
+        fn assert_eq_ast_ctn(it: &mut dyn Iterator<Item = InterpolPart<PathContent>>, x: &str) {
             let tmp = it.next().expect("unexpected EOF");
             if let InterpolPart::Interpolation(astn) = tmp {
                 assert_eq!(astn.expr().unwrap().syntax().to_string(), x);
@@ -50,16 +39,25 @@ mod tests {
             }
         }
 
+        fn assert_eq_lit(it: &mut dyn Iterator<Item = InterpolPart<PathContent>>, x: &str) {
+            let tmp = it.next().expect("unexpected EOF");
+            if let InterpolPart::Literal(astn) = tmp {
+                assert_eq!(astn.syntax().text(), x);
+            } else {
+                unreachable!("unexpected interpol {:?}", tmp);
+            }
+        }
+
         let inp = r#"./a/b/${"c"}/${d}/e/f"#;
         let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
         match expr {
             ast::Expr::Path(p) => {
-                let mut it = p.parts_parsed().into_iter();
-                assert_eq!(it.next().unwrap(), InterpolPart::Literal("./a/b/".to_string()));
+                let mut it = p.parts();
+                assert_eq_lit(&mut it, "./a/b/");
                 assert_eq_ast_ctn(&mut it, "\"c\"");
-                assert_eq!(it.next().unwrap(), InterpolPart::Literal("/".to_string()));
+                assert_eq_lit(&mut it, "/");
                 assert_eq_ast_ctn(&mut it, "d");
-                assert_eq!(it.next().unwrap(), InterpolPart::Literal("/e/f".to_string()));
+                assert_eq_lit(&mut it, "/e/f");
             }
             _ => unreachable!(),
         }
