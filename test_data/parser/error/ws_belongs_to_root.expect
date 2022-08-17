@@ -15,8 +15,9 @@ NODE_ROOT@0..50
       TOKEN_COMMENT@18..38 "# predicate to check"
       TOKEN_WHITESPACE@38..43 "\n    "
       NODE_LAMBDA@43..48
-        NODE_IDENT@43..47
-          TOKEN_IDENT@43..47 "pred"
+        NODE_IDENT_PARAM@43..47
+          NODE_IDENT@43..47
+            TOKEN_IDENT@43..47 "pred"
         TOKEN_COLON@47..48 ":"
   TOKEN_WHITESPACE@48..50 "\n\n"
 

@@ -359,10 +359,16 @@ impl PatEntry {
     ng! { default, Expr, 1 }
 }
 
+node! { #[from(NODE_IDENT_PARAM)] struct IdentParam; }
+
+impl IdentParam {
+    ng! { ident, Ident, 0 }
+}
+
 node! {
     #[from(
         Pattern,
-        Ident,
+        IdentParam,
     )]
     enum Param;
 }
