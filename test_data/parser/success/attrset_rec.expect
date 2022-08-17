@@ -1,0 +1,14 @@
+NODE_ROOT@0..12
+  NODE_ATTR_SET@0..12
+    TOKEN_REC@0..3 "rec"
+    TOKEN_L_BRACE@3..4 "{"
+    NODE_ATTRPATH_VALUE@4..11
+      NODE_ATTRPATH@4..8
+        NODE_IDENT@4..8
+          TOKEN_IDENT@4..8 "test"
+      TOKEN_ASSIGN@8..9 "="
+      NODE_LITERAL@9..10
+        TOKEN_INTEGER@9..10 "1"
+      TOKEN_SEMICOLON@10..11 ";"
+    TOKEN_R_BRACE@11..12 "}"
+

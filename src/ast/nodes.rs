@@ -1,8 +1,7 @@
 use crate::{NixLanguage, SyntaxKind, SyntaxKind::*, SyntaxNode, SyntaxToken};
 
 use super::{operators::BinOpKind, support::*, AstNode, UnaryOpKind};
-use rowan::ast::AstChildren;
-use rowan::ast::AstNode as OtherAstNode;
+use rowan::ast::{AstChildren, AstNode as OtherAstNode};
 
 pub trait HasEntry: AstNode {
     fn entries(&self) -> AstChildren<Entry>
@@ -61,9 +60,13 @@ macro_rules! node {
                 &self.0
             }
         }
+
+        impl $name {
+            pub const KIND: SyntaxKind = $kind;
+        }
     };
     (
-        #[case($($kind:ident => $variant:ident),* $(,)?)]
+        #[from($($variant:ident),* $(,)?)]
         $(#[$meta:meta])*
         enum $name:ident;
     ) => {
@@ -85,13 +88,13 @@ macro_rules! node {
             type Language = NixLanguage;
 
             fn can_cast(kind: SyntaxKind) -> bool {
-                matches!(kind, $($kind)|*)
+                matches!(kind, $($variant::KIND)|*)
             }
 
             fn cast(syntax: SyntaxNode) -> Option<Self> {
                 let res = match syntax.kind() {
                     $(
-                        $kind => $name::$variant($variant(syntax))
+                        $variant::KIND => $name::$variant($variant(syntax))
                     ),*,
                     _ => return None,
                 };
@@ -166,38 +169,37 @@ macro_rules! ng {
 node! { #[from(NODE_LITERAL)] struct Literal; }
 
 node! {
-    #[case(
-        NODE_APPLY => Apply,
-        NODE_ASSERT => Assert,
-        NODE_ERROR => Error,
-        NODE_IF_ELSE => IfElse,
-        NODE_SELECT => Select,
-        NODE_INHERIT => Inherit,
-        NODE_INHERIT_FROM => InheritFrom,
-        NODE_LITERAL => Literal,
-        NODE_LAMBDA => Lambda,
-        NODE_LEGACY_LET => LegacyLet,
-        NODE_LET_IN => LetIn,
-        NODE_LIST => List,
-        NODE_BIN_OP => BinOp,
-        NODE_PAREN => Paren,
-        NODE_ROOT => Root,
-        NODE_ATTR_SET => AttrSet,
-        NODE_UNARY_OP => UnaryOp,
-        NODE_IDENT => Ident,
-        NODE_WITH => With,
-        NODE_STRING => Str,
-        NODE_HAS_ATTR => HasAttr,
+    #[from(
+        Apply,
+        Assert,
+        Error,
+        IfElse,
+        Select,
+        Str,
+        Path,
+        Literal,
+        Lambda,
+        LegacyLet,
+        LetIn,
+        List,
+        BinOp,
+        Paren,
+        Root,
+        AttrSet,
+        UnaryOp,
+        Ident,
+        With,
+        HasAttr,
     )]
     /// An expression. The fundamental nix ast type.
     enum Expr;
 }
 
 node! {
-    #[case(
-        NODE_IDENT => Ident,
-        NODE_DYNAMIC => Dynamic,
-        NODE_STRING => Str,
+    #[from(
+        Ident,
+        Dynamic,
+        Str,
     )]
     enum Attr;
 }
@@ -233,6 +235,12 @@ impl Attrpath {
 
 node! { #[from(NODE_DYNAMIC)] struct Dynamic; }
 
+impl Dynamic {
+    tg! { interpol_start_token, TOKEN_INTERPOL_START }
+    ng! { expr, Expr, 0 }
+    tg! { interpol_end_token, TOKEN_INTERPOL_END }
+}
+
 node! { #[from(NODE_ERROR)] struct Error; }
 
 node! { #[from(NODE_IF_ELSE)] struct IfElse; }
@@ -267,16 +275,18 @@ impl Inherit {
 node! { #[from(NODE_INHERIT_FROM)] struct InheritFrom; }
 
 impl InheritFrom {
-    tg! { l_paren_token, "(" }
+    tg! { l_paren_token, '(' }
     ng! { expr, Expr, 0 }
-    tg! { r_paren_token, ")" }
+    tg! { r_paren_token, ')' }
 }
+
+node! { #[from(NODE_PATH)] struct Path; }
 
 node! { #[from(NODE_STRING)] struct Str; }
 
-node! { #[from(NODE_STRING_INTERPOL)] struct StrInterpol; }
+node! { #[from(NODE_INTERPOL)] struct Interpol; }
 
-impl StrInterpol {
+impl Interpol {
     ng! { expr, Expr, 0 }
 }
 
@@ -294,8 +304,8 @@ impl HasEntry for LegacyLet {}
 
 impl LegacyLet {
     tg! { let_token, let }
-    tg! { curly_open_token, "{" }
-    tg! { curly_close_token, "}" }
+    tg! { curly_open_token, '{' }
+    tg! { curly_close_token, '}' }
 }
 
 node! { #[from(NODE_LET_IN)] struct LetIn; }
@@ -311,9 +321,9 @@ impl LetIn {
 node! { #[from(NODE_LIST)] struct List; }
 
 impl List {
-    tg! { l_brack_token, "[" }
+    tg! { l_brack_token, '[' }
     ng! { items, [Expr] }
-    tg! { r_brack_token, "]" }
+    tg! { r_brack_token, ']' }
 }
 
 node! { #[from(NODE_BIN_OP)] struct BinOp; }
@@ -331,9 +341,9 @@ impl BinOp {
 node! { #[from(NODE_PAREN)] struct Paren; }
 
 impl Paren {
-    tg! { l_paren_token, "(" }
+    tg! { l_paren_token, '(' }
     ng! { expr, Expr, 0 }
-    tg! { r_paren_token, ")" }
+    tg! { r_paren_token, ')' }
 }
 
 node! { #[from(NODE_PAT_BIND)] struct PatBind; }
@@ -351,9 +361,9 @@ impl PatEntry {
 }
 
 node! {
-    #[case(
-        NODE_PATTERN => Pattern,
-        NODE_IDENT => Ident,
+    #[from(
+        Pattern,
+        Ident,
     )]
     enum Param;
 }
@@ -379,14 +389,14 @@ impl HasEntry for AttrSet {}
 
 impl AttrSet {
     tg! { rec_token, rec }
-    tg! { l_curly_token, "{" }
-    tg! { r_curly_token, "}" }
+    tg! { l_curly_token, '{' }
+    tg! { r_curly_token, '}' }
 }
 
 node! {
-    #[case(
-        NODE_INHERIT => Inherit,
-        NODE_ATTRPATH_VALUE => AttrpathValue,
+    #[from(
+        Inherit,
+        AttrpathValue,
     )]
     enum Entry;
 }

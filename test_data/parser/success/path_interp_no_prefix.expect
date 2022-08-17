@@ -1,0 +1,9 @@
+NODE_ROOT@0..6
+  NODE_PATH@0..6
+    TOKEN_PATH@0..2 "a/"
+    NODE_INTERPOL@2..6
+      TOKEN_INTERPOL_START@2..4 "${"
+      NODE_IDENT@4..5
+        TOKEN_IDENT@4..5 "b"
+      TOKEN_INTERPOL_END@5..6 "}"
+

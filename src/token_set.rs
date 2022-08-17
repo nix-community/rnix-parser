@@ -35,3 +35,51 @@ impl TokenSet {
 const fn mask(kind: SyntaxKind) -> u128 {
     1u128 << (kind as usize)
 }
+
+impl ops::BitOr for SyntaxKind {
+    type Output = TokenSet;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        TokenSet(mask(self) | mask(rhs))
+    }
+}
+
+impl ops::BitOr<SyntaxKind> for TokenSet {
+    type Output = TokenSet;
+
+    fn bitor(self, rhs: SyntaxKind) -> Self::Output {
+        self.union(TokenSet(mask(rhs)))
+    }
+}
+
+impl ops::BitOr<TokenSet> for SyntaxKind {
+    type Output = TokenSet;
+
+    fn bitor(self, rhs: TokenSet) -> Self::Output {
+        TokenSet(mask(self)).union(rhs)
+    }
+}
+
+impl ops::BitOr<TokenSet> for TokenSet {
+    type Output = TokenSet;
+
+    fn bitor(self, rhs: TokenSet) -> Self::Output {
+        self.union(rhs)
+    }
+}
+
+impl ops::BitOr<SyntaxKind> for () {
+    type Output = TokenSet;
+
+    fn bitor(self, rhs: SyntaxKind) -> Self::Output {
+        TokenSet::new(rhs)
+    }
+}
+
+impl ops::BitOr<()> for SyntaxKind {
+    type Output = TokenSet;
+
+    fn bitor(self, (): ()) -> Self::Output {
+        TokenSet::new(self)
+    }
+}

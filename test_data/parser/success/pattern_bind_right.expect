@@ -1,0 +1,16 @@
+NODE_ROOT@0..13
+  NODE_LAMBDA@0..13
+    NODE_PATTERN@0..10
+      TOKEN_L_BRACE@0..1 "{"
+      TOKEN_R_BRACE@1..2 "}"
+      TOKEN_WHITESPACE@2..3 " "
+      NODE_PAT_BIND@3..10
+        TOKEN_AT@3..4 "@"
+        TOKEN_WHITESPACE@4..5 " "
+        NODE_IDENT@5..10
+          TOKEN_IDENT@5..10 "outer"
+    TOKEN_COLON@10..11 ":"
+    TOKEN_WHITESPACE@11..12 " "
+    NODE_LITERAL@12..13
+      TOKEN_INTEGER@12..13 "1"
+

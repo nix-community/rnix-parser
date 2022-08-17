@@ -1,0 +1,43 @@
+NODE_ROOT@0..137
+  NODE_ATTR_SET@0..137
+    TOKEN_L_BRACE@0..1 "{"
+    TOKEN_WHITESPACE@1..4 "\n  "
+    NODE_ATTRPATH_VALUE@4..21
+      NODE_ATTRPATH@4..10
+        NODE_IDENT@4..10
+          TOKEN_IDENT@4..10 "simple"
+      TOKEN_WHITESPACE@10..11 " "
+      TOKEN_ASSIGN@11..12 "="
+      TOKEN_WHITESPACE@12..13 " "
+      NODE_STRING@13..20
+        TOKEN_STRING_START@13..14 "\""
+        TOKEN_STRING_CONTENT@14..19 "hello"
+        TOKEN_STRING_END@19..20 "\""
+      TOKEN_SEMICOLON@20..21 ";"
+    TOKEN_WHITESPACE@21..24 "\n  "
+    NODE_ATTRPATH_VALUE@24..63
+      NODE_ATTRPATH@24..32
+        NODE_IDENT@24..32
+          TOKEN_IDENT@24..32 "indented"
+      TOKEN_WHITESPACE@32..33 " "
+      TOKEN_ASSIGN@33..34 "="
+      TOKEN_WHITESPACE@34..35 " "
+      NODE_STRING@35..62
+        TOKEN_STRING_START@35..37 "''"
+        TOKEN_STRING_CONTENT@37..60 "\n    hello\n    world\n  "
+        TOKEN_STRING_END@60..62 "''"
+      TOKEN_SEMICOLON@62..63 ";"
+    TOKEN_WHITESPACE@63..66 "\n  "
+    NODE_ATTRPATH_VALUE@66..135
+      NODE_ATTRPATH@66..101
+        NODE_IDENT@66..101
+          TOKEN_IDENT@66..101 "uri_is_also_a_string_ ..."
+      TOKEN_WHITESPACE@101..102 " "
+      TOKEN_ASSIGN@102..103 "="
+      TOKEN_WHITESPACE@103..104 " "
+      NODE_LITERAL@104..134
+        TOKEN_URI@104..134 "http://example.org/fo ..."
+      TOKEN_SEMICOLON@134..135 ";"
+    TOKEN_WHITESPACE@135..136 "\n"
+    TOKEN_R_BRACE@136..137 "}"
+

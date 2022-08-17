@@ -1,0 +1,43 @@
+NODE_ROOT@0..33
+  NODE_ATTR_SET@0..33
+    TOKEN_L_BRACE@0..1 "{"
+    TOKEN_WHITESPACE@1..4 "\n  "
+    NODE_ATTRPATH_VALUE@4..12
+      NODE_ATTRPATH@4..7
+        NODE_IDENT@4..5
+          TOKEN_IDENT@4..5 "a"
+        TOKEN_DOT@5..6 "."
+        NODE_IDENT@6..7
+          TOKEN_IDENT@6..7 "b"
+      TOKEN_WHITESPACE@7..8 " "
+      TOKEN_ASSIGN@8..9 "="
+      TOKEN_WHITESPACE@9..10 " "
+      NODE_LITERAL@10..11
+        TOKEN_INTEGER@10..11 "2"
+      TOKEN_SEMICOLON@11..12 ";"
+    TOKEN_WHITESPACE@12..15 "\n  "
+    NODE_ATTRPATH_VALUE@15..31
+      NODE_ATTRPATH@15..26
+        NODE_STRING@15..21
+          TOKEN_STRING_START@15..16 "\""
+          NODE_INTERPOL@16..20
+            TOKEN_INTERPOL_START@16..18 "${"
+            NODE_IDENT@18..19
+              TOKEN_IDENT@18..19 "c"
+            TOKEN_INTERPOL_END@19..20 "}"
+          TOKEN_STRING_END@20..21 "\""
+        TOKEN_DOT@21..22 "."
+        NODE_DYNAMIC@22..26
+          TOKEN_INTERPOL_START@22..24 "${"
+          NODE_IDENT@24..25
+            TOKEN_IDENT@24..25 "d"
+          TOKEN_INTERPOL_END@25..26 "}"
+      TOKEN_WHITESPACE@26..27 " "
+      TOKEN_ASSIGN@27..28 "="
+      TOKEN_WHITESPACE@28..29 " "
+      NODE_LITERAL@29..30
+        TOKEN_INTEGER@29..30 "3"
+      TOKEN_SEMICOLON@30..31 ";"
+    TOKEN_WHITESPACE@31..32 "\n"
+    TOKEN_R_BRACE@32..33 "}"
+

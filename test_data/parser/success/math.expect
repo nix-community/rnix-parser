@@ -1,0 +1,37 @@
+NODE_ROOT@0..23
+  NODE_BIN_OP@0..23
+    NODE_BIN_OP@0..9
+      NODE_LITERAL@0..1
+        TOKEN_INTEGER@0..1 "1"
+      TOKEN_WHITESPACE@1..2 " "
+      TOKEN_ADD@2..3 "+"
+      TOKEN_WHITESPACE@3..4 " "
+      NODE_BIN_OP@4..9
+        NODE_LITERAL@4..5
+          TOKEN_INTEGER@4..5 "2"
+        TOKEN_WHITESPACE@5..6 " "
+        TOKEN_MUL@6..7 "*"
+        TOKEN_WHITESPACE@7..8 " "
+        NODE_LITERAL@8..9
+          TOKEN_INTEGER@8..9 "3"
+    TOKEN_WHITESPACE@9..10 " "
+    TOKEN_ADD@10..11 "+"
+    TOKEN_WHITESPACE@11..12 " "
+    NODE_BIN_OP@12..23
+      NODE_LITERAL@12..13
+        TOKEN_INTEGER@12..13 "4"
+      TOKEN_WHITESPACE@13..14 " "
+      TOKEN_DIV@14..15 "/"
+      TOKEN_WHITESPACE@15..16 " "
+      NODE_PAREN@16..23
+        TOKEN_L_PAREN@16..17 "("
+        NODE_BIN_OP@17..22
+          NODE_LITERAL@17..18
+            TOKEN_INTEGER@17..18 "5"
+          TOKEN_WHITESPACE@18..19 " "
+          TOKEN_SUB@19..20 "-"
+          TOKEN_WHITESPACE@20..21 " "
+          NODE_LITERAL@21..22
+            TOKEN_INTEGER@21..22 "6"
+        TOKEN_R_PAREN@22..23 ")"
+
