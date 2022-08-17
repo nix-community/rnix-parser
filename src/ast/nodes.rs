@@ -282,9 +282,9 @@ node! { #[from(NODE_PATH)] struct Path; }
 
 node! { #[from(NODE_STRING)] struct Str; }
 
-node! { #[from(NODE_INTERPOL)] struct StrInterpol; }
+node! { #[from(NODE_INTERPOL)] struct Interpol; }
 
-impl StrInterpol {
+impl Interpol {
     ng! { expr, Expr, 0 }
 }
 
