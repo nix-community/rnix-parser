@@ -1,32 +1,43 @@
 use crate::kinds::SyntaxKind::*;
 use rowan::{ast::AstNode as OtherAstNode, NodeOrToken};
 
-use crate::{
-    ast::{self, AstNode},
-    SyntaxElement, SyntaxToken,
-};
+use crate::ast;
+
+use super::{support::children_tokens_u, AstToken, InterpolPart, StrContent};
 
 impl ast::Str {
-    pub fn parts(&self) -> Vec<StrPart> {
-        fn children_tokens<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
-            parent.syntax().children_with_tokens().filter_map(SyntaxElement::into_token)
-        }
+    pub fn parts(&self) -> impl Iterator<Item = InterpolPart<StrContent>> {
+        self.syntax().children_with_tokens().filter_map(|child| match child {
+            NodeOrToken::Token(token) if token.kind() == TOKEN_STRING_CONTENT => {
+                Some(InterpolPart::Literal(StrContent::cast(token).unwrap()))
+            }
+            NodeOrToken::Token(token) => {
+                assert!(token.kind() == TOKEN_STRING_START || token.kind() == TOKEN_STRING_END);
+                None
+            }
+            NodeOrToken::Node(node) => {
+                assert_eq!(node.kind(), NODE_INTERPOL);
+                Some(InterpolPart::Interpolation(ast::Interpol::cast(node.clone()).unwrap()))
+            }
+        })
+    }
 
-        let mut parts = Vec::new();
+    pub fn normalized_parts(&self) -> Vec<InterpolPart<String>> {
+        let mut parsed_parts = Vec::new();
         let mut literals = 0;
         let mut common = std::usize::MAX;
-        let multiline = children_tokens(self).next().map_or(false, |t| t.text() == "''");
+        let multiline = children_tokens_u(self).next().map_or(false, |t| t.text() == "''");
         let mut last_was_ast = false;
 
-        for child in self.syntax().children_with_tokens() {
-            match &child {
-                NodeOrToken::Token(token) if token.kind() == TOKEN_STRING_CONTENT => {
-                    let text: &str = token.text();
+        let mut parts = self.parts().peekable();
+
+        while let Some(part) = parts.next() {
+            match part {
+                InterpolPart::Literal(literal) => {
+                    let text: &str = literal.syntax().text();
 
                     let line_count = text.lines().count();
-                    let next_is_ast = child
-                        .next_sibling_or_token()
-                        .map_or(false, |child| child.kind() == NODE_INTERPOL);
+                    let next_is_ast = matches!(parts.peek(), Some(InterpolPart::Interpolation(_)));
                     for (i, line) in text.lines().enumerate().skip(if last_was_ast { 1 } else { 0 })
                     {
                         let indent: usize = indention(line).count();
@@ -37,25 +48,19 @@ impl ast::Str {
                         }
                         common = common.min(indent);
                     }
-                    parts.push(StrPart::Literal(text.to_string()));
+                    parsed_parts.push(InterpolPart::Literal(text.to_string()));
                     literals += 1;
                 }
-                NodeOrToken::Token(token) => {
-                    assert!(token.kind() == TOKEN_STRING_START || token.kind() == TOKEN_STRING_END)
-                }
-                NodeOrToken::Node(node) => {
-                    assert_eq!(node.kind(), NODE_INTERPOL);
-                    parts.push(StrPart::Interpolation(
-                        ast::StrInterpol::cast(node.clone()).unwrap(),
-                    ));
+                InterpolPart::Interpolation(interpol) => {
+                    parsed_parts.push(InterpolPart::Interpolation(interpol));
                     last_was_ast = true;
                 }
             }
         }
 
         let mut i = 0;
-        for part in parts.iter_mut() {
-            if let StrPart::Literal(ref mut text) = part {
+        for part in parsed_parts.iter_mut() {
+            if let InterpolPart::Literal(ref mut text) = part {
                 if multiline {
                     *text = remove_indent(text, i == 0, common);
                     // If the last literal is of the form `X\nY`, exclude Y if it consists solely of spaces
@@ -73,14 +78,8 @@ impl ast::Str {
             }
         }
 
-        parts
+        parsed_parts
     }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum StrPart {
-    Literal(String),
-    Interpolation(ast::StrInterpol),
 }
 
 /// Interpret escape sequences in the nix string and return the converted value
@@ -211,7 +210,10 @@ mod tests {
         let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
         match expr {
             ast::Expr::Str(str) => {
-                assert_eq!(str.parts(), vec![StrPart::Literal("hello ".to_string())])
+                assert_eq!(
+                    str.normalized_parts(),
+                    vec![InterpolPart::Literal("hello ".to_string())]
+                )
             }
             _ => unreachable!(),
         }
@@ -222,7 +224,10 @@ mod tests {
         let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
         match expr {
             ast::Expr::Str(str) => {
-                assert_eq!(str.parts(), vec![StrPart::Literal("hello\n".to_string())])
+                assert_eq!(
+                    str.normalized_parts(),
+                    vec![InterpolPart::Literal("hello\n".to_string())]
+                )
             }
             _ => unreachable!(),
         }
@@ -255,7 +260,9 @@ mod tests {
                 "#
         .replace("|trailing-whitespace", "");
 
-        if let [StrPart::Literal(lit)] = &ast::Str::parts(&string_node(txtin.as_str()))[..] {
+        if let [InterpolPart::Literal(lit)] =
+            &ast::Str::normalized_parts(&string_node(txtin.as_str()))[..]
+        {
             assert_eq!(lit,
                 // Get the below with nix repl
                 "    \n          \nThis is a multiline string :D\n  indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\ntwo single quotes: ''\nthree single quotes: '''\n"
@@ -267,9 +274,9 @@ mod tests {
 
     #[test]
     fn parts_ast() {
-        fn assert_eq_ast_ctn(it: &mut dyn Iterator<Item = StrPart>, x: &str) {
+        fn assert_eq_ast_ctn(it: &mut dyn Iterator<Item = InterpolPart<String>>, x: &str) {
             let tmp = it.next().expect("unexpected EOF");
-            if let StrPart::Interpolation(astn) = tmp {
+            if let InterpolPart::Interpolation(astn) = tmp {
                 assert_eq!(astn.expr().unwrap().syntax().to_string(), x);
             } else {
                 unreachable!("unexpected literal {:?}", tmp);
@@ -299,19 +306,19 @@ mod tests {
         let expr = Root::parse(inp).ok().unwrap().expr().unwrap();
         match expr {
             ast::Expr::Str(s) => {
-                let mut it = s.parts().into_iter();
+                let mut it = s.normalized_parts().into_iter();
                 assert_eq!(
                     it.next().unwrap(),
-                    StrPart::Literal("\nThis version of Nixpkgs requires Nix >= ".to_string())
+                    InterpolPart::Literal("\nThis version of Nixpkgs requires Nix >= ".to_string())
                 );
                 assert_eq_ast_ctn(&mut it, "requiredVersion");
-                assert_eq!(it.next().unwrap(), StrPart::Literal(
+                assert_eq!(it.next().unwrap(), InterpolPart::Literal(
                         ", please upgrade:\n\n- If you are running NixOS, `nixos-rebuild' can be used to upgrade your system.\n\n- Alternatively, with Nix > 2.0 `nix upgrade-nix' can be used to imperatively\n  upgrade Nix. You may use `nix-env --version' to check which version you have.\n\n- If you installed Nix using the install script (https://nixos.org/nix/install),\n  it is safe to upgrade by running it again:\n\n      curl -L https://nixos.org/nix/install | sh\n\nFor more information, please see the NixOS release notes at\nhttps://nixos.org/nixos/manual or locally at\n".to_string()
                     ));
                 assert_eq_ast_ctn(&mut it, "toString ./nixos/doc/manual/release-notes");
                 assert_eq!(
                     it.next().unwrap(),
-                    StrPart::Literal(
+                    InterpolPart::Literal(
                         ".\n\nIf you need further help, see https://nixos.org/nixos/support.html\n"
                             .to_string()
                     )

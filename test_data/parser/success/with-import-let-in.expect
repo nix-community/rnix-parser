@@ -33,7 +33,7 @@ NODE_ROOT@0..150
       TOKEN_IN@48..50 "in"
       TOKEN_WHITESPACE@50..51 " "
       NODE_ATTR_SET@51..150
-        TOKEN_CURLY_B_OPEN@51..52 "{"
+        TOKEN_L_BRACE@51..52 "{"
         TOKEN_WHITESPACE@52..55 "\n  "
         NODE_ATTRPATH_VALUE@55..65
           NODE_ATTRPATH@55..56
@@ -62,7 +62,7 @@ NODE_ROOT@0..150
           NODE_LEGACY_LET@78..147
             TOKEN_LET@78..81 "let"
             TOKEN_WHITESPACE@81..82 " "
-            TOKEN_CURLY_B_OPEN@82..83 "{"
+            TOKEN_L_BRACE@82..83 "{"
             TOKEN_WHITESPACE@83..88 "\n    "
             NODE_ATTRPATH_VALUE@88..113
               NODE_ATTRPATH@88..105
@@ -86,8 +86,8 @@ NODE_ROOT@0..150
                 TOKEN_IDENT@125..142 "this_syntax_sucks"
               TOKEN_SEMICOLON@142..143 ";"
             TOKEN_WHITESPACE@143..146 "\n  "
-            TOKEN_CURLY_B_CLOSE@146..147 "}"
+            TOKEN_R_BRACE@146..147 "}"
           TOKEN_SEMICOLON@147..148 ";"
         TOKEN_WHITESPACE@148..149 "\n"
-        TOKEN_CURLY_B_CLOSE@149..150 "}"
+        TOKEN_R_BRACE@149..150 "}"
 

@@ -1,8 +1,8 @@
-error: unexpected TOKEN_PAREN_OPEN at 12..13, wanted any of [TOKEN_IDENT]
-error: unexpected TOKEN_PAREN_CLOSE at 14..15, wanted any of [TOKEN_IDENT]
+error: unexpected TOKEN_L_PAREN at 12..13, wanted any of [TOKEN_IDENT, TOKEN_OR]
+error: unexpected TOKEN_R_PAREN at 14..15, wanted any of [TOKEN_IDENT, TOKEN_OR]
 NODE_ROOT@0..20
   NODE_ATTR_SET@0..20
-    TOKEN_CURLY_B_OPEN@0..1 "{"
+    TOKEN_L_BRACE@0..1 "{"
     TOKEN_WHITESPACE@1..2 " "
     NODE_INHERIT@2..18
       TOKEN_INHERIT@2..9 "inherit"
@@ -11,15 +11,15 @@ NODE_ROOT@0..20
         TOKEN_IDENT@10..11 "a"
       TOKEN_WHITESPACE@11..12 " "
       NODE_ERROR@12..13
-        TOKEN_PAREN_OPEN@12..13 "("
+        TOKEN_L_PAREN@12..13 "("
       NODE_IDENT@13..14
         TOKEN_IDENT@13..14 "b"
       NODE_ERROR@14..15
-        TOKEN_PAREN_CLOSE@14..15 ")"
+        TOKEN_R_PAREN@14..15 ")"
       TOKEN_WHITESPACE@15..16 " "
       NODE_IDENT@16..17
         TOKEN_IDENT@16..17 "c"
       TOKEN_SEMICOLON@17..18 ";"
     TOKEN_WHITESPACE@18..19 " "
-    TOKEN_CURLY_B_CLOSE@19..20 "}"
+    TOKEN_R_BRACE@19..20 "}"
 

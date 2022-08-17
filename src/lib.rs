@@ -131,13 +131,13 @@ mod tests {
         let attrpath_value = ast::AttrpathValue::try_from(entry).unwrap();
         let value = ast::Str::try_from(attrpath_value.value().unwrap()).unwrap();
 
-        match &*value.parts() {
+        match &*value.normalized_parts() {
             &[
-                ast::StrPart::Literal(ref s1),
-                ast::StrPart::Interpolation(_),
-                ast::StrPart::Literal(ref s2),
-                ast::StrPart::Interpolation(_),
-                ast::StrPart::Literal(ref s3)
+                ast::InterpolPart::Literal(ref s1),
+                ast::InterpolPart::Interpolation(_),
+                ast::InterpolPart::Literal(ref s2),
+                ast::InterpolPart::Interpolation(_),
+                ast::InterpolPart::Literal(ref s3)
             ]
             if s1 == "The set's x value is: "
                 && s2 == "\n\nThis line shall have no indention\n  This line shall be indented by 2\n\n\n"
@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn t_macro() {
         assert_eq!(T![@], SyntaxKind::TOKEN_AT);
-        assert!(matches!(SyntaxKind::TOKEN_PAREN_OPEN, T!["("]));
+        assert!(matches!(SyntaxKind::TOKEN_L_PAREN, T!['(']));
     }
 
     fn dir_tests<F>(dir: &str, get_actual: F)
