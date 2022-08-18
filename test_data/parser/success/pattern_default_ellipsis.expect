@@ -4,11 +4,13 @@ NODE_ROOT@0..28
       TOKEN_L_BRACE@0..1 "{"
       TOKEN_WHITESPACE@1..2 " "
       NODE_PAT_ENTRY@2..3
-        TOKEN_IDENT@2..3 "a"
+        NODE_IDENT@2..3
+          TOKEN_IDENT@2..3 "a"
       TOKEN_COMMA@3..4 ","
       TOKEN_WHITESPACE@4..5 " "
       NODE_PAT_ENTRY@5..18
-        TOKEN_IDENT@5..6 "b"
+        NODE_IDENT@5..6
+          TOKEN_IDENT@5..6 "b"
         TOKEN_WHITESPACE@6..7 " "
         TOKEN_QUESTION@7..8 "?"
         TOKEN_WHITESPACE@8..9 " "
