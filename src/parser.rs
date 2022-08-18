@@ -320,7 +320,7 @@ where
                     }
                     Some(TOKEN_IDENT) => {
                         self.start_node(NODE_PAT_ENTRY);
-                        self.bump();
+                        self.expect_ident();
                         if let Some(T![?]) = self.peek() {
                             self.bump();
                             self.parse_expr();
