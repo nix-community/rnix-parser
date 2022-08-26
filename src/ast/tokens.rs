@@ -48,7 +48,53 @@ token! { #[from(TOKEN_COMMENT)] struct Comment; }
 
 impl Comment {
     pub fn text(&self) -> &str {
-        self.syntax().text().strip_prefix('#').unwrap()
+        let text = self.syntax().text();
+        // Handle both "#..." and "/*...*/" comments.
+        match text.strip_prefix("#") {
+            Some(s) => s,
+            None => text.strip_prefix(r#"/*"#).unwrap().strip_suffix(r#"*/"#).unwrap(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ast;
+    use crate::match_ast;
+    use crate::Root;
+
+    use super::*;
+    use rowan::ast::AstNode;
+
+    #[test]
+    fn comment() {
+        let s = "# comment bruh
+/* this is a multiline comment wow
+asdfasdf
+asdfasdf */
+1 + 1
+/* last one */
+";
+        let comments: Vec<String> = Root::parse(s)
+            .ok()
+            .unwrap()
+            .syntax()
+            .children_with_tokens()
+            .filter_map(|e| match e {
+                rowan::NodeOrToken::Token(token) => match_ast! { match token {
+                    ast::Comment(it) => Some(it.text().to_string()),
+                    _ => None,
+                }},
+                rowan::NodeOrToken::Node(_) => None,
+            })
+            .collect();
+        let expected = vec![
+            " comment bruh",
+            " this is a multiline comment wow\nasdfasdf\nasdfasdf ",
+            " last one ",
+        ];
+
+        assert_eq!(comments, expected);
     }
 }
 
