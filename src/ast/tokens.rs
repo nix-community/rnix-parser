@@ -50,10 +50,9 @@ impl Comment {
     pub fn text(&self) -> &str {
         let text = self.syntax().text();
         // Handle both "#..." and "/*...*/" comments.
-        if text.starts_with("#") {
-            text.strip_prefix('#').unwrap()
-        } else {
-            text.strip_prefix(r#"/*"#).unwrap().strip_suffix(r#"*/"#).unwrap()
+        match text.strip_prefix("#") {
+            Some(s) => s,
+            None => text.strip_prefix(r#"/*"#).unwrap().strip_suffix(r#"*/"#).unwrap(),
         }
     }
 }
