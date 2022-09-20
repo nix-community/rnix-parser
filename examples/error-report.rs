@@ -1,4 +1,4 @@
-use rnix::parser::ParseError;
+use rnix::ParseError;
 use std::{env, fs};
 
 fn main() {

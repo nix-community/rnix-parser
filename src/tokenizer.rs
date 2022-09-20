@@ -46,13 +46,12 @@ impl Eq for State<'_> {}
 
 pub type Token<'a> = (SyntaxKind, &'a str);
 
-/// A convenience function for tokenizing the given input
-pub fn tokenize(input: &str) -> Vec<Token<'_>> {
-    Tokenizer::new(input).collect()
+/// Tokenize the given input
+pub fn tokenize(input: &str) -> impl Iterator<Item = Token<'_>> + '_ {
+    Tokenizer::new(input)
 }
 
-/// The tokenizer. You may want to use the `tokenize` convenience function from this module instead.
-pub struct Tokenizer<'a> {
+struct Tokenizer<'a> {
     ctx: Vec<Context>,
     state: State<'a>,
 }
