@@ -9,5 +9,5 @@ fn main() {
         println!("error: {}", error);
     }
 
-    println!("{}", ast.tree());
+    println!("{:#?}", ast.tree());
 }
