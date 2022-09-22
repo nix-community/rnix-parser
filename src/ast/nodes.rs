@@ -268,7 +268,7 @@ node! { #[from(NODE_INHERIT)] struct Inherit; }
 impl Inherit {
     tg! { inherit_token, inherit }
     ng! { from, InheritFrom, 0 }
-    ng! { idents, [Ident] }
+    ng! { attrs, [Attr] }
 }
 
 node! { #[from(NODE_INHERIT_FROM)] struct InheritFrom; }

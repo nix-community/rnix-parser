@@ -45,7 +45,7 @@ fn inherit() {
     let from = inherit.from().unwrap().expr().unwrap();
     let ident: ast::Ident = ast::Ident::try_from(from).unwrap();
     assert_eq!(ident.syntax().text(), "set");
-    let mut children = inherit.idents();
+    let mut children = inherit.attrs();
     assert_eq!(children.next().unwrap().syntax().text(), "z");
     assert_eq!(children.next().unwrap().syntax().text(), "a");
     assert!(children.next().is_none());
