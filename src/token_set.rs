@@ -7,6 +7,7 @@ use crate::SyntaxKind;
 pub struct TokenSet(u128);
 
 impl TokenSet {
+    #[allow(dead_code)]
     pub(crate) const EMPTY: TokenSet = TokenSet(0);
 
     pub(crate) const fn new(kind: SyntaxKind) -> TokenSet {
