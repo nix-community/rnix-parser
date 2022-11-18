@@ -106,9 +106,9 @@ pub enum SyntaxKind {
 use SyntaxKind::*;
 
 impl SyntaxKind {
-    /// Returns true if this token is a literal, such as an integer or a string
+    /// Returns true if this token is parsed into a NODE_LITERAL
     pub fn is_literal(self) -> bool {
-        matches!(self, TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI)
+        matches!(self, TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_URI)
     }
 
     /// Returns true if this token should be used as a function argument.
@@ -124,6 +124,7 @@ impl SyntaxKind {
     pub fn is_fn_arg(self) -> bool {
         match self {
             TOKEN_REC | TOKEN_L_BRACE | TOKEN_L_BRACK | TOKEN_L_PAREN | TOKEN_STRING_START
+            | TOKEN_PATH
             | TOKEN_IDENT => true,
             _ => self.is_literal(),
         }
