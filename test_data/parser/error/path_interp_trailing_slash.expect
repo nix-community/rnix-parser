@@ -1,0 +1,12 @@
+error: unexpected token at 8..9
+NODE_ROOT@0..9
+  NODE_PATH@0..8
+    TOKEN_PATH@0..2 "./"
+    NODE_INTERPOL@2..8
+      TOKEN_INTERPOL_START@2..4 "${"
+      NODE_IDENT@4..7
+        TOKEN_IDENT@4..7 "foo"
+      TOKEN_INTERPOL_END@7..8 "}"
+  NODE_ERROR@8..9
+    TOKEN_ERROR@8..9 "/"
+
