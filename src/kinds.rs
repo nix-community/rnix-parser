@@ -131,6 +131,6 @@ impl SyntaxKind {
     /// Returns true if this token is a comment, whitespace, or similar, and
     /// should be skipped over by the parser.
     pub fn is_trivia(self) -> bool {
-        matches!(self, TOKEN_COMMENT | TOKEN_ERROR | TOKEN_WHITESPACE)
+        matches!(self, TOKEN_COMMENT | TOKEN_WHITESPACE)
     }
 }
