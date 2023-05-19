@@ -98,7 +98,7 @@ impl Tokenizer<'_> {
     }
 
     /// Consumes all next characters.
-    /// Until the predicate function [f] returns true
+    /// while the predicate function [f] returns true
     ///
     /// returns the count of consumed characters.
     fn consume<F>(&mut self, mut f: F) -> usize
