@@ -97,6 +97,10 @@ impl Tokenizer<'_> {
         self.ctx.pop();
     }
 
+    /// Consumes all next characters.
+    /// Until the predicate function [f] returns true
+    ///
+    /// returns the count of consumed characters.
     fn consume<F>(&mut self, mut f: F) -> usize
     where
         F: FnMut(char) -> bool,
@@ -443,14 +447,24 @@ impl Tokenizer<'_> {
                 self.push_ctx(Context::StringBody { multiline: true });
                 TOKEN_STRING_START
             }
-            '0'..='9' => {
-                self.consume(|c| c.is_ascii_digit());
-                if self.peek() == Some('.') {
-                    self.next().unwrap();
+            fst @ '0'..='9' => {
+                // Due to nix's behavior on leading 0's we know immediately
+                // That a '0' followed by some other number character MUST tokenize into an INT.
+                // More background on this: https://github.com/nix-community/rnix-parser/issues/157
+                if fst == '0' && self.peek() != Some('.') {
+                    // In that case just consume the remaining number characters to fill the TOKEN_INTEGER
                     self.consume(|c| c.is_ascii_digit());
-                    self.consume_scientific()
-                } else {
                     TOKEN_INTEGER
+                } else {
+                    // If we are not in that edge-case we can just continue with the regular number tokenization
+                    self.consume(|c| c.is_ascii_digit());
+                    if self.peek() == Some('.') {
+                        self.next().unwrap();
+                        self.consume(|c| c.is_ascii_digit());
+                        self.consume_scientific()
+                    } else {
+                        TOKEN_INTEGER
+                    }
                 }
             }
             _ => TOKEN_ERROR,
