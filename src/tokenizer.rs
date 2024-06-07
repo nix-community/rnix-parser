@@ -136,7 +136,7 @@ impl Tokenizer<'_> {
                         }
                         Some('\\') => {
                             self.next().unwrap();
-                            if let None = self.next() {
+                            if self.next().is_none() {
                                 return TOKEN_ERROR;
                             }
                         }
@@ -336,8 +336,8 @@ impl Tokenizer<'_> {
             ':' => TOKEN_COLON,
             ',' => TOKEN_COMMA,
             '.' => {
-                if self.peek().map_or(false, |x| ('0'..='9').contains(&x)) {
-                    self.consume(|c| ('0'..='9').contains(&c));
+                if self.peek().map_or(false, |x| x.is_ascii_digit()) {
+                    self.consume(|c| c.is_ascii_digit());
                     self.consume_scientific()
                 } else {
                     TOKEN_DOT
@@ -436,10 +436,10 @@ impl Tokenizer<'_> {
                 TOKEN_STRING_START
             }
             '0'..='9' => {
-                self.consume(|c| ('0'..='9').contains(&c));
+                self.consume(|c| c.is_ascii_digit());
                 if self.peek() == Some('.') {
                     self.next().unwrap();
-                    self.consume(|c| ('0'..='9').contains(&c));
+                    self.consume(|c| c.is_ascii_digit());
                     self.consume_scientific()
                 } else {
                     TOKEN_INTEGER
@@ -455,7 +455,7 @@ impl Tokenizer<'_> {
             if self.peek() == Some('-') || self.peek() == Some('+') {
                 self.next().unwrap();
             }
-            if self.consume(|c| ('0'..='9').contains(&c)) == 0 {
+            if self.consume(|c| c.is_ascii_digit()) == 0 {
                 return TOKEN_ERROR;
             }
         }

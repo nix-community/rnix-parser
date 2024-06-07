@@ -49,7 +49,7 @@ mod support {
     }
 
     pub(super) fn token<N: AstNode, T: AstToken>(parent: &N) -> Option<T> {
-        children_tokens(parent).nth(0)
+        children_tokens(parent).next()
     }
 
     /// Token untyped
