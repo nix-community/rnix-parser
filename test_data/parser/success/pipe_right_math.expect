@@ -1,0 +1,21 @@
+NODE_ROOT@0..26
+  NODE_BIN_OP@0..26
+    NODE_BIN_OP@0..5
+      NODE_LITERAL@0..1
+        TOKEN_INTEGER@0..1 "1"
+      TOKEN_WHITESPACE@1..2 " "
+      TOKEN_ADD@2..3 "+"
+      TOKEN_WHITESPACE@3..4 " "
+      NODE_LITERAL@4..5
+        TOKEN_INTEGER@4..5 "1"
+    TOKEN_WHITESPACE@5..6 " "
+    TOKEN_PIPE_RIGHT@6..8 "|>"
+    TOKEN_WHITESPACE@8..9 " "
+    NODE_SELECT@9..26
+      NODE_IDENT@9..17
+        TOKEN_IDENT@9..17 "builtins"
+      TOKEN_DOT@17..18 "."
+      NODE_ATTRPATH@18..26
+        NODE_IDENT@18..26
+          TOKEN_IDENT@18..26 "toString"
+

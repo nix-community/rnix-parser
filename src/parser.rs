@@ -693,6 +693,12 @@ where
         // Always point this to the lowest-level math function there is
         self.parse_implication()
     }
+    fn parse_pipe_right(&mut self) -> Checkpoint {
+        self.parse_left_assoc(Self::parse_math, T!["|>"] | ())
+    }
+    fn parse_pipe_left(&mut self) -> Checkpoint {
+        self.parse_right_assoc(Self::parse_pipe_right, T!["<|"] | ())
+    }
     /// Parse Nix code into an AST
     pub fn parse_expr(&mut self) -> Checkpoint {
         // Limit chosen somewhat arbitrarily
@@ -758,7 +764,7 @@ where
                 self.finish_node();
                 checkpoint
             }
-            _ => self.parse_math(),
+            _ => self.parse_pipe_left(),
         };
         self.depth -= 1;
         out

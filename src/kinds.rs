@@ -54,6 +54,8 @@ pub enum SyntaxKind {
     TOKEN_MORE_OR_EQ,
     TOKEN_NOT_EQUAL,
     TOKEN_OR_OR,
+    TOKEN_PIPE_RIGHT,
+    TOKEN_PIPE_LEFT,
 
     // Identifiers and values
     TOKEN_FLOAT,
