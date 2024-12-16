@@ -71,7 +71,7 @@ impl<T: AstNode> Parse<T> {
 
     /// Return all errors in the tree, if any
     pub fn errors(&self) -> &[ParseError] {
-        &*self.errors
+        &self.errors
     }
 
     /// Either return the first error in the tree, or if there are none return self
