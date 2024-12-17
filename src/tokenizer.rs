@@ -364,6 +364,10 @@ impl Tokenizer<'_> {
             '-' => TOKEN_SUB,
             '*' => TOKEN_MUL,
             '/' => TOKEN_DIV,
+            '<' if self.peek() == Some('|') => {
+                self.next().unwrap();
+                TOKEN_PIPE_LEFT
+            }
             '<' if kind == Some(IdentType::Store) => {
                 self.consume(is_valid_path_char);
                 if self.next() != Some('>') {
@@ -375,6 +379,10 @@ impl Tokenizer<'_> {
             '&' if self.peek() == Some('&') => {
                 self.next().unwrap();
                 TOKEN_AND_AND
+            }
+            '|' if self.peek() == Some('>') => {
+                self.next().unwrap();
+                TOKEN_PIPE_RIGHT
             }
             '|' if self.peek() == Some('|') => {
                 self.next().unwrap();

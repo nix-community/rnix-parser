@@ -19,6 +19,8 @@ pub enum BinOpKind {
     MoreOrEq,
     NotEqual,
     Or,
+    PipeRight,
+    PipeLeft,
 }
 
 impl BinOpKind {
@@ -42,6 +44,9 @@ impl BinOpKind {
             TOKEN_MORE_OR_EQ => Some(BinOpKind::MoreOrEq),
             TOKEN_NOT_EQUAL => Some(BinOpKind::NotEqual),
             TOKEN_OR_OR => Some(BinOpKind::Or),
+
+            TOKEN_PIPE_RIGHT => Some(BinOpKind::PipeRight),
+            TOKEN_PIPE_LEFT => Some(BinOpKind::PipeLeft),
 
             _ => None,
         }

@@ -45,5 +45,7 @@ macro_rules! T {
     (>=)      => ($crate::SyntaxKind::TOKEN_MORE_OR_EQ);
     (!=)      => ($crate::SyntaxKind::TOKEN_NOT_EQUAL);
     (||)      => ($crate::SyntaxKind::TOKEN_OR_OR);
+    ("|>")      => ($crate::SyntaxKind::TOKEN_PIPE_RIGHT);
+    ("<|")      => ($crate::SyntaxKind::TOKEN_PIPE_LEFT);
     ($kind:ident) => ($crate::SyntaxKind::$kind);
 }

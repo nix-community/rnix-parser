@@ -1,0 +1,15 @@
+NODE_ROOT@0..22
+  NODE_BIN_OP@0..22
+    NODE_SELECT@0..17
+      NODE_IDENT@0..8
+        TOKEN_IDENT@0..8 "builtins"
+      TOKEN_DOT@8..9 "."
+      NODE_ATTRPATH@9..17
+        NODE_IDENT@9..17
+          TOKEN_IDENT@9..17 "toString"
+    TOKEN_WHITESPACE@17..18 " "
+    TOKEN_PIPE_LEFT@18..20 "<|"
+    TOKEN_WHITESPACE@20..21 " "
+    NODE_LITERAL@21..22
+      TOKEN_INTEGER@21..22 "1"
+
