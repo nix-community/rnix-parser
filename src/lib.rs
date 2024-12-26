@@ -2,23 +2,22 @@
 mod macros;
 pub mod ast;
 mod kinds;
-pub mod parser;
+mod parser;
 #[cfg(test)]
 mod tests;
 mod token_set;
-pub mod tokenizer;
+mod tokenizer;
 
 use std::marker::PhantomData;
 
 pub use self::{kinds::SyntaxKind, tokenizer::tokenize};
 
 use ast::AstNode;
-use parser::ParseError;
+pub use parser::ParseError;
 use rowan::GreenNode;
 pub use rowan::{NodeOrToken, TextRange, TextSize, TokenAtOffset, WalkEvent};
 pub(crate) use token_set::TokenSet;
-
-use self::tokenizer::Tokenizer;
+pub use tokenizer::Token;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NixLanguage {}
@@ -45,7 +44,7 @@ pub use ast::Root;
 
 impl Root {
     pub fn parse(s: &str) -> Parse<Root> {
-        let (green, errors) = parser::parse(Tokenizer::new(s));
+        let (green, errors) = parser::parse(tokenize(s));
         Parse { green, errors, _ty: PhantomData }
     }
 }
