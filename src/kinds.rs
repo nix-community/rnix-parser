@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+use strum_macros::EnumString;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumString)]
 #[repr(u16)]
 #[allow(non_camel_case_types)]
 pub enum SyntaxKind {
@@ -134,5 +136,16 @@ impl SyntaxKind {
     /// should be skipped over by the parser.
     pub fn is_trivia(self) -> bool {
         matches!(self, TOKEN_COMMENT | TOKEN_WHITESPACE)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::SyntaxKind;
+
+    #[test]
+    fn try_from() {
+        let kind = SyntaxKind::try_from("TOKEN_COMMENT").unwrap();
+        assert_eq!(kind, SyntaxKind::TOKEN_COMMENT);
     }
 }

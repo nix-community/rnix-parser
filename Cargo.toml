@@ -14,6 +14,8 @@ name = "all-packages"
 
 [dependencies]
 rowan = "0.15.0"
+strum = "0.26.2"
+strum_macros = "0.26.2"
 
 [dev-dependencies]
 criterion = "0.3.0"
