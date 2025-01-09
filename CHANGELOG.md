@@ -4,7 +4,9 @@ All notable changes between releases will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [v0.12.0] - 2025-01-09
+
+* Add support for pipe operators
 
 ## [v0.11.0] - 2022-11-11
 
