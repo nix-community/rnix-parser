@@ -64,7 +64,12 @@ pub enum SyntaxKind {
     TOKEN_INTEGER,
     TOKEN_INTERPOL_END,
     TOKEN_INTERPOL_START,
-    TOKEN_PATH,
+    // Path tokens (distinct kinds)
+    TOKEN_PATH_ABS,    // /foo/bar, /nix/store/…
+    TOKEN_PATH_REL,    // foo/bar, ./foo, ../bar
+    TOKEN_PATH_HOME,   // ~/foo/bar
+    TOKEN_PATH_SEARCH, // <nixpkgs/foo>
+
     TOKEN_URI,
     TOKEN_STRING_CONTENT,
     TOKEN_STRING_END,
@@ -99,7 +104,10 @@ pub enum SyntaxKind {
     NODE_UNARY_OP,
     NODE_LITERAL,
     NODE_WITH,
-    NODE_PATH,
+    NODE_PATH_ABS,
+    NODE_PATH_REL,
+    NODE_PATH_HOME,
+    NODE_PATH_SEARCH,
     // Attrpath existence check: foo ? bar.${baz}."bux"
     NODE_HAS_ATTR,
 }
@@ -175,7 +183,10 @@ impl std::str::FromStr for SyntaxKind {
             "TOKEN_INTEGER" => Ok(TOKEN_INTEGER),
             "TOKEN_INTERPOL_END" => Ok(TOKEN_INTERPOL_END),
             "TOKEN_INTERPOL_START" => Ok(TOKEN_INTERPOL_START),
-            "TOKEN_PATH" => Ok(TOKEN_PATH),
+            "TOKEN_PATH_ABS" => Ok(TOKEN_PATH_ABS),
+            "TOKEN_PATH_REL" => Ok(TOKEN_PATH_REL),
+            "TOKEN_PATH_HOME" => Ok(TOKEN_PATH_HOME),
+            "TOKEN_PATH_SEARCH" => Ok(TOKEN_PATH_SEARCH),
             "TOKEN_URI" => Ok(TOKEN_URI),
             "TOKEN_STRING_CONTENT" => Ok(TOKEN_STRING_CONTENT),
             "TOKEN_STRING_END" => Ok(TOKEN_STRING_END),
@@ -208,7 +219,10 @@ impl std::str::FromStr for SyntaxKind {
             "NODE_UNARY_OP" => Ok(NODE_UNARY_OP),
             "NODE_LITERAL" => Ok(NODE_LITERAL),
             "NODE_WITH" => Ok(NODE_WITH),
-            "NODE_PATH" => Ok(NODE_PATH),
+            "NODE_PATH_ABS" => Ok(NODE_PATH_ABS),
+            "NODE_PATH_REL" => Ok(NODE_PATH_REL),
+            "NODE_PATH_HOME" => Ok(NODE_PATH_HOME),
+            "NODE_PATH_SEARCH" => Ok(NODE_PATH_SEARCH),
             "NODE_HAS_ATTR" => Ok(NODE_HAS_ATTR),
             _ => Err(ParseSyntaxKindError),
         }
@@ -218,7 +232,16 @@ impl std::str::FromStr for SyntaxKind {
 impl SyntaxKind {
     /// Returns true if this token is a literal, such as an integer or a string
     pub fn is_literal(self) -> bool {
-        matches!(self, TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI)
+        matches!(
+            self,
+            TOKEN_FLOAT
+                | TOKEN_INTEGER
+                | TOKEN_PATH_ABS
+                | TOKEN_PATH_REL
+                | TOKEN_PATH_HOME
+                | TOKEN_PATH_SEARCH
+                | TOKEN_URI
+        )
     }
 
     /// Returns true if this token should be used as a function argument.

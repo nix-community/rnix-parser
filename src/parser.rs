@@ -485,14 +485,28 @@ where
                 self.finish_node();
             }
             TOKEN_STRING_START => self.parse_string(),
-            TOKEN_PATH => {
-                self.start_node(NODE_PATH);
+            TOKEN_PATH_ABS | TOKEN_PATH_REL | TOKEN_PATH_HOME | TOKEN_PATH_SEARCH => {
+                let node_kind = match self.peek().unwrap() {
+                    TOKEN_PATH_ABS => NODE_PATH_ABS,
+                    TOKEN_PATH_REL => NODE_PATH_REL,
+                    TOKEN_PATH_HOME => NODE_PATH_HOME,
+                    TOKEN_PATH_SEARCH => NODE_PATH_SEARCH,
+                    _ => unreachable!(),
+                };
+                self.start_node(node_kind);
                 self.bump();
-                let is_complex_path = self.peek() == Some(TOKEN_INTERPOL_START);
+
+                // Search paths (<nixpkgs>) don't support interpolation
+                let is_search_path = node_kind == NODE_PATH_SEARCH;
+                let is_complex_path =
+                    !is_search_path && self.peek() == Some(TOKEN_INTERPOL_START);
+
                 if is_complex_path {
                     loop {
                         match self.peek_raw().map(|(t, _)| t) {
-                            Some(TOKEN_PATH) => self.bump(),
+                            Some(TOKEN_PATH_ABS) | Some(TOKEN_PATH_REL) | Some(TOKEN_PATH_HOME) => {
+                                self.bump()
+                            }
                             Some(TOKEN_INTERPOL_START) => {
                                 self.start_node(NODE_INTERPOL);
                                 self.bump();

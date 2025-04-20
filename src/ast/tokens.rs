@@ -114,7 +114,60 @@ impl Integer {
     }
 }
 
-token! { #[from(TOKEN_PATH)] struct PathContent; }
+// A literal part of a path (absolute / relative / home / search) without
+// distinguishing which concrete flavour it was taken from.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PathContent(pub(super) SyntaxToken);
+
+impl PathContent {
+    /// Returns the path as a string
+    pub fn text(&self) -> &str {
+        self.syntax().text()
+    }
+
+    /// Returns the kind of path token
+    pub fn path_kind(&self) -> SyntaxKind {
+        self.syntax().kind()
+    }
+
+    /// Returns true if this is an absolute path
+    pub fn is_absolute(&self) -> bool {
+        self.path_kind() == TOKEN_PATH_ABS
+    }
+
+    /// Returns true if this is a relative path
+    pub fn is_relative(&self) -> bool {
+        self.path_kind() == TOKEN_PATH_REL
+    }
+
+    /// Returns true if this is a home-relative path
+    pub fn is_home(&self) -> bool {
+        self.path_kind() == TOKEN_PATH_HOME
+    }
+
+    /// Returns true if this is a search path
+    pub fn is_search(&self) -> bool {
+        self.path_kind() == TOKEN_PATH_SEARCH
+    }
+}
+
+impl AstToken for PathContent {
+    fn can_cast(kind: SyntaxKind) -> bool {
+        matches!(kind, TOKEN_PATH_ABS | TOKEN_PATH_REL | TOKEN_PATH_HOME | TOKEN_PATH_SEARCH)
+    }
+
+    fn cast(from: SyntaxToken) -> Option<Self> {
+        if Self::can_cast(from.kind()) {
+            Some(Self(from))
+        } else {
+            None
+        }
+    }
+
+    fn syntax(&self) -> &SyntaxToken {
+        &self.0
+    }
+}
 
 token! { #[from(TOKEN_STRING_CONTENT)] struct StrContent; }
 

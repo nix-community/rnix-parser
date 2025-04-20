@@ -5,8 +5,10 @@ use crate::SyntaxKind::{self, *};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum IdentType {
     Ident,
-    Path,
-    Store,
+    PathRel,
+    PathAbs,
+    PathHome,
+    PathSearch,
     Uri,
 }
 
@@ -27,7 +29,7 @@ enum Context {
     StringEnd,
     Interpol { brackets: u32 },
     InterpolStart,
-    Path,
+    Path(SyntaxKind),
 }
 
 #[derive(Clone, Copy)]
@@ -92,7 +94,10 @@ impl Tokenizer<'_> {
     }
 
     fn pop_ctx(&mut self, ctx: Context) {
-        debug_assert_eq!(self.ctx.last(), Some(&ctx));
+        debug_assert!(self
+            .ctx
+            .last()
+            .map_or(false, |c| std::mem::discriminant(c) == std::mem::discriminant(&ctx)));
         self.ctx.pop();
     }
 
@@ -170,7 +175,7 @@ impl Tokenizer<'_> {
         }
     }
 
-    fn check_path_since(&mut self, past: State) -> SyntaxKind {
+    fn check_path_since(&mut self, past: State, kind: SyntaxKind) -> SyntaxKind {
         self.consume(is_valid_path_char);
         if self.remaining().starts_with("${") {
             self.ctx.push(Context::InterpolStart);
@@ -179,9 +184,9 @@ impl Tokenizer<'_> {
         } else if self.str_since(past).contains("//") {
             return TOKEN_ERROR;
         } else {
-            self.pop_ctx(Context::Path);
+            self.pop_ctx(Context::Path(kind));
         }
-        TOKEN_PATH
+        kind
     }
 
     fn next_inner(&mut self) -> Option<SyntaxKind> {
@@ -199,14 +204,23 @@ impl Tokenizer<'_> {
                         unreachable!()
                     }
                 }
-                Some(Context::Path) => {
-                    if self.starts_with_bump("${") {
+                Some(Context::Path(path_kind)) => {
+                    let path_kind = *path_kind;
+
+                    // Search paths (<nixpkgs>) don't support interpolation
+                    if path_kind == TOKEN_PATH_SEARCH {
+                        if self.peek().map_or(false, is_valid_path_char) {
+                            return Some(self.check_path_since(start, path_kind));
+                        } else {
+                            self.pop_ctx(Context::Path(path_kind));
+                        }
+                    } else if self.starts_with_bump("${") {
                         self.ctx.push(Context::Interpol { brackets: 0 });
                         return Some(TOKEN_INTERPOL_START);
                     } else if self.peek().is_some_and(is_valid_path_char) {
-                        return Some(self.check_path_since(start));
+                        return Some(self.check_path_since(start, path_kind));
                     } else {
-                        self.pop_ctx(Context::Path);
+                        self.pop_ctx(Context::Path(path_kind));
                     }
                 }
                 Some(&Context::StringBody { multiline }) => {
@@ -271,8 +285,26 @@ impl Tokenizer<'_> {
         }
 
         // Check if it's a path
-        let store_path = self.peek() == Some('<');
-        let kind = {
+        // First, simple prefix based detection for absolute ("/...") or home relative ("~/...") paths.
+        // For absolute paths, we need to be careful to not interfere with operators
+        let kind = if self.peek() == Some('/') {
+            // For absolute paths, we need to have a valid path character after the '/'
+            // AND we need to make sure it's not an operator like //
+            if self.remaining().starts_with("//") {
+                None // This could be an update operator, let the operator matcher handle it
+            } else {
+                let second_char = self.remaining().chars().nth(1);
+                if second_char.map_or(false, is_valid_path_char) {
+                    Some(IdentType::PathAbs)
+                } else {
+                    None // Not a path, might be division operator or something else
+                }
+            }
+        } else if self.peek() == Some('~') {
+            Some(IdentType::PathHome)
+        } else {
+            // Fallback to heuristic previously used for relative, search and URI paths.
+            let store_path = self.peek() == Some('<');
             let skipped = self
                 .remaining()
                 .chars()
@@ -284,27 +316,57 @@ impl Tokenizer<'_> {
 
             let mut lookahead = self.remaining().chars().skip(skipped.chars().count());
 
-            match (lookahead.next(), lookahead.next()) {
+            let res = match (lookahead.next(), lookahead.next()) {
                 // a//b parses as Update(a, b)
                 (Some('/'), Some('/')) => None,
                 (Some('/'), Some('*')) => None,
-                (Some('/'), Some(c)) if !c.is_whitespace() => Some(IdentType::Path),
-                (Some('>'), _) => Some(IdentType::Store),
+                (Some('/'), Some(c)) if !c.is_whitespace() => {
+                    // If the first character of the yet‑to‑be‑consumed token was '/', we treat it as absolute later.
+                    // Otherwise it's a relative path.
+                    Some(IdentType::PathRel)
+                }
+                (Some('>'), _) => Some(IdentType::PathSearch),
                 (Some(':'), Some(c)) if is_valid_uri_char(c) && !skipped.contains('_') => {
                     Some(IdentType::Uri)
                 }
                 _ => None,
-            }
+            };
+            res
         };
 
         let c = self.next()?;
 
-        if c == '~' || kind == Some(IdentType::Path) {
-            return Some(if c == '~' && self.next() != Some('/') {
-                TOKEN_ERROR
-            } else {
-                self.push_ctx(Context::Path);
-                self.check_path_since(start)
+        // First, handle specific operators that might be confused with paths
+        if c == '/' && self.peek() == Some('/') {
+            // This is the update operator '//'
+            self.next().unwrap(); // Consume the second '/'
+            return Some(TOKEN_UPDATE);
+        }
+
+        if c == '~'
+            || matches!(kind, Some(IdentType::PathAbs | IdentType::PathRel))
+            || (c == '/' && self.peek().map_or(false, is_valid_path_char))
+        {
+            return Some({
+                // Determine the concrete path token kind to use
+                let token_kind = if c == '~' {
+                    // we've just consumed '~', ensure '/' exists already consumed by next()
+                    if self.next() != Some('/') {
+                        return Some(TOKEN_ERROR);
+                    }
+                    TOKEN_PATH_HOME
+                } else {
+                    // For abs vs rel: If the first char we consumed was '/', it's absolute.
+                    if c == '/' {
+                        TOKEN_PATH_ABS
+                    } else {
+                        TOKEN_PATH_REL
+                    }
+                };
+
+                // Store the kind in context so subsequent segments are consistent
+                self.push_ctx(Context::Path(token_kind));
+                self.check_path_since(start, token_kind)
             });
         }
 
@@ -374,12 +436,12 @@ impl Tokenizer<'_> {
                 self.next().unwrap();
                 TOKEN_PIPE_LEFT
             }
-            '<' if kind == Some(IdentType::Store) => {
+            '<' if kind == Some(IdentType::PathSearch) => {
                 self.consume(is_valid_path_char);
                 if self.next() != Some('>') {
                     TOKEN_ERROR
                 } else {
-                    TOKEN_PATH
+                    TOKEN_PATH_SEARCH
                 }
             }
             '&' if self.peek() == Some('&') => {
@@ -413,7 +475,7 @@ impl Tokenizer<'_> {
                 let kind = match kind {
                     // It's detected as store if it ends with >, but if it
                     // didn't start with <, that's wrong
-                    Some(IdentType::Store) | None => IdentType::Ident,
+                    Some(IdentType::PathSearch) | None => IdentType::Ident,
                     Some(kind) => kind,
                 };
                 self.consume(|c| match c {
@@ -436,8 +498,10 @@ impl Tokenizer<'_> {
                         _ => TOKEN_IDENT,
                     },
                     IdentType::Uri => TOKEN_URI,
-                    IdentType::Path => panic!("paths are checked earlier"),
-                    IdentType::Store => panic!("store paths are checked earlier"),
+                    IdentType::PathAbs | IdentType::PathRel | IdentType::PathHome => {
+                        panic!("paths are checked earlier")
+                    }
+                    IdentType::PathSearch => panic!("search paths are checked earlier"),
                 }
             }
             '"' => {

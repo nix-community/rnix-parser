@@ -176,7 +176,10 @@ node! {
         IfElse,
         Select,
         Str,
-        Path,
+        PathAbs,
+        PathRel,
+        PathHome,
+        PathSearch,
         Literal,
         Lambda,
         LegacyLet,
@@ -279,7 +282,20 @@ impl InheritFrom {
     tg! { r_paren_token, ')' }
 }
 
-node! { #[from(NODE_PATH)] struct Path; }
+node! { #[from(NODE_PATH_ABS)]    struct PathAbs; }
+node! { #[from(NODE_PATH_REL)]    struct PathRel; }
+node! { #[from(NODE_PATH_HOME)]   struct PathHome; }
+node! { #[from(NODE_PATH_SEARCH)] struct PathSearch; }
+
+node! {
+    #[from(
+        PathAbs,
+        PathRel,
+        PathHome,
+        PathSearch,
+    )]
+    enum Path;
+}
 
 node! { #[from(NODE_STRING)] struct Str; }
 

@@ -6,8 +6,8 @@ NODE_ROOT@0..150
       NODE_IDENT@5..11
         TOKEN_IDENT@5..11 "import"
       TOKEN_WHITESPACE@11..12 " "
-      NODE_PATH@12..28
-        TOKEN_PATH@12..28 "./simple-set.nix"
+      NODE_PATH_REL@12..28
+        TOKEN_PATH_REL@12..28 "./simple-set.nix"
     TOKEN_SEMICOLON@28..29 ";"
     TOKEN_WHITESPACE@29..31 "\n\n"
     NODE_LET_IN@31..150

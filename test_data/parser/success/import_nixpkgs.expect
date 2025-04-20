@@ -3,8 +3,8 @@ NODE_ROOT@0..17
     NODE_APPLY@0..15
       NODE_IDENT@0..6
         TOKEN_IDENT@0..6 "import"
-      NODE_PATH@6..15
-        TOKEN_PATH@6..15 "<nixpkgs>"
+      NODE_PATH_SEARCH@6..15
+        TOKEN_PATH_SEARCH@6..15 "<nixpkgs>"
     NODE_ATTR_SET@15..17
       TOKEN_L_BRACE@15..16 "{"
       TOKEN_R_BRACE@16..17 "}"
