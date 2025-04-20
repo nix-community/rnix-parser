@@ -9,8 +9,8 @@ NODE_ROOT@0..107
       TOKEN_WHITESPACE@7..8 " "
       TOKEN_ASSIGN@8..9 "="
       TOKEN_WHITESPACE@9..10 " "
-      NODE_PATH@10..20
-        TOKEN_PATH@10..20 "/nix/store"
+      NODE_PATH_ABS@10..20
+        TOKEN_PATH_ABS@10..20 "/nix/store"
       TOKEN_SEMICOLON@20..21 ";"
     TOKEN_WHITESPACE@21..24 "\n  "
     NODE_ATTRPATH_VALUE@24..50
@@ -20,8 +20,8 @@ NODE_ROOT@0..107
       TOKEN_WHITESPACE@28..29 " "
       TOKEN_ASSIGN@29..30 "="
       TOKEN_WHITESPACE@30..31 " "
-      NODE_PATH@31..49
-        TOKEN_PATH@31..49 "~/.nix-profile/bin"
+      NODE_PATH_HOME@31..49
+        TOKEN_PATH_HOME@31..49 "~/.nix-profile/bin"
       TOKEN_SEMICOLON@49..50 ";"
     TOKEN_WHITESPACE@50..53 "\n  "
     NODE_ATTRPATH_VALUE@53..79
@@ -31,8 +31,8 @@ NODE_ROOT@0..107
       TOKEN_WHITESPACE@56..57 " "
       TOKEN_ASSIGN@57..58 "="
       TOKEN_WHITESPACE@58..59 " "
-      NODE_PATH@59..78
-        TOKEN_PATH@59..78 "./configuration.nix"
+      NODE_PATH_REL@59..78
+        TOKEN_PATH_REL@59..78 "./configuration.nix"
       TOKEN_SEMICOLON@78..79 ";"
     TOKEN_WHITESPACE@79..82 "\n  "
     NODE_ATTRPATH_VALUE@82..105
@@ -42,8 +42,8 @@ NODE_ROOT@0..107
       TOKEN_WHITESPACE@87..88 " "
       TOKEN_ASSIGN@88..89 "="
       TOKEN_WHITESPACE@89..90 " "
-      NODE_PATH@90..104
-        TOKEN_PATH@90..104 "<nixpkgs/pkgs>"
+      NODE_PATH_SEARCH@90..104
+        TOKEN_PATH_SEARCH@90..104 "<nixpkgs/pkgs>"
       TOKEN_SEMICOLON@104..105 ";"
     TOKEN_WHITESPACE@105..106 "\n"
     TOKEN_R_BRACE@106..107 "}"

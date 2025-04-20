@@ -5,6 +5,8 @@ mod interpol;
 mod nodes;
 mod operators;
 mod path_util;
+
+pub use path_util::Path;
 mod str_util;
 mod tokens;
 

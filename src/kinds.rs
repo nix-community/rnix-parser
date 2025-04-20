@@ -63,7 +63,12 @@ pub enum SyntaxKind {
     TOKEN_INTEGER,
     TOKEN_INTERPOL_END,
     TOKEN_INTERPOL_START,
-    TOKEN_PATH,
+    // Path tokens (distinct kinds)
+    TOKEN_PATH_ABS,    // /foo/bar, /nix/store/…
+    TOKEN_PATH_REL,    // foo/bar, ./foo, ../bar
+    TOKEN_PATH_HOME,   // ~/foo/bar
+    TOKEN_PATH_SEARCH, // <nixpkgs/foo>
+
     TOKEN_URI,
     TOKEN_STRING_CONTENT,
     TOKEN_STRING_END,
@@ -98,7 +103,10 @@ pub enum SyntaxKind {
     NODE_UNARY_OP,
     NODE_LITERAL,
     NODE_WITH,
-    NODE_PATH,
+    NODE_PATH_ABS,
+    NODE_PATH_REL,
+    NODE_PATH_HOME,
+    NODE_PATH_SEARCH,
     // Attrpath existence check: foo ? bar.${baz}."bux"
     NODE_HAS_ATTR,
 
@@ -110,7 +118,16 @@ use SyntaxKind::*;
 impl SyntaxKind {
     /// Returns true if this token is a literal, such as an integer or a string
     pub fn is_literal(self) -> bool {
-        matches!(self, TOKEN_FLOAT | TOKEN_INTEGER | TOKEN_PATH | TOKEN_URI)
+        matches!(
+            self,
+            TOKEN_FLOAT
+                | TOKEN_INTEGER
+                | TOKEN_PATH_ABS
+                | TOKEN_PATH_REL
+                | TOKEN_PATH_HOME
+                | TOKEN_PATH_SEARCH
+                | TOKEN_URI
+        )
     }
 
     /// Returns true if this token should be used as a function argument.
