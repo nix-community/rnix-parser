@@ -172,6 +172,8 @@ impl Tokenizer<'_> {
             self.ctx.push(Context::InterpolStart);
         } else if self.str_since(past).ends_with('/') {
             return TOKEN_ERROR;
+        } else if self.str_since(past).contains("//") {
+            return TOKEN_ERROR;
         } else {
             self.pop_ctx(Context::Path);
         }
