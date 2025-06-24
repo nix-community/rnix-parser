@@ -1,0 +1,1 @@
+https://github.com/NixOS/nixpkgs/archive/master.tar.gz
