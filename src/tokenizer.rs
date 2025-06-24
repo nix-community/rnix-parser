@@ -294,13 +294,13 @@ impl Tokenizer<'_> {
                 None // This could be an update operator, let the operator matcher handle it
             } else {
                 let second_char = self.remaining().chars().nth(1);
-                if second_char.map_or(false, is_valid_path_char) {
+                if second_char.map_or(false, |c| is_valid_path_char(c) && c != '*') {
                     Some(IdentType::PathAbs)
                 } else {
                     None // Not a path, might be division operator or something else
                 }
             }
-        } else if self.peek() == Some('~') {
+        } else if self.peek() == Some('~') && self.remaining().chars().nth(1) == Some('/') {
             Some(IdentType::PathHome)
         } else {
             // Fallback to heuristic previously used for relative, search and URI paths.
@@ -437,8 +437,13 @@ impl Tokenizer<'_> {
                 TOKEN_PIPE_LEFT
             }
             '<' if kind == Some(IdentType::PathSearch) => {
+                let content_start = self.state.offset;
                 self.consume(is_valid_path_char);
-                if self.next() != Some('>') {
+                // Check if we consumed any content between < and >
+                if self.state.offset == content_start {
+                    // Empty search path <> is not valid
+                    TOKEN_LESS
+                } else if self.next() != Some('>') {
                     TOKEN_ERROR
                 } else {
                     TOKEN_PATH_SEARCH

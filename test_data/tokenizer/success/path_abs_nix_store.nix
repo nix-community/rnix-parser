@@ -1,0 +1,1 @@
+/nix/store/abc123def456-package-1.0.0/bin/executable

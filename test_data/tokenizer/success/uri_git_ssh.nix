@@ -1,0 +1,1 @@
+git+ssh://git@github.com/NixOS/nix.git

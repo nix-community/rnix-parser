@@ -1,0 +1,96 @@
+error: unexpected TOKEN_ASSIGN at 361..388, wanted any of [TOKEN_SEMICOLON]
+NODE_ROOT@0..391
+  NODE_ATTR_SET@0..391
+    TOKEN_L_BRACE@0..1 "{"
+    TOKEN_WHITESPACE@1..4 "\n  "
+    NODE_ATTRPATH_VALUE@4..30
+      NODE_ATTRPATH@4..8
+        NODE_IDENT@4..8
+          TOKEN_IDENT@4..8 "http"
+      TOKEN_WHITESPACE@8..9 " "
+      TOKEN_ASSIGN@9..10 "="
+      TOKEN_WHITESPACE@10..11 " "
+      NODE_LITERAL@11..29
+        TOKEN_URI@11..29 "http://example.com"
+      TOKEN_SEMICOLON@29..30 ";"
+    TOKEN_WHITESPACE@30..33 "\n  "
+    NODE_ATTRPATH_VALUE@33..74
+      NODE_ATTRPATH@33..38
+        NODE_IDENT@33..38
+          TOKEN_IDENT@33..38 "https"
+      TOKEN_WHITESPACE@38..39 " "
+      TOKEN_ASSIGN@39..40 "="
+      TOKEN_WHITESPACE@40..41 " "
+      NODE_LITERAL@41..73
+        TOKEN_URI@41..73 "https://github.com/Ni ..."
+      TOKEN_SEMICOLON@73..74 ";"
+    TOKEN_WHITESPACE@74..77 "\n  "
+    NODE_ATTRPATH_VALUE@77..123
+      NODE_ATTRPATH@77..80
+        NODE_IDENT@77..80
+          TOKEN_IDENT@77..80 "git"
+      TOKEN_WHITESPACE@80..81 " "
+      TOKEN_ASSIGN@81..82 "="
+      TOKEN_WHITESPACE@82..83 " "
+      NODE_LITERAL@83..122
+        TOKEN_URI@83..122 "git+ssh://git@github. ..."
+      TOKEN_SEMICOLON@122..123 ";"
+    TOKEN_WHITESPACE@123..126 "\n  "
+    NODE_ATTRPATH_VALUE@126..164
+      NODE_ATTRPATH@126..130
+        NODE_IDENT@126..130
+          TOKEN_IDENT@126..130 "file"
+      TOKEN_WHITESPACE@130..131 " "
+      TOKEN_ASSIGN@131..132 "="
+      TOKEN_WHITESPACE@132..133 " "
+      NODE_LITERAL@133..163
+        TOKEN_URI@133..163 "file:///home/user/doc ..."
+      TOKEN_SEMICOLON@163..164 ";"
+    TOKEN_WHITESPACE@164..167 "\n  "
+    NODE_ATTRPATH_VALUE@167..211
+      NODE_ATTRPATH@167..170
+        NODE_IDENT@167..170
+          TOKEN_IDENT@167..170 "ftp"
+      TOKEN_WHITESPACE@170..171 " "
+      TOKEN_ASSIGN@171..172 "="
+      TOKEN_WHITESPACE@172..173 " "
+      NODE_LITERAL@173..210
+        TOKEN_URI@173..210 "ftp://ftp.example.com ..."
+      TOKEN_SEMICOLON@210..211 ";"
+    TOKEN_WHITESPACE@211..217 "\n  \n  "
+    TOKEN_COMMENT@217..247 "# URIs with special c ..."
+    TOKEN_WHITESPACE@247..250 "\n  "
+    NODE_ATTRPATH_VALUE@250..298
+      NODE_ATTRPATH@250..259
+        NODE_IDENT@250..259
+          TOKEN_IDENT@250..259 "withQuery"
+      TOKEN_WHITESPACE@259..260 " "
+      TOKEN_ASSIGN@260..261 "="
+      TOKEN_WHITESPACE@261..262 " "
+      NODE_LITERAL@262..297
+        TOKEN_URI@262..297 "https://example.com?f ..."
+      TOKEN_SEMICOLON@297..298 ";"
+    TOKEN_WHITESPACE@298..301 "\n  "
+    NODE_ATTRPATH_VALUE@301..389
+      NODE_ATTRPATH@301..313
+        NODE_IDENT@301..313
+          TOKEN_IDENT@301..313 "withFragment"
+      TOKEN_WHITESPACE@313..314 " "
+      TOKEN_ASSIGN@314..315 "="
+      TOKEN_WHITESPACE@315..316 " "
+      NODE_APPLY@316..360
+        NODE_LITERAL@316..340
+          TOKEN_URI@316..340 "https://example.com/page"
+        TOKEN_COMMENT@340..349 "#section;"
+        TOKEN_WHITESPACE@349..352 "\n  "
+        NODE_IDENT@352..360
+          TOKEN_IDENT@352..360 "withPort"
+      TOKEN_WHITESPACE@360..361 " "
+      NODE_ERROR@361..388
+        TOKEN_ASSIGN@361..362 "="
+        TOKEN_WHITESPACE@362..363 " "
+        TOKEN_URI@363..388 "http://localhost:8080 ..."
+      TOKEN_SEMICOLON@388..389 ";"
+    TOKEN_WHITESPACE@389..390 "\n"
+    TOKEN_R_BRACE@390..391 "}"
+
