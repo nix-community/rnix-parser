@@ -10,6 +10,7 @@ pub mod tokenizer;
 
 use std::marker::PhantomData;
 
+use self::kinds::SYNTAX_KIND_MAX;
 pub use self::{kinds::SyntaxKind, tokenizer::tokenize};
 
 use ast::AstNode;
@@ -27,7 +28,7 @@ impl rowan::Language for NixLanguage {
     type Kind = SyntaxKind;
     fn kind_from_raw(raw: rowan::SyntaxKind) -> Self::Kind {
         let discriminant: u16 = raw.0;
-        assert!(discriminant <= (SyntaxKind::__LAST as u16));
+        assert!(discriminant <= SYNTAX_KIND_MAX);
         unsafe { std::mem::transmute::<u16, SyntaxKind>(discriminant) }
     }
     fn kind_to_raw(kind: Self::Kind) -> rowan::SyntaxKind {
@@ -71,7 +72,7 @@ impl<T: AstNode> Parse<T> {
 
     /// Return all errors in the tree, if any
     pub fn errors(&self) -> &[ParseError] {
-        &*self.errors
+        &self.errors
     }
 
     /// Either return the first error in the tree, or if there are none return self

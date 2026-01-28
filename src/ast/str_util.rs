@@ -17,7 +17,7 @@ impl ast::Str {
             }
             NodeOrToken::Node(node) => {
                 assert_eq!(node.kind(), NODE_INTERPOL);
-                Some(InterpolPart::Interpolation(ast::Interpol::cast(node.clone()).unwrap()))
+                Some(InterpolPart::Interpolation(ast::Interpol::cast(node).unwrap()))
             }
         })
     }

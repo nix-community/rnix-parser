@@ -1,6 +1,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u16)]
 #[allow(non_camel_case_types)]
+#[non_exhaustive]
 pub enum SyntaxKind {
     // Internals
     TOKEN_COMMENT,
@@ -101,11 +102,11 @@ pub enum SyntaxKind {
     NODE_PATH,
     // Attrpath existence check: foo ? bar.${baz}."bux"
     NODE_HAS_ATTR,
-
-    #[doc(hidden)]
-    __LAST,
 }
 use SyntaxKind::*;
+
+/// Maximum valid discriminant value for SyntaxKind
+pub(crate) const SYNTAX_KIND_MAX: u16 = NODE_HAS_ATTR as u16;
 
 impl SyntaxKind {
     /// Returns true if this token is a literal, such as an integer or a string

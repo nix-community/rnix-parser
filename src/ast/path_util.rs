@@ -13,7 +13,7 @@ impl ast::nodes::Path {
                 InterpolPart::Literal(PathContent::cast(token).unwrap())
             }
             NodeOrToken::Node(node) => {
-                InterpolPart::Interpolation(ast::Interpol::cast(node.clone()).unwrap())
+                InterpolPart::Interpolation(ast::Interpol::cast(node).unwrap())
             }
         })
     }
