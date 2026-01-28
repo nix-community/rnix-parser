@@ -203,8 +203,8 @@ impl Tokenizer<'_> {
                         self.pop_ctx(Context::Path);
                     }
                 }
-                Some(Context::StringBody { multiline }) => {
-                    let token = self.next_string(*multiline);
+                Some(&Context::StringBody { multiline }) => {
+                    let token = self.next_string(multiline);
                     // skip empty stuff
                     if self.state == start {
                         continue;
