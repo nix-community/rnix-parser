@@ -7,12 +7,10 @@
     import-cargo.url = "github:edolstra/import-cargo";
   };
 
-  # first comment
-  # second comment
   outputs = { self, nixpkgs, utils, import-cargo }:
     {
       overlay = final: prev: let
-        target = final.rust.toRustTarget final.stdenv.hostPlatform;
+        target = final.stdenv.hostPlatform.rust.rustcTarget;
         flags = "--release --offline --target ${target}";
         inherit (import-cargo.builders) importCargo;
       in {
