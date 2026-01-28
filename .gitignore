@@ -1,3 +1,7 @@
 /target
 
 /.direnv/
+
+# Nix build outputs
+/result
+/result-*
