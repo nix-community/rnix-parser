@@ -10,8 +10,8 @@ pub mod tokenizer;
 
 use std::marker::PhantomData;
 
-pub use self::{kinds::SyntaxKind, tokenizer::tokenize};
 use self::kinds::SYNTAX_KIND_MAX;
+pub use self::{kinds::SyntaxKind, tokenizer::tokenize};
 
 use ast::AstNode;
 use parser::ParseError;
