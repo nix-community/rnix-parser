@@ -488,7 +488,7 @@ where
             TOKEN_PATH => {
                 self.start_node(NODE_PATH);
                 self.bump();
-                let is_complex_path = self.peek().map_or(false, |t| t == TOKEN_INTERPOL_START);
+                let is_complex_path = self.peek() == Some(TOKEN_INTERPOL_START);
                 if is_complex_path {
                     loop {
                         match self.peek_raw().map(|(t, _)| t) {

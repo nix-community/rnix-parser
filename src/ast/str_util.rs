@@ -23,7 +23,7 @@ impl ast::Str {
     }
 
     pub fn normalized_parts(&self) -> Vec<InterpolPart<String>> {
-        let multiline = children_tokens_u(self).next().map_or(false, |t| t.text() == "''");
+        let multiline = children_tokens_u(self).next().is_some_and(|t| t.text() == "''");
         let mut is_first_literal = true;
         let mut at_start_of_line = true;
         let mut min_indent = 1000000;

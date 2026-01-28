@@ -46,13 +46,12 @@ impl Eq for State<'_> {}
 
 pub type Token<'a> = (SyntaxKind, &'a str);
 
-/// A convenience function for tokenizing the given input
-pub fn tokenize(input: &str) -> Vec<Token<'_>> {
-    Tokenizer::new(input).collect()
+/// Tokenize the given input
+pub fn tokenize(input: &str) -> impl Iterator<Item = Token<'_>> + '_ {
+    Tokenizer::new(input)
 }
 
-/// The tokenizer. You may want to use the `tokenize` convenience function from this module instead.
-pub struct Tokenizer<'a> {
+struct Tokenizer<'a> {
     ctx: Vec<Context>,
     state: State<'a>,
 }
@@ -124,33 +123,34 @@ impl Tokenizer<'_> {
                     self.push_ctx(Context::StringEnd);
                     return TOKEN_STRING_CONTENT;
                 }
-                Some('\\') if !multiline => match self.next() {
-                    None => return TOKEN_ERROR,
-                    Some(_) => (),
-                },
+                Some('\\') if !multiline => {
+                    if self.next().is_none() {
+                        return TOKEN_ERROR;
+                    }
+                }
 
                 Some('\'') if multiline => match self.peek() {
                     None => return TOKEN_ERROR,
-                    Some('\'') => match {
+                    Some('\'') => {
                         self.next();
-                        self.peek()
-                    } {
-                        Some('\'') | Some('$') => {
-                            self.next().unwrap();
-                        }
-                        Some('\\') => {
-                            self.next().unwrap();
-                            if self.next().is_none() {
-                                return TOKEN_ERROR;
+                        match self.peek() {
+                            Some('\'') | Some('$') => {
+                                self.next().unwrap();
+                            }
+                            Some('\\') => {
+                                self.next().unwrap();
+                                if self.next().is_none() {
+                                    return TOKEN_ERROR;
+                                }
+                            }
+                            _ => {
+                                self.state = start;
+                                self.pop_ctx(Context::StringBody { multiline: true });
+                                self.push_ctx(Context::StringEnd);
+                                return TOKEN_STRING_CONTENT;
                             }
                         }
-                        _ => {
-                            self.state = start;
-                            self.pop_ctx(Context::StringBody { multiline: true });
-                            self.push_ctx(Context::StringEnd);
-                            return TOKEN_STRING_CONTENT;
-                        }
-                    },
+                    }
                     Some(_) => (),
                 },
 
@@ -201,7 +201,7 @@ impl Tokenizer<'_> {
                     if self.starts_with_bump("${") {
                         self.ctx.push(Context::Interpol { brackets: 0 });
                         return Some(TOKEN_INTERPOL_START);
-                    } else if self.peek().map_or(false, is_valid_path_char) {
+                    } else if self.peek().is_some_and(is_valid_path_char) {
                         return Some(self.check_path_since(start));
                     } else {
                         self.pop_ctx(Context::Path);
@@ -222,16 +222,16 @@ impl Tokenizer<'_> {
                             self.next().unwrap();
                             true
                         }
-                        Some('\'') => match {
+                        Some('\'') => {
                             self.next().unwrap();
-                            self.peek()
-                        } {
-                            Some('\'') => {
-                                self.next().unwrap();
-                                true
+                            match self.peek() {
+                                Some('\'') => {
+                                    self.next().unwrap();
+                                    true
+                                }
+                                _ => false,
                             }
-                            _ => false,
-                        },
+                        }
                         _ => false,
                     };
                     return Some(if status { TOKEN_STRING_END } else { TOKEN_ERROR });
@@ -340,7 +340,7 @@ impl Tokenizer<'_> {
             ':' => TOKEN_COLON,
             ',' => TOKEN_COMMA,
             '.' => {
-                if self.peek().map_or(false, |x| x.is_ascii_digit()) {
+                if self.peek().is_some_and(|x| x.is_ascii_digit()) {
                     self.consume(|c| c.is_ascii_digit());
                     self.consume_scientific()
                 } else {
