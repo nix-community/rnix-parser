@@ -11,7 +11,7 @@ pub mod tokenizer;
 use std::marker::PhantomData;
 
 use self::kinds::SYNTAX_KIND_MAX;
-pub use self::{kinds::SyntaxKind, tokenizer::tokenize};
+pub use self::{kinds::ParseSyntaxKindError, kinds::SyntaxKind, tokenizer::tokenize};
 
 use ast::AstNode;
 use parser::ParseError;
