@@ -13,7 +13,7 @@ harness = false
 name = "all-packages"
 
 [dependencies]
-rowan = "0.15.0"
+rowan = "0.16"
 
 [dev-dependencies]
 criterion = "0.8"
