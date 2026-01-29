@@ -5,9 +5,13 @@
     utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     import-cargo.url = "github:edolstra/import-cargo";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, utils, import-cargo }:
+  outputs = { self, nixpkgs, utils, import-cargo, fenix }:
     {
       overlay = final: prev: let
         target = final.stdenv.hostPlatform.rust.rustcTarget;
@@ -49,12 +53,30 @@
     // utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; overlays = [ self.overlay ]; };
+        fenixPkgs = fenix.packages.${system};
+        nightlyToolchain = fenixPkgs.combine [
+          fenixPkgs.minimal.cargo
+          fenixPkgs.minimal.rustc
+        ];
       in
       rec {
         # `nix develop`
-        devShell = pkgs.mkShell {
+        devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [ rustfmt rustc cargo clippy ];
         };
+
+        # `nix develop .#fuzz` - for running cargo-fuzz
+        devShells.fuzz = pkgs.mkShell {
+          buildInputs = [
+            nightlyToolchain
+            pkgs.cargo-fuzz
+          ];
+          # libFuzzer needs libstdc++
+          LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
+        };
+
+        # Backwards compat
+        devShell = devShells.default;
 
         packages.rnix-parser = pkgs.rnix-parser;
         defaultPackage = packages.rnix-parser;
