@@ -44,9 +44,27 @@ pub type SyntaxNodeChildren = rowan::SyntaxNodeChildren<NixLanguage>;
 pub use ast::Root;
 
 impl Root {
+    /// Parse a string into an AST.
     pub fn parse(s: &str) -> Parse<Root> {
         let (green, errors) = parser::parse(tokenize(s));
         Parse { green, errors, _ty: PhantomData }
+    }
+
+    /// Parse bytes into an AST.
+    ///
+    /// If the input is valid UTF-8, it is used directly. Otherwise, invalid
+    /// UTF-8 sequences are replaced with U+FFFD (replacement character).
+    ///
+    /// This allows parsing `.nix` files that contain non-UTF-8 bytes, matching
+    /// the behavior of the C++ Nix parser.
+    pub fn parse_bytes(bytes: &[u8]) -> Parse<Root> {
+        match std::str::from_utf8(bytes) {
+            Ok(s) => Self::parse(s),
+            Err(_) => {
+                let s = String::from_utf8_lossy(bytes);
+                Self::parse(&s)
+            }
+        }
     }
 }
 
