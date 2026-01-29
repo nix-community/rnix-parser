@@ -132,15 +132,11 @@ fn tokenizer_dir_tests() {
 #[allow(invalid_from_utf8)]
 fn non_utf8_can_be_parsed_with_parse_bytes_issue173() {
     // This is `{ x = "\xff"; }` with a raw 0xFF byte (invalid UTF-8) in the string
-    let non_utf8_bytes: &[u8] = &[
-        0x7b, 0x20, 0x78, 0x20, 0x3d, 0x20, 0x22, 0xff, 0x22, 0x3b, 0x20, 0x7d,
-    ];
+    let non_utf8_bytes: &[u8] =
+        &[0x7b, 0x20, 0x78, 0x20, 0x3d, 0x20, 0x22, 0xff, 0x22, 0x3b, 0x20, 0x7d];
 
     // Verify this is indeed invalid UTF-8
-    assert!(
-        std::str::from_utf8(non_utf8_bytes).is_err(),
-        "test input should be invalid UTF-8"
-    );
+    assert!(std::str::from_utf8(non_utf8_bytes).is_err(), "test input should be invalid UTF-8");
 
     // parse_bytes handles non-UTF8 by doing lossy conversion
     let parse = Root::parse_bytes(non_utf8_bytes);
