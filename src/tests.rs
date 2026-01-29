@@ -125,3 +125,25 @@ fn tokenizer_dir_tests() {
         actual
     })
 }
+
+/// Test that demonstrates the non-UTF8 limitation (issue #173).
+/// nix (C++) can parse files with non-UTF8 bytes, but rnix requires valid UTF-8.
+#[test]
+#[allow(invalid_from_utf8)]
+fn non_utf8_cannot_be_parsed_issue173() {
+    // This is `{ x = "\xff"; }` with a raw 0xFF byte (invalid UTF-8) in the string
+    let non_utf8_bytes: &[u8] = &[
+        0x7b, 0x20, 0x78, 0x20, 0x3d, 0x20, 0x22, 0xff, 0x22, 0x3b, 0x20, 0x7d,
+    ];
+
+    // Verify this is indeed invalid UTF-8
+    assert!(
+        std::str::from_utf8(non_utf8_bytes).is_err(),
+        "test input should be invalid UTF-8"
+    );
+
+    // Currently, rnix cannot parse this because Root::parse requires &str.
+    // This test documents the limitation described in issue #173.
+    // When this issue is fixed, this test should be updated to verify
+    // that parsing succeeds with a bytes-based API.
+}
