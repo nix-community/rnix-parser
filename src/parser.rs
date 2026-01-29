@@ -498,8 +498,7 @@ where
 
                 // Search paths (<nixpkgs>) don't support interpolation
                 let is_search_path = node_kind == NODE_PATH_SEARCH;
-                let is_complex_path =
-                    !is_search_path && self.peek() == Some(TOKEN_INTERPOL_START);
+                let is_complex_path = !is_search_path && self.peek() == Some(TOKEN_INTERPOL_START);
 
                 if is_complex_path {
                     loop {
