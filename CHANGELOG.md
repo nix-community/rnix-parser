@@ -4,6 +4,45 @@ All notable changes between releases will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.13.0] - 2026-01-29
+
+### Breaking Changes
+
+* **Path types are now distinguished at the type level.** `TOKEN_PATH` and `NODE_PATH` have been
+  replaced with specific variants for each path type:
+  - `TOKEN_PATH_ABS` / `NODE_PATH_ABS` - absolute paths (`/foo/bar`)
+  - `TOKEN_PATH_REL` / `NODE_PATH_REL` - relative paths (`./foo`, `../bar`, `foo/bar`)
+  - `TOKEN_PATH_HOME` / `NODE_PATH_HOME` - home-relative paths (`~/foo`)
+  - `TOKEN_PATH_SEARCH` / `NODE_PATH_SEARCH` - search paths (`<nixpkgs>`)
+
+  The `ast::Expr` enum now has `PathAbs`, `PathRel`, `PathHome`, and `PathSearch` variants
+  instead of a single `Path` variant. See `MIGRATING.md` for upgrade guidance.
+
+* **Double slashes in paths are now syntax errors.** Paths like `foo//bar` now produce
+  `TOKEN_ERROR` instead of being parsed.
+
+* **The `parser` and `tokenizer` modules are now private.** Use `rnix::Root::parse()` and
+  `rnix::tokenize()` instead.
+
+### Added
+
+* Implement `FromStr` for `SyntaxKind` (from [@abhillman](https://github.com/abhillman)).
+
+* Add `MIGRATING.md` with upgrade guidance for breaking changes.
+
+* Add `nix develop .#fuzz` devShell for running cargo-fuzz with nightly Rust.
+
+### Fixed
+
+* Fix leading zero number parsing to match Nix behavior (from [@hsjobeki](https://github.com/hsjobeki)).
+
+### Changed
+
+* Update `rowan` to 0.16.
+* Update `criterion` to 0.8.
+* Update `expect-test` to 1.5.1.
+* Add Clippy to CI and resolve all warnings.
+
 ## [v0.12.0] - 2025-01-09
 
 * Add support for pipe operators
@@ -122,7 +161,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 * Fixed a memory leak while parsing `inherit`-expressions with invalid syntax (from [@Ma27](https://github.com/Ma27/)).
 
-[Unreleased]: https://github.com/nix-community/rnix-parser/compare/v0.11.0...master
+[Unreleased]: https://github.com/nix-community/rnix-parser/compare/v0.13.0...master
+[v0.13.0]: https://github.com/nix-community/rnix-parser/compare/v0.12.0...v0.13.0
+[v0.12.0]: https://github.com/nix-community/rnix-parser/compare/v0.11.0...v0.12.0
 [v0.11.0]: https://github.com/nix-community/rnix-parser/compare/v0.10.2...v0.11.0
 [v0.10.2]: https://github.com/nix-community/rnix-parser/compare/v0.10.1...v0.10.2
 [v0.10.1]: https://github.com/nix-community/rnix-parser/compare/v0.10.0...v0.10.1

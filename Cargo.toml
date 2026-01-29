@@ -6,7 +6,7 @@ license = "MIT"
 name = "rnix"
 readme = "README.md"
 repository = "https://github.com/nix-community/rnix-parser"
-version = "0.12.0"
+version = "0.13.0"
 
 [[bench]]
 harness = false
