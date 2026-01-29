@@ -1,0 +1,6 @@
+NODE_ROOT@0..14
+  NODE_STRING@0..14
+    TOKEN_STRING_START@0..2 "''"
+    TOKEN_STRING_CONTENT@2..12 "\n''\\'''${\n"
+    TOKEN_STRING_END@12..14 "''"
+
