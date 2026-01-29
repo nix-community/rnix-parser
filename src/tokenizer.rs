@@ -97,7 +97,7 @@ impl Tokenizer<'_> {
         debug_assert!(self
             .ctx
             .last()
-            .map_or(false, |c| std::mem::discriminant(c) == std::mem::discriminant(&ctx)));
+            .is_some_and(|c| std::mem::discriminant(c) == std::mem::discriminant(&ctx)));
         self.ctx.pop();
     }
 
@@ -177,11 +177,10 @@ impl Tokenizer<'_> {
 
     fn check_path_since(&mut self, past: State, kind: SyntaxKind) -> SyntaxKind {
         self.consume(is_valid_path_char);
+        let path_str = self.str_since(past);
         if self.remaining().starts_with("${") {
             self.ctx.push(Context::InterpolStart);
-        } else if self.str_since(past).ends_with('/') {
-            return TOKEN_ERROR;
-        } else if self.str_since(past).contains("//") {
+        } else if path_str.ends_with('/') || path_str.contains("//") {
             return TOKEN_ERROR;
         } else {
             self.pop_ctx(Context::Path(kind));
@@ -209,7 +208,7 @@ impl Tokenizer<'_> {
 
                     // Search paths (<nixpkgs>) don't support interpolation
                     if path_kind == TOKEN_PATH_SEARCH {
-                        if self.peek().map_or(false, is_valid_path_char) {
+                        if self.peek().is_some_and(is_valid_path_char) {
                             return Some(self.check_path_since(start, path_kind));
                         } else {
                             self.pop_ctx(Context::Path(path_kind));
@@ -294,7 +293,7 @@ impl Tokenizer<'_> {
                 None // This could be an update operator, let the operator matcher handle it
             } else {
                 let second_char = self.remaining().chars().nth(1);
-                if second_char.map_or(false, |c| is_valid_path_char(c) && c != '*') {
+                if second_char.is_some_and(|c| is_valid_path_char(c) && c != '*') {
                     Some(IdentType::PathAbs)
                 } else {
                     None // Not a path, might be division operator or something else
@@ -316,7 +315,7 @@ impl Tokenizer<'_> {
 
             let mut lookahead = self.remaining().chars().skip(skipped.chars().count());
 
-            let res = match (lookahead.next(), lookahead.next()) {
+            match (lookahead.next(), lookahead.next()) {
                 // a//b parses as Update(a, b)
                 (Some('/'), Some('/')) => None,
                 (Some('/'), Some('*')) => None,
@@ -330,8 +329,7 @@ impl Tokenizer<'_> {
                     Some(IdentType::Uri)
                 }
                 _ => None,
-            };
-            res
+            }
         };
 
         let c = self.next()?;
@@ -345,7 +343,7 @@ impl Tokenizer<'_> {
 
         if c == '~'
             || matches!(kind, Some(IdentType::PathAbs | IdentType::PathRel))
-            || (c == '/' && self.peek().map_or(false, is_valid_path_char))
+            || (c == '/' && self.peek().is_some_and(is_valid_path_char))
         {
             return Some({
                 // Determine the concrete path token kind to use
