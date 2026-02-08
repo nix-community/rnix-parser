@@ -14,6 +14,7 @@ pub enum SyntaxKind {
     TOKEN_IF,
     TOKEN_IN,
     TOKEN_INHERIT,
+    TOKEN_CUR_POS,
     TOKEN_LET,
     TOKEN_OR,
     TOKEN_REC,
@@ -85,6 +86,7 @@ pub enum SyntaxKind {
     NODE_SELECT,
     NODE_INHERIT,
     NODE_INHERIT_FROM,
+    NODE_CUR_POS,
     NODE_STRING,
     NODE_INTERPOL,
     NODE_LAMBDA,
@@ -257,7 +259,7 @@ impl SyntaxKind {
     pub fn is_fn_arg(self) -> bool {
         match self {
             TOKEN_REC | TOKEN_L_BRACE | TOKEN_L_BRACK | TOKEN_L_PAREN | TOKEN_STRING_START
-            | TOKEN_IDENT => true,
+            | TOKEN_IDENT | TOKEN_CUR_POS => true,
             _ => self.is_literal(),
         }
     }

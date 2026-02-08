@@ -281,7 +281,7 @@ where
             Some(TOKEN_INTERPOL_START) => self.parse_dynamic(),
             Some(TOKEN_STRING_START) => self.parse_string(),
             _ => {
-                if self.expect_peek_any(&[TOKEN_IDENT, TOKEN_OR]).is_some() {
+                if self.expect_peek_any(&[TOKEN_IDENT, TOKEN_OR, TOKEN_CUR_POS]).is_some() {
                     self.start_node(NODE_IDENT);
                     let (_, s) = self.try_next().unwrap();
                     self.manual_bump(s, TOKEN_IDENT);
@@ -415,6 +415,11 @@ where
         };
         let checkpoint = self.checkpoint();
         match peek {
+            T![__curPos] => {
+                self.start_node(NODE_CUR_POS);
+                self.bump();
+                self.finish_node();
+            }
             T!['('] => {
                 self.start_node(NODE_PAREN);
                 self.bump();

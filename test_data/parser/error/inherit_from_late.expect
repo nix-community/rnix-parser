@@ -1,5 +1,5 @@
-error: unexpected TOKEN_L_PAREN at 12..13, wanted any of [TOKEN_IDENT, TOKEN_OR]
-error: unexpected TOKEN_R_PAREN at 14..15, wanted any of [TOKEN_IDENT, TOKEN_OR]
+error: unexpected TOKEN_L_PAREN at 12..13, wanted any of [TOKEN_IDENT, TOKEN_OR, TOKEN_CUR_POS]
+error: unexpected TOKEN_R_PAREN at 14..15, wanted any of [TOKEN_IDENT, TOKEN_OR, TOKEN_CUR_POS]
 NODE_ROOT@0..20
   NODE_ATTR_SET@0..20
     TOKEN_L_BRACE@0..1 "{"
