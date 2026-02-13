@@ -1,0 +1,10 @@
+NODE_ROOT@0..18
+  NODE_LAMBDA@0..18
+    NODE_IDENT_PARAM@0..8
+      NODE_IDENT@0..8
+        TOKEN_IDENT@0..8 "__curPos"
+    TOKEN_COLON@8..9 ":"
+    TOKEN_WHITESPACE@9..10 " "
+    NODE_IDENT@10..18
+      TOKEN_IDENT@10..18 "__curPos"
+
