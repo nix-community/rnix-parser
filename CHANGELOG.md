@@ -4,6 +4,16 @@ All notable changes between releases will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Breaking Changes
+
+* **`__curPos` is now a distinct node type.** `__curPos` is a Nix keyword that evaluates to an
+  attribute set containing the file, line, and column where it appears.
+  [Lix documents this as a keyword.](https://docs.lix.systems/manual/lix/nightly/language/constructs.html#keywords-__curPos)
+  It was previously represented as `NODE_IDENT`, but is now parsed as `NODE_CUR_POS` with a
+  corresponding `TOKEN_CUR_POS` token kind (from [@3timeslazy](https://github.com/3timeslazy)).
+
 ## [v0.13.0] - 2026-01-29
 
 ### Breaking Changes
@@ -162,6 +172,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Fixed a memory leak while parsing `inherit`-expressions with invalid syntax (from [@Ma27](https://github.com/Ma27/)).
 
 [Unreleased]: https://github.com/nix-community/rnix-parser/compare/v0.13.0...master
+[v0.14.0]: https://github.com/nix-community/rnix-parser/compare/v0.13.0...v0.14.0
 [v0.13.0]: https://github.com/nix-community/rnix-parser/compare/v0.12.0...v0.13.0
 [v0.12.0]: https://github.com/nix-community/rnix-parser/compare/v0.11.0...v0.12.0
 [v0.11.0]: https://github.com/nix-community/rnix-parser/compare/v0.10.2...v0.11.0
