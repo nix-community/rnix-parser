@@ -249,6 +249,9 @@ impl SyntaxKind {
     /// ```
     pub fn is_fn_arg(self) -> bool {
         match self {
+            // NB: the tokenizer always emits TOKEN_IDENT for __curPos;
+            // TOKEN_CUR_POS is included for completeness but cannot
+            // currently be produced by the tokenizer.
             TOKEN_REC | TOKEN_L_BRACE | TOKEN_L_BRACK | TOKEN_L_PAREN | TOKEN_STRING_START
             | TOKEN_IDENT | TOKEN_CUR_POS => true,
             _ => self.is_literal(),

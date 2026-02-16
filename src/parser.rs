@@ -296,6 +296,9 @@ where
             Some(TOKEN_INTERPOL_START) => self.parse_dynamic(),
             Some(TOKEN_STRING_START) => self.parse_string(),
             _ => {
+                // NB: the tokenizer always emits TOKEN_IDENT for __curPos;
+                // TOKEN_CUR_POS is included for completeness but cannot
+                // currently be produced by the tokenizer.
                 if self.expect_peek_any(&[TOKEN_IDENT, TOKEN_OR, TOKEN_CUR_POS]).is_some() {
                     self.start_node(NODE_IDENT);
                     let (_, s) = self.try_next().unwrap();
