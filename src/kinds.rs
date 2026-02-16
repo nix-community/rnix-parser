@@ -193,6 +193,7 @@ impl std::str::FromStr for SyntaxKind {
             "TOKEN_STRING_CONTENT" => Ok(TOKEN_STRING_CONTENT),
             "TOKEN_STRING_END" => Ok(TOKEN_STRING_END),
             "TOKEN_STRING_START" => Ok(TOKEN_STRING_START),
+            "TOKEN_CUR_POS" => Ok(TOKEN_CUR_POS),
             "NODE_APPLY" => Ok(NODE_APPLY),
             "NODE_ASSERT" => Ok(NODE_ASSERT),
             "NODE_ATTRPATH" => Ok(NODE_ATTRPATH),
@@ -226,6 +227,7 @@ impl std::str::FromStr for SyntaxKind {
             "NODE_PATH_HOME" => Ok(NODE_PATH_HOME),
             "NODE_PATH_SEARCH" => Ok(NODE_PATH_SEARCH),
             "NODE_HAS_ATTR" => Ok(NODE_HAS_ATTR),
+            "NODE_CUR_POS" => Ok(NODE_CUR_POS),
             _ => Err(ParseSyntaxKindError),
         }
     }

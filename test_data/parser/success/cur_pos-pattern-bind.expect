@@ -1,0 +1,17 @@
+NODE_ROOT@0..24
+  NODE_LAMBDA@0..24
+    NODE_PATTERN@0..14
+      NODE_PAT_BIND@0..10
+        NODE_IDENT@0..8
+          TOKEN_IDENT@0..8 "__curPos"
+        TOKEN_WHITESPACE@8..9 " "
+        TOKEN_AT@9..10 "@"
+      TOKEN_WHITESPACE@10..11 " "
+      TOKEN_L_BRACE@11..12 "{"
+      TOKEN_WHITESPACE@12..13 " "
+      TOKEN_R_BRACE@13..14 "}"
+    TOKEN_COLON@14..15 ":"
+    TOKEN_WHITESPACE@15..16 " "
+    NODE_CUR_POS@16..24
+      TOKEN_CUR_POS@16..24 "__curPos"
+

@@ -498,8 +498,6 @@ impl Tokenizer<'_> {
                         "rec" => TOKEN_REC,
                         "then" => TOKEN_THEN,
                         "with" => TOKEN_WITH,
-                        // similarly to "or", it is contextual and will be handled in the parser.
-                        "__curPos" => TOKEN_CUR_POS,
                         _ => TOKEN_IDENT,
                     },
                     IdentType::Uri => TOKEN_URI,

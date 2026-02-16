@@ -187,14 +187,29 @@ where
         self.consumed += TextSize::of(s);
         self.builder.token(NixLanguage::kind_to_raw(token), s)
     }
-    fn peek_data(&mut self) -> Option<&Token<'a>> {
+    fn peek(&mut self) -> Option<SyntaxKind> {
         while self.peek_raw().map(|&(t, _)| t.is_trivia()).unwrap_or(false) {
             self.bump();
         }
-        self.peek_raw()
+        self.peek_ahead(0)
     }
-    fn peek(&mut self) -> Option<SyntaxKind> {
-        self.peek_data().map(|&(t, _)| t)
+    fn peek_ahead(&mut self, n: usize) -> Option<SyntaxKind> {
+        // count how many non-trivia tokens there is in the buffer,
+        // and fill it up to `n` non-trivia tokens
+        let mut non_trivia = self.buffer.iter().filter(|(t, _)| !t.is_trivia()).count();
+        while non_trivia < n + 1 {
+            match self.iter.next() {
+                Some(token) => {
+                    if !token.0.is_trivia() {
+                        non_trivia += 1;
+                    }
+                    self.buffer.push_back(token);
+                }
+                None => return None,
+            }
+        }
+
+        self.buffer.iter().filter(|(t, _)| !t.is_trivia()).nth(n).map(|(t, _)| *t)
     }
     fn expect_peek_any(&mut self, allowed_slice: &[SyntaxKind]) -> Option<SyntaxKind> {
         let allowed = TokenSet::from_slice(allowed_slice);
@@ -415,11 +430,6 @@ where
         };
         let checkpoint = self.checkpoint();
         match peek {
-            T![__curPos] => {
-                self.start_node(NODE_CUR_POS);
-                self.bump();
-                self.finish_node();
-            }
             T!['('] => {
                 self.start_node(NODE_PAREN);
                 self.bump();
@@ -530,22 +540,26 @@ where
                 self.finish_node();
             }
             TOKEN_IDENT => {
-                self.expect_ident();
+                let ident = self.peek_raw().map(|&(_, s)| s);
 
-                match self.peek() {
+                match self.peek_ahead(1) {
                     Some(T![:]) => {
+                        self.expect_ident();
+
                         self.start_node_at(checkpoint, NODE_LAMBDA);
                         self.start_node_at(checkpoint, NODE_IDENT_PARAM);
                         self.finish_node();
-                        self.bump();
+                        self.expect(T![:]);
                         self.parse_expr();
                         self.finish_node();
                     }
                     Some(T![@]) => {
+                        self.expect_ident();
+
                         self.start_node_at(checkpoint, NODE_LAMBDA);
                         self.start_node_at(checkpoint, NODE_PATTERN);
                         self.start_node_at(checkpoint, NODE_PAT_BIND);
-                        self.bump();
+                        self.expect(T![@]);
                         self.finish_node(); // PatBind
 
                         self.expect(T!['{']);
@@ -556,7 +570,13 @@ where
                         self.parse_expr();
                         self.finish_node(); // Lambda
                     }
-                    _ => (),
+                    _ if ident == Some("__curPos") => {
+                        self.start_node(NODE_CUR_POS);
+                        let (_, s) = self.try_next().unwrap();
+                        self.manual_bump(s, TOKEN_CUR_POS);
+                        self.finish_node();
+                    }
+                    _ => self.expect_ident(),
                 }
             }
             kind => {
