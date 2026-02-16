@@ -291,6 +291,9 @@ impl Tokenizer<'_> {
             // AND we need to make sure it's not an operator like //
             if self.remaining().starts_with("//") {
                 None // This could be an update operator, let the operator matcher handle it
+            } else if self.remaining().starts_with("/${") {
+                // Absolute path with interpolation, e.g. /${foo}/bar
+                Some(IdentType::PathAbs)
             } else {
                 let second_char = self.remaining().chars().nth(1);
                 if second_char.is_some_and(|c| is_valid_path_char(c) && c != '*') {
