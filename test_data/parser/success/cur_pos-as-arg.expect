@@ -1,0 +1,30 @@
+NODE_ROOT@0..44
+  NODE_STRING@0..44
+    TOKEN_STRING_START@0..1 "\""
+    NODE_INTERPOL@1..17
+      TOKEN_INTERPOL_START@1..3 "${"
+      NODE_SELECT@3..16
+        NODE_CUR_POS@3..11
+          TOKEN_CUR_POS@3..11 "__curPos"
+        TOKEN_DOT@11..12 "."
+        NODE_ATTRPATH@12..16
+          NODE_IDENT@12..16
+            TOKEN_IDENT@12..16 "file"
+      TOKEN_INTERPOL_END@16..17 "}"
+    TOKEN_STRING_CONTENT@17..18 ":"
+    NODE_INTERPOL@18..43
+      TOKEN_INTERPOL_START@18..20 "${"
+      NODE_APPLY@20..42
+        NODE_IDENT@20..28
+          TOKEN_IDENT@20..28 "toString"
+        TOKEN_WHITESPACE@28..29 " "
+        NODE_SELECT@29..42
+          NODE_CUR_POS@29..37
+            TOKEN_CUR_POS@29..37 "__curPos"
+          TOKEN_DOT@37..38 "."
+          NODE_ATTRPATH@38..42
+            NODE_IDENT@38..42
+              TOKEN_IDENT@38..42 "line"
+      TOKEN_INTERPOL_END@42..43 "}"
+    TOKEN_STRING_END@43..44 "\""
+

@@ -193,6 +193,7 @@ node! {
         Ident,
         With,
         HasAttr,
+        CurPos,
     )]
     /// An expression. The fundamental nix ast type.
     enum Expr;
@@ -454,4 +455,10 @@ impl HasAttr {
     ng! { expr, Expr, 0 }
     tg! { question_token, ? }
     ng! { attrpath, Attrpath, 0 }
+}
+
+node! { #[from(NODE_CUR_POS)] struct CurPos; }
+
+impl CurPos {
+    tg! { cur_pos_token, __curPos }
 }

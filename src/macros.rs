@@ -1,16 +1,17 @@
 #[macro_export]
 #[rustfmt::skip]
 macro_rules! T {
-    (assert)  => ($crate::SyntaxKind::TOKEN_ASSERT);
-    (else)    => ($crate::SyntaxKind::TOKEN_ELSE);
-    (if)      => ($crate::SyntaxKind::TOKEN_IF);
-    (in)      => ($crate::SyntaxKind::TOKEN_IN);
-    (inherit) => ($crate::SyntaxKind::TOKEN_INHERIT);
-    (let)     => ($crate::SyntaxKind::TOKEN_LET);
-    (or)      => ($crate::SyntaxKind::TOKEN_OR);
-    (rec)     => ($crate::SyntaxKind::TOKEN_REC);
-    (then)    => ($crate::SyntaxKind::TOKEN_THEN);
-    (with)    => ($crate::SyntaxKind::TOKEN_WITH);
+    (assert)   => ($crate::SyntaxKind::TOKEN_ASSERT);
+    (else)     => ($crate::SyntaxKind::TOKEN_ELSE);
+    (if)       => ($crate::SyntaxKind::TOKEN_IF);
+    (in)       => ($crate::SyntaxKind::TOKEN_IN);
+    (inherit)  => ($crate::SyntaxKind::TOKEN_INHERIT);
+    (let)      => ($crate::SyntaxKind::TOKEN_LET);
+    (or)       => ($crate::SyntaxKind::TOKEN_OR);
+    (rec)      => ($crate::SyntaxKind::TOKEN_REC);
+    (then)     => ($crate::SyntaxKind::TOKEN_THEN);
+    (with)     => ($crate::SyntaxKind::TOKEN_WITH);
+    (__curPos) => ($crate::SyntaxKind::TOKEN_CUR_POS);
 
     ('{')     => ($crate::SyntaxKind::TOKEN_L_BRACE);
     ('}')     => ($crate::SyntaxKind::TOKEN_R_BRACE);

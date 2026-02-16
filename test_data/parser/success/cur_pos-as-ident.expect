@@ -1,0 +1,22 @@
+NODE_ROOT@0..26
+  NODE_SELECT@0..26
+    NODE_ATTR_SET@0..17
+      TOKEN_L_BRACE@0..1 "{"
+      TOKEN_WHITESPACE@1..2 " "
+      NODE_ATTRPATH_VALUE@2..15
+        NODE_ATTRPATH@2..10
+          NODE_IDENT@2..10
+            TOKEN_IDENT@2..10 "__curPos"
+        TOKEN_WHITESPACE@10..11 " "
+        TOKEN_ASSIGN@11..12 "="
+        TOKEN_WHITESPACE@12..13 " "
+        NODE_LITERAL@13..14
+          TOKEN_INTEGER@13..14 "1"
+        TOKEN_SEMICOLON@14..15 ";"
+      TOKEN_WHITESPACE@15..16 " "
+      TOKEN_R_BRACE@16..17 "}"
+    TOKEN_DOT@17..18 "."
+    NODE_ATTRPATH@18..26
+      NODE_IDENT@18..26
+        TOKEN_IDENT@18..26 "__curPos"
+

@@ -1,0 +1,4 @@
+NODE_ROOT@0..8
+  NODE_CUR_POS@0..8
+    TOKEN_CUR_POS@0..8 "__curPos"
+

@@ -1,4 +1,4 @@
-error: unexpected TOKEN_ERROR at 2..3, wanted any of [TOKEN_IDENT, TOKEN_OR]
+error: unexpected TOKEN_ERROR at 2..3, wanted any of [TOKEN_IDENT, TOKEN_OR, TOKEN_CUR_POS]
 NODE_ROOT@0..12
   NODE_ATTR_SET@0..12
     TOKEN_L_BRACE@0..1 "{"
