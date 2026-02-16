@@ -194,22 +194,21 @@ where
         self.peek_ahead(0)
     }
     fn peek_ahead(&mut self, n: usize) -> Option<SyntaxKind> {
-        // count how many non-trivia tokens there is in the buffer,
-        // and fill it up to `n` non-trivia tokens
-        let mut non_trivia = self.buffer.iter().filter(|(t, _)| !t.is_trivia()).count();
-        while non_trivia < n + 1 {
-            match self.iter.next() {
-                Some(token) => {
-                    if !token.0.is_trivia() {
-                        non_trivia += 1;
-                    }
-                    self.buffer.push_back(token);
+        let mut non_trivia_seen = 0;
+        let mut cursor = 0;
+        loop {
+            if self.buffer.len() <= cursor {
+                self.buffer.push_back(self.iter.next()?);
+            }
+            let kind = self.buffer[cursor].0;
+            cursor += 1;
+            if !kind.is_trivia() {
+                if non_trivia_seen == n {
+                    return Some(kind);
                 }
-                None => return None,
+                non_trivia_seen += 1;
             }
         }
-
-        self.buffer.iter().filter(|(t, _)| !t.is_trivia()).nth(n).map(|(t, _)| *t)
     }
     fn expect_peek_any(&mut self, allowed_slice: &[SyntaxKind]) -> Option<SyntaxKind> {
         let allowed = TokenSet::from_slice(allowed_slice);
