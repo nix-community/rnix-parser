@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+* Fix absolute path interpolation starting with `/${` failing to parse
+  ([#182](https://github.com/nix-community/rnix-parser/issues/182),
+  from [@imxyy1soope1](https://github.com/imxyy1soope1)).
+
 ### Breaking Changes
 
 * **`__curPos` is now a distinct node type.** `__curPos` is a Nix keyword that evaluates to an
