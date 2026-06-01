@@ -257,10 +257,8 @@ where
     fn parse_dynamic(&mut self) {
         self.start_node(NODE_DYNAMIC);
         self.bump();
-        while self.peek().map(|t| t != TOKEN_INTERPOL_END).unwrap_or(false) {
-            self.parse_expr();
-        }
-        self.bump();
+        self.parse_expr();
+        self.expect(TOKEN_INTERPOL_END);
         self.finish_node();
     }
 
