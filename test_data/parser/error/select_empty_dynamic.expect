@@ -1,0 +1,14 @@
+error: unexpected TOKEN_INTERPOL_END at 5..6, wanted any of [TOKEN_L_PAREN, TOKEN_REC, TOKEN_L_BRACE, TOKEN_L_BRACK, TOKEN_STRING_START, TOKEN_IDENT]
+error: unexpected end of file, wanted any of [TOKEN_INTERPOL_END]
+NODE_ROOT@0..6
+  NODE_SELECT@0..6
+    NODE_ATTR_SET@0..2
+      TOKEN_L_BRACE@0..1 "{"
+      TOKEN_R_BRACE@1..2 "}"
+    TOKEN_DOT@2..3 "."
+    NODE_ATTRPATH@3..6
+      NODE_DYNAMIC@3..6
+        TOKEN_INTERPOL_START@3..5 "${"
+        NODE_ERROR@5..6
+          TOKEN_INTERPOL_END@5..6 "}"
+
