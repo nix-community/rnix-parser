@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+* Fix parser mistakenly allowing empty dynamic attribute selects such as `{}.${}`
+  ([#186](https://github.com/nix-community/rnix-parser/pull/186),
+  from [@Starnick4444](https://github.com/Starnick4444)).
+
 ## [v0.14.0] - 2026-02-16
 
 ### Fixed
