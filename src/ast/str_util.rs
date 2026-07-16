@@ -31,10 +31,8 @@ impl ast::Str {
         let mut n = 0;
         let mut first_is_literal = false;
 
-        let parts: Vec<InterpolPart<StrContent>> = self.parts().collect();
-
         if multiline {
-            for part in &parts {
+            for part in self.parts() {
                 match part {
                     InterpolPart::Interpolation(_) => {
                         if at_start_of_line {
@@ -81,13 +79,14 @@ impl ast::Str {
             }
         }
 
-        let mut normalized_parts = Vec::new();
+        let mut normalized_parts =
+            Vec::with_capacity(if multiline { n } else { self.parts().count() });
         let mut cur_dropped = 0;
         let mut i = 0;
         is_first_literal = true;
         at_start_of_line = true;
 
-        for part in parts {
+        for part in self.parts() {
             match part {
                 InterpolPart::Interpolation(interpol) => {
                     at_start_of_line = false;
@@ -112,7 +111,7 @@ impl ast::Str {
                             }
                         }
 
-                        let mut str = String::new();
+                        let mut str = String::with_capacity(token_text.len());
                         for c in token_text.chars() {
                             if at_start_of_line {
                                 if c == ' ' {
@@ -160,7 +159,7 @@ impl ast::Str {
 
 /// Interpret escape sequences in the nix string and return the converted value
 pub fn unescape(input: &str, multiline: bool) -> String {
-    let mut output = String::new();
+    let mut output = String::with_capacity(input.len());
     let mut input = input.chars().peekable();
     loop {
         match input.next() {
