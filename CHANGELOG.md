@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+* Speed up the tokenizer's path/URI lookahead by tracking the scanned prefix length and
+  underscore presence in a single pass instead of collecting the prefix into a `String`, and
+  speed up `Str::normalized_parts` by iterating string parts directly instead of collecting
+  them into an intermediate `Vec`
+  ([#188](https://github.com/nix-community/rnix-parser/pull/188),
+  from [@NotAShelf](https://github.com/NotAShelf)).
+
 ### Fixed
 
 * Fix parser mistakenly allowing empty dynamic attribute selects such as `{}.${}`
