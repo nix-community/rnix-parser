@@ -307,16 +307,18 @@ impl Tokenizer<'_> {
         } else {
             // Fallback to heuristic previously used for relative, search and URI paths.
             let store_path = self.peek() == Some('<');
-            let skipped = self
-                .remaining()
-                .chars()
-                .take_while(|&c| match c {
+            let remaining = self.remaining();
+            let (skipped_len, contains_underscore) = remaining
+                .char_indices()
+                .take_while(|&(_, c)| match c {
                     '<' | '/' => store_path,
                     _ => is_valid_path_char(c),
                 })
-                .collect::<String>();
+                .fold((0, false), |(_, contains_underscore), (offset, c)| {
+                    (offset + c.len_utf8(), contains_underscore || c == '_')
+                });
 
-            let mut lookahead = self.remaining().chars().skip(skipped.chars().count());
+            let mut lookahead = remaining[skipped_len..].chars();
 
             match (lookahead.next(), lookahead.next()) {
                 // a//b parses as Update(a, b)
@@ -328,7 +330,7 @@ impl Tokenizer<'_> {
                     Some(IdentType::PathRel)
                 }
                 (Some('>'), _) => Some(IdentType::PathSearch),
-                (Some(':'), Some(c)) if is_valid_uri_char(c) && !skipped.contains('_') => {
+                (Some(':'), Some(c)) if is_valid_uri_char(c) && !contains_underscore => {
                     Some(IdentType::Uri)
                 }
                 _ => None,
