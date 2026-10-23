@@ -32,43 +32,42 @@ fn main() -> Result<(), Box<dyn Error>> {
         _ => return Err("root isn't a set".into()),
     };
     for entry in set.entries() {
-        if let ast::Entry::AttrpathValue(attrpath_value) = entry {
-            if let Some(ast::Expr::Lambda(lambda)) = attrpath_value.value() {
-                let attrpath = attrpath_value.attrpath().unwrap();
-                let ident = attrpath.attrs().last().and_then(|attr| match attr {
-                    ast::Attr::Ident(ident) => Some(ident),
-                    _ => None,
-                });
-                let s = ident.as_ref().map_or_else(
-                    || "error".to_string(),
-                    |ident| ident.ident_token().unwrap().text().to_string(),
-                );
-                println!("Function name: {}", s);
+        if let ast::Entry::AttrpathValue(attrpath_value) = entry
+            && let Some(ast::Expr::Lambda(lambda)) = attrpath_value.value()
+        {
+            let attrpath = attrpath_value.attrpath().unwrap();
+            let ident = attrpath.attrs().last().and_then(|attr| match attr {
+                ast::Attr::Ident(ident) => Some(ident),
+                _ => None,
+            });
+            let s = ident.as_ref().map_or_else(
+                || "error".to_string(),
+                |ident| ident.ident_token().unwrap().text().to_string(),
+            );
+            println!("Function name: {}", s);
+            {
+                let comments = comments_before(attrpath_value.syntax());
+                if !comments.is_empty() {
+                    println!("--> Doc: {comments}");
+                }
+            }
+
+            let mut value = Some(lambda);
+            while let Some(lambda) = value {
+                let s = lambda
+                    .param()
+                    .as_ref()
+                    .map_or_else(|| "error".to_string(), |param| param.to_string());
+                println!("-> Param: {}", s);
                 {
-                    let comments = comments_before(attrpath_value.syntax());
+                    let comments = comments_before(lambda.syntax());
                     if !comments.is_empty() {
                         println!("--> Doc: {comments}");
                     }
                 }
-
-                let mut value = Some(lambda);
-                while let Some(lambda) = value {
-                    let s = lambda
-                        .param()
-                        .as_ref()
-                        .map_or_else(|| "error".to_string(), |param| param.to_string());
-                    println!("-> Param: {}", s);
-                    {
-                        let comments = comments_before(lambda.syntax());
-                        if !comments.is_empty() {
-                            println!("--> Doc: {comments}");
-                        }
-                    }
-                    value =
-                        single_match!(lambda.body().unwrap(), ast::Expr::Lambda(lambda) => lambda);
-                }
-                println!();
+                value = single_match!(lambda.body().unwrap(), ast::Expr::Lambda(lambda) => lambda);
             }
+            println!();
         }
     }
 

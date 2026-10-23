@@ -50,10 +50,10 @@ impl ast::Str {
 
                         if is_first_literal && first_is_literal {
                             is_first_literal = false;
-                            if let Some(p) = token_text.find('\n') {
-                                if token_text[0..p].chars().all(|c| c == ' ') {
-                                    token_text = &token_text[p + 1..]
-                                }
+                            if let Some(p) = token_text.find('\n')
+                                && token_text[0..p].chars().all(|c| c == ' ')
+                            {
+                                token_text = &token_text[p + 1..]
                             }
                         }
 
@@ -100,13 +100,13 @@ impl ast::Str {
                     if multiline {
                         if is_first_literal && first_is_literal {
                             is_first_literal = false;
-                            if let Some(p) = token_text.find('\n') {
-                                if token_text[0..p].chars().all(|c| c == ' ') {
-                                    token_text = &token_text[p + 1..];
-                                    if token_text.is_empty() {
-                                        i += 1;
-                                        continue;
-                                    }
+                            if let Some(p) = token_text.find('\n')
+                                && token_text[0..p].chars().all(|c| c == ' ')
+                            {
+                                token_text = &token_text[p + 1..];
+                                if token_text.is_empty() {
+                                    i += 1;
+                                    continue;
                                 }
                             }
                         }
@@ -135,12 +135,11 @@ impl ast::Str {
                             }
                         }
 
-                        if i == n - 1 {
-                            if let Some(p) = str.rfind('\n') {
-                                if str[p + 1..].chars().all(|c| c == ' ') {
-                                    str.truncate(p + 1);
-                                }
-                            }
+                        if i == n - 1
+                            && let Some(p) = str.rfind('\n')
+                            && str[p + 1..].chars().all(|c| c == ' ')
+                        {
+                            str.truncate(p + 1);
                         }
 
                         normalized_parts.push(InterpolPart::Literal(unescape(&str, multiline)));
