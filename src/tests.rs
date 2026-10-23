@@ -30,10 +30,7 @@ fn interpolation() {
         ] if s1 == "The set's x value is: "
             && s2
                 == "\n\nThis line shall have no indention\n  This line shall be indented by 2\n\n\n"
-            && s3 == "\n" =>
-        {
-            ()
-        }
+            && s3 == "\n" => {}
         parts => panic!("did not match: {:#?}", parts),
     }
 }
