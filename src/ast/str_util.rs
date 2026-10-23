@@ -6,7 +6,7 @@ use crate::ast;
 use super::{support::children_tokens_u, AstToken, InterpolPart, StrContent};
 
 impl ast::Str {
-    pub fn parts(&self) -> impl Iterator<Item = InterpolPart<StrContent>> {
+    pub fn parts(&self) -> impl Iterator<Item = InterpolPart<StrContent>> + use<> {
         self.syntax().children_with_tokens().filter_map(|child| match child {
             NodeOrToken::Token(token) if token.kind() == TOKEN_STRING_CONTENT => {
                 Some(InterpolPart::Literal(StrContent::cast(token).unwrap()))
