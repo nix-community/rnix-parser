@@ -5,10 +5,10 @@ use std::{collections::VecDeque, fmt};
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, TextRange, TextSize};
 
 use crate::{
-    tokenizer::Token,
     NixLanguage,
     SyntaxKind::{self, *},
     TokenSet,
+    tokenizer::Token,
 };
 
 /// An error that occurred during parsing

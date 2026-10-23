@@ -1,11 +1,11 @@
 use crate::kinds::SyntaxKind::{TOKEN_PATH_ABS, TOKEN_PATH_HOME, TOKEN_PATH_REL};
 
-use rowan::{ast::AstNode as OtherAstNode, NodeOrToken};
+use rowan::{NodeOrToken, ast::AstNode as OtherAstNode};
 
 pub use super::nodes::Path;
 use super::{
-    nodes::{PathAbs, PathHome, PathRel, PathSearch},
     AstToken, InterpolPart, PathContent,
+    nodes::{PathAbs, PathHome, PathRel, PathSearch},
 };
 use crate::ast;
 
@@ -92,8 +92,8 @@ mod tests {
 
     use super::InterpolPart;
     use crate::{
-        ast::{self, Path},
         Root,
+        ast::{self, Path},
     };
 
     #[test]

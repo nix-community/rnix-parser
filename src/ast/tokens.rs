@@ -1,9 +1,9 @@
 use core::num;
 
 use crate::{
-    ast::AstToken,
     SyntaxKind::{self, *},
     SyntaxToken,
+    ast::AstToken,
 };
 
 macro_rules! token {
@@ -59,9 +59,9 @@ impl Comment {
 
 #[cfg(test)]
 mod tests {
+    use crate::Root;
     use crate::ast;
     use crate::match_ast;
-    use crate::Root;
 
     use super::*;
     use rowan::ast::AstNode;
@@ -157,11 +157,7 @@ impl AstToken for PathContent {
     }
 
     fn cast(from: SyntaxToken) -> Option<Self> {
-        if Self::can_cast(from.kind()) {
-            Some(Self(from))
-        } else {
-            None
-        }
+        if Self::can_cast(from.kind()) { Some(Self(from)) } else { None }
     }
 
     fn syntax(&self) -> &SyntaxToken {

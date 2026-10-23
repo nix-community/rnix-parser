@@ -1,9 +1,9 @@
 use crate::kinds::SyntaxKind::*;
-use rowan::{ast::AstNode as OtherAstNode, NodeOrToken};
+use rowan::{NodeOrToken, ast::AstNode as OtherAstNode};
 
 use crate::ast;
 
-use super::{support::children_tokens_u, AstToken, InterpolPart, StrContent};
+use super::{AstToken, InterpolPart, StrContent, support::children_tokens_u};
 
 impl ast::Str {
     pub fn parts(&self) -> impl Iterator<Item = InterpolPart<StrContent>> + use<> {
@@ -295,7 +295,8 @@ mod tests {
         if let [InterpolPart::Literal(lit)] =
             &ast::Str::normalized_parts(&string_node(txtin.as_str()))[..]
         {
-            assert_eq!(lit,
+            assert_eq!(
+                lit,
                 // Get the below with nix repl
                 "    \n          \nThis is a multiline string :D\n  indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\ntwo single quotes: ''\nthree single quotes: '''\n"
             );

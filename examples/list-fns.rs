@@ -1,8 +1,9 @@
 use std::{env, error::Error, fs};
 
 use rnix::{
+    NodeOrToken, SyntaxNode,
     ast::{self, AstToken, HasEntry},
-    match_ast, NodeOrToken, SyntaxNode,
+    match_ast,
 };
 use rowan::ast::AstNode;
 

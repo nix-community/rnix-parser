@@ -94,10 +94,11 @@ impl Tokenizer<'_> {
     }
 
     fn pop_ctx(&mut self, ctx: Context) {
-        debug_assert!(self
-            .ctx
-            .last()
-            .is_some_and(|c| std::mem::discriminant(c) == std::mem::discriminant(&ctx)));
+        debug_assert!(
+            self.ctx
+                .last()
+                .is_some_and(|c| std::mem::discriminant(c) == std::mem::discriminant(&ctx))
+        );
         self.ctx.pop();
     }
 
@@ -360,11 +361,7 @@ impl Tokenizer<'_> {
                     TOKEN_PATH_HOME
                 } else {
                     // For abs vs rel: If the first char we consumed was '/', it's absolute.
-                    if c == '/' {
-                        TOKEN_PATH_ABS
-                    } else {
-                        TOKEN_PATH_REL
-                    }
+                    if c == '/' { TOKEN_PATH_ABS } else { TOKEN_PATH_REL }
                 };
 
                 // Store the kind in context so subsequent segments are consistent
