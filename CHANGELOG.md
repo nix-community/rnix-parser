@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [v0.15.0] - 2026-10-22
+
 ### Breaking Changes
 
 * **Update `rowan` to 0.17.** `rnix` re-exports `rowan` types (`SyntaxNode`, `TextRange`, etc.),
@@ -204,7 +206,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 * Fixed a memory leak while parsing `inherit`-expressions with invalid syntax (from [@Ma27](https://github.com/Ma27/)).
 
-[Unreleased]: https://github.com/nix-community/rnix-parser/compare/v0.14.0...master
+[Unreleased]: https://github.com/nix-community/rnix-parser/compare/v0.15.0...master
+[v0.15.0]: https://github.com/nix-community/rnix-parser/compare/v0.14.0...v0.15.0
 [v0.14.0]: https://github.com/nix-community/rnix-parser/compare/v0.13.0...v0.14.0
 [v0.13.0]: https://github.com/nix-community/rnix-parser/compare/v0.12.0...v0.13.0
 [v0.12.0]: https://github.com/nix-community/rnix-parser/compare/v0.11.0...v0.12.0
