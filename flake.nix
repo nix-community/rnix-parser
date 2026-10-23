@@ -65,7 +65,7 @@
       rec {
         # `nix develop`
         devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [ rustfmt rustc cargo clippy ];
+          buildInputs = with pkgs; [ rustfmt rustc cargo clippy rust-analyzer ];
         };
 
         # `nix develop .#fuzz` - for running cargo-fuzz
