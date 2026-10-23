@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Breaking Changes
+
+* **Update `rowan` to 0.17.** `rnix` re-exports `rowan` types (`SyntaxNode`, `TextRange`, etc.),
+  so downstream crates must move to `rowan` 0.17 as well
+  ([#189](https://github.com/nix-community/rnix-parser/pull/189),
+  from [@mdaniels5757](https://github.com/mdaniels5757)).
+
 ### Changed
 
 * Speed up the tokenizer's path/URI lookahead by tracking the scanned prefix length and
