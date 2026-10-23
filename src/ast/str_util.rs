@@ -1,12 +1,12 @@
 use crate::kinds::SyntaxKind::*;
-use rowan::{ast::AstNode as OtherAstNode, NodeOrToken};
+use rowan::{NodeOrToken, ast::AstNode as OtherAstNode};
 
 use crate::ast;
 
-use super::{support::children_tokens_u, AstToken, InterpolPart, StrContent};
+use super::{AstToken, InterpolPart, StrContent, support::children_tokens_u};
 
 impl ast::Str {
-    pub fn parts(&self) -> impl Iterator<Item = InterpolPart<StrContent>> {
+    pub fn parts(&self) -> impl Iterator<Item = InterpolPart<StrContent>> + use<> {
         self.syntax().children_with_tokens().filter_map(|child| match child {
             NodeOrToken::Token(token) if token.kind() == TOKEN_STRING_CONTENT => {
                 Some(InterpolPart::Literal(StrContent::cast(token).unwrap()))
@@ -50,10 +50,10 @@ impl ast::Str {
 
                         if is_first_literal && first_is_literal {
                             is_first_literal = false;
-                            if let Some(p) = token_text.find('\n') {
-                                if token_text[0..p].chars().all(|c| c == ' ') {
-                                    token_text = &token_text[p + 1..]
-                                }
+                            if let Some(p) = token_text.find('\n')
+                                && token_text[0..p].chars().all(|c| c == ' ')
+                            {
+                                token_text = &token_text[p + 1..]
                             }
                         }
 
@@ -100,13 +100,13 @@ impl ast::Str {
                     if multiline {
                         if is_first_literal && first_is_literal {
                             is_first_literal = false;
-                            if let Some(p) = token_text.find('\n') {
-                                if token_text[0..p].chars().all(|c| c == ' ') {
-                                    token_text = &token_text[p + 1..];
-                                    if token_text.is_empty() {
-                                        i += 1;
-                                        continue;
-                                    }
+                            if let Some(p) = token_text.find('\n')
+                                && token_text[0..p].chars().all(|c| c == ' ')
+                            {
+                                token_text = &token_text[p + 1..];
+                                if token_text.is_empty() {
+                                    i += 1;
+                                    continue;
                                 }
                             }
                         }
@@ -135,12 +135,11 @@ impl ast::Str {
                             }
                         }
 
-                        if i == n - 1 {
-                            if let Some(p) = str.rfind('\n') {
-                                if str[p + 1..].chars().all(|c| c == ' ') {
-                                    str.truncate(p + 1);
-                                }
-                            }
+                        if i == n - 1
+                            && let Some(p) = str.rfind('\n')
+                            && str[p + 1..].chars().all(|c| c == ' ')
+                        {
+                            str.truncate(p + 1);
                         }
 
                         normalized_parts.push(InterpolPart::Literal(unescape(&str, multiline)));
@@ -295,7 +294,8 @@ mod tests {
         if let [InterpolPart::Literal(lit)] =
             &ast::Str::normalized_parts(&string_node(txtin.as_str()))[..]
         {
-            assert_eq!(lit,
+            assert_eq!(
+                lit,
                 // Get the below with nix repl
                 "    \n          \nThis is a multiline string :D\n  indented by two\n\\'\\'\\'\\'\\\n${ interpolation was escaped }\ntwo single quotes: ''\nthree single quotes: '''\n"
             );

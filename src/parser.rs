@@ -5,10 +5,10 @@ use std::{collections::VecDeque, fmt};
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language, TextRange, TextSize};
 
 use crate::{
-    tokenizer::Token,
     NixLanguage,
     SyntaxKind::{self, *},
     TokenSet,
+    tokenizer::Token,
 };
 
 /// An error that occurred during parsing
@@ -128,10 +128,10 @@ where
     }
 
     fn peek_raw(&mut self) -> Option<&Token<'a>> {
-        if self.buffer.is_empty() {
-            if let Some(token) = self.iter.next() {
-                self.buffer.push_back(token);
-            }
+        if self.buffer.is_empty()
+            && let Some(token) = self.iter.next()
+        {
+            self.buffer.push_back(token);
         }
         self.buffer.front()
     }

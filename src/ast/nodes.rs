@@ -1,6 +1,6 @@
 use crate::{NixLanguage, SyntaxKind, SyntaxKind::*, SyntaxNode, SyntaxToken};
 
-use super::{operators::BinOpKind, support::*, AstNode, UnaryOpKind};
+use super::{AstNode, UnaryOpKind, operators::BinOpKind, support::*};
 use rowan::ast::{AstChildren, AstNode as OtherAstNode};
 
 pub trait HasEntry: AstNode {

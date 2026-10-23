@@ -59,7 +59,9 @@ mod support {
         children_tokens_u(parent).find(|it| it.kind() == kind)
     }
 
-    pub(super) fn children_tokens<N: AstNode, T: AstToken>(parent: &N) -> impl Iterator<Item = T> {
+    pub(super) fn children_tokens<N: AstNode, T: AstToken>(
+        parent: &N,
+    ) -> impl Iterator<Item = T> + use<N, T> {
         parent
             .syntax()
             .children_with_tokens()
@@ -67,7 +69,9 @@ mod support {
             .filter_map(T::cast)
     }
 
-    pub(super) fn children_tokens_u<N: AstNode>(parent: &N) -> impl Iterator<Item = SyntaxToken> {
+    pub(super) fn children_tokens_u<N: AstNode>(
+        parent: &N,
+    ) -> impl Iterator<Item = SyntaxToken> + use<N> {
         parent.syntax().children_with_tokens().filter_map(SyntaxElement::into_token)
     }
 }

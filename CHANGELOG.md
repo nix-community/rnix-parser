@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Breaking Changes
+
+* **Update `rowan` to 0.17.** `rnix` re-exports `rowan` types (`SyntaxNode`, `TextRange`, etc.),
+  so downstream crates must move to `rowan` 0.17 as well
+  ([#189](https://github.com/nix-community/rnix-parser/pull/189),
+  from [@mdaniels5757](https://github.com/mdaniels5757)).
+
+* **Minimum supported Rust version is now 1.88.** The crate moved to the 2024 edition and uses
+  let chains; this is now declared via `rust-version` in `Cargo.toml`.
+
 ### Changed
 
 * Speed up the tokenizer's path/URI lookahead by tracking the scanned prefix length and

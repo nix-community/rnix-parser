@@ -4,8 +4,9 @@ use expect_test::expect_file;
 use rowan::ast::AstNode;
 
 use crate::{
+    Root, SyntaxKind,
     ast::{self, HasEntry},
-    tokenize, Root, SyntaxKind,
+    tokenize,
 };
 
 #[test]
@@ -20,18 +21,18 @@ fn interpolation() {
     let value = ast::Str::try_from(attrpath_value.value().unwrap()).unwrap();
 
     match &*value.normalized_parts() {
-    &[
-        ast::InterpolPart::Literal(ref s1),
-        ast::InterpolPart::Interpolation(_),
-        ast::InterpolPart::Literal(ref s2),
-        ast::InterpolPart::Interpolation(_),
-        ast::InterpolPart::Literal(ref s3)
-    ]
-    if s1 == "The set's x value is: "
-        && s2 == "\n\nThis line shall have no indention\n  This line shall be indented by 2\n\n\n"
-        && s3 == "\n" => (),
-    parts => panic!("did not match: {:#?}", parts)
-}
+        &[
+            ast::InterpolPart::Literal(ref s1),
+            ast::InterpolPart::Interpolation(_),
+            ast::InterpolPart::Literal(ref s2),
+            ast::InterpolPart::Interpolation(_),
+            ast::InterpolPart::Literal(ref s3),
+        ] if s1 == "The set's x value is: "
+            && s2
+                == "\n\nThis line shall have no indention\n  This line shall be indented by 2\n\n\n"
+            && s3 == "\n" => {}
+        parts => panic!("did not match: {:#?}", parts),
+    }
 }
 
 #[test]
