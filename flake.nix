@@ -13,7 +13,7 @@
 
   outputs = { self, nixpkgs, utils, import-cargo, fenix }:
     {
-      overlay = final: prev: let
+      overlays.default = final: prev: let
         target = final.stdenv.hostPlatform.rust.rustcTarget;
         flags = "--release --offline --target ${target}";
         inherit (import-cargo.builders) importCargo;
@@ -49,10 +49,13 @@
           '';
         };
       };
+
+      # Backwards compat
+      overlay = self.overlays.default;
     }
     // utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; overlays = [ self.overlay ]; };
+        pkgs = import nixpkgs { inherit system; overlays = [ self.overlays.default ]; };
         fenixPkgs = fenix.packages.${system};
         nightlyToolchain = fenixPkgs.combine [
           fenixPkgs.minimal.cargo
@@ -79,7 +82,10 @@
         devShell = devShells.default;
 
         packages.rnix-parser = pkgs.rnix-parser;
-        defaultPackage = packages.rnix-parser;
+        packages.default = packages.rnix-parser;
+
+        # Backwards compat
+        defaultPackage = packages.default;
       }
     );
 }
